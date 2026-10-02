@@ -1,0 +1,42 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fragama.Domain", "src\Fragama.Domain\Fragama.Domain.csproj", "{991794FF-0D65-495F-86D7-73F5897A9E7B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fragama.Application", "src\Fragama.Application\Fragama.Application.csproj", "{DE087A0A-3639-4439-BB48-01AA6B5CD4FA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fragama.Infrastructure", "src\Fragama.Infrastructure\Fragama.Infrastructure.csproj", "{148797CF-8D20-4BCE-BD86-487C38FBA64C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fragama.API", "src\Fragama.API\Fragama.API.csproj", "{2E8DB506-21F4-4105-959D-16CC411A8144}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{991794FF-0D65-495F-86D7-73F5897A9E7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{991794FF-0D65-495F-86D7-73F5897A9E7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{991794FF-0D65-495F-86D7-73F5897A9E7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{991794FF-0D65-495F-86D7-73F5897A9E7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DE087A0A-3639-4439-BB48-01AA6B5CD4FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DE087A0A-3639-4439-BB48-01AA6B5CD4FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DE087A0A-3639-4439-BB48-01AA6B5CD4FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DE087A0A-3639-4439-BB48-01AA6B5CD4FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{148797CF-8D20-4BCE-BD86-487C38FBA64C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{148797CF-8D20-4BCE-BD86-487C38FBA64C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{148797CF-8D20-4BCE-BD86-487C38FBA64C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{148797CF-8D20-4BCE-BD86-487C38FBA64C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E8DB506-21F4-4105-959D-16CC411A8144}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E8DB506-21F4-4105-959D-16CC411A8144}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E8DB506-21F4-4105-959D-16CC411A8144}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E8DB506-21F4-4105-959D-16CC411A8144}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {66AFF18C-ECB5-4448-A120-1DEE0DAEED82}
+	EndGlobalSection
+EndGlobal

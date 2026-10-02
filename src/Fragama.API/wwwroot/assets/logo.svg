@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" width="360" height="80">
+  <defs>
+    <linearGradient id="fragamaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="50%" stop-color="#0EA5E9" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6500" />
+      <stop offset="100%" stop-color="#FFA825" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Icono Isotipo: Bodega moderna con gota de pureza / limpieza institucional y engranaje logístico -->
+  <g transform="translate(10, 10)">
+    <!-- Base cubo logístico -->
+    <path d="M 30,6 L 55,19 L 30,33 L 5,19 Z" fill="url(#amberGrad)" />
+    <path d="M 5,21 L 30,35 L 30,58 L 5,44 Z" fill="#0B192C" opacity="0.9" />
+    <path d="M 55,21 L 30,35 L 30,58 L 55,44 Z" fill="#1E3E62" />
+    
+    <!-- Destello de limpieza / brillo impecable -->
+    <path d="M 30,12 C 30,12 36,19 36,23 C 36,27 33,30 30,30 C 27,30 24,27 24,23 C 24,19 30,12 30,12 Z" fill="#FFFFFF" opacity="0.95" />
+    <circle cx="48" cy="14" r="3" fill="#FFFFFF" />
+  </g>
+
+  <!-- Tipografía Corporativa Fragama -->
+  <text x="80" y="36" font-family="'Plus Jakarta Sans', 'Segoe UI', -apple-system, sans-serif" font-weight="900" font-size="25" fill="#0B192C" letter-spacing="1.5">
+    FRAGAMA
+  </text>
+  <text x="82" y="52" font-family="'Plus Jakarta Sans', 'Segoe UI', -apple-system, sans-serif" font-weight="700" font-size="9" fill="#0284C7" letter-spacing="2.2">
+    DISTRIBUIDORA DE LIMPIEZA &amp; DESECHABLES
+  </text>
+  <text x="82" y="64" font-family="'Plus Jakarta Sans', 'Segoe UI', -apple-system, sans-serif" font-weight="600" font-size="8" fill="#FF6500" letter-spacing="1">
+    CARTAGO, COSTA RICA
+  </text>
+</svg>

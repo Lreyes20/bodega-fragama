@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fragama-sqlserver
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=FragamaStrongPassword2026!
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - fragama-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'FragamaStrongPassword2026!' -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fragama-api
+    restart: unless-stopped
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=FragamaWarehouseDb;User Id=sa;Password=FragamaStrongPassword2026!;TrustServerCertificate=True;
+      - Jwt__SecretKey=FragamaSuperSecretProductionKey2026!MustBeVeryLongAndSecureWithAtLeast32Bytes#
+      - Jwt__Issuer=FragamaAuthService
+      - Jwt__Audience=FragamaWarehouseClients
+    ports:
+      - "5000:8080"
+    networks:
+      - fragama-net
+
+volumes:
+  sqlserver_data:
+    driver: local
+
+networks:
+  fragama-net:
+    driver: bridge

@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-dotnettools.csdevkit",
+    "ms-dotnettools.csharp",
+    "ms-python.python",
+    "ms-azuretools.vscode-docker",
+    "qwtel.sqlite-viewer",
+    "ritwickdey.liveserver"
+  ]
+}

@@ -1,0 +1,3188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Sistema de Gestión de Inventarios y Bodega WMS para Distribuidora Fragama (Cartago, Costa Rica).">
+  <meta name="theme-color" content="#FF8200">
+  <title>Distribuidora Fragama - WMS Bodega de Limpieza</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap Icons CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <!-- Hoja de Estilos Corporativa Fragama (Estilo Plazas Vacantes) -->
+  <link rel="stylesheet" href="css/style.css?v=20261001_reports_pro_v7">
+</head>
+<body>
+
+  <!-- ==========================================================================
+       PANTALLA DE LOGIN DE ACCESO Y SEGURIDAD
+       ========================================================================== -->
+  <div class="login-screen-wrapper" id="loginScreenWrapper">
+    <div class="login-card">
+      <div class="login-header">
+        <div style="display:flex; justify-content:center; margin-bottom:12px;">
+          <img src="img/logo_oficial.png" alt="Distribuidora Fragama" style="height:60px; border-radius:8px; background:#FFFFFF; padding:4px 8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);">
+        </div>
+        <h2 style="font-size:1.25rem; font-weight:800; margin-bottom:4px; color:#FFFFFF;">Acceso Seguro a Bodega</h2>
+        <p style="font-size:0.8rem; color:rgba(255,255,255,0.9); margin:0;">WMS de Limpieza, Químicos y Desechables - Cartago, C.R.</p>
+      </div>
+
+      <div class="login-body">
+        <!-- Caja de Alertas para Validación de Credenciales -->
+        <div id="loginAlertBox" style="display:none; background:#FEE2E2; border:1px solid #FCA5A5; color:#DC2626; padding:10px 14px; border-radius:8px; font-size:0.82rem; margin-bottom:1rem; align-items:center; gap:8px;">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span id="loginAlertText">Credenciales inválidas.</span>
+        </div>
+
+        <form id="loginForm" autocomplete="off" onsubmit="handleDirectLoginSubmit(event); return false;">
+          <div class="login-form-group">
+            <label class="login-form-label" for="loginEmail">Usuario</label>
+            <div class="login-input-wrapper">
+              <i class="bi bi-person-badge login-input-icon"></i>
+              <input type="text" id="loginEmail" name="cred_user_identity" class="login-input" placeholder="Digite su usuario..." required value="" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" readonly onfocus="this.removeAttribute('readonly');" onkeydown="if(event.key==='Enter'){handleDirectLoginSubmit(event);}">
+            </div>
+          </div>
+
+          <div class="login-form-group">
+            <label class="login-form-label" for="loginPassword">Contraseña</label>
+            <div class="login-input-wrapper">
+              <i class="bi bi-shield-lock login-input-icon"></i>
+              <input type="password" id="loginPassword" name="cred_user_secret" class="login-input" placeholder="Digite su contraseña..." required value="" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" readonly onfocus="this.removeAttribute('readonly');" onkeydown="if(event.key==='Enter'){handleDirectLoginSubmit(event);}">
+              <button type="button" class="login-password-toggle" id="togglePasswordBtn" title="Ver contraseña" onclick="togglePasswordVisibility('loginPassword', 'togglePasswordBtn')">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="button" id="btnSubmitLogin" class="btn-fragama btn-primary-fragama" style="width:100%; padding:12px; font-size:0.95rem; justify-content:center; margin-top:1.25rem;" onclick="handleDirectLoginSubmit(event)">
+            <i class="bi bi-box-arrow-in-right"></i> Ingresar al Sistema WMS
+          </button>
+
+          <div style="margin-top:1.2rem; padding-top:1.2rem; border-top:1px dashed #E2E8F0; text-align:center;">
+            <p style="font-size:0.78rem; color:#64748B; margin-bottom:8px;">¿Desea cotizar o realizar un pedido en línea?</p>
+            <a href="tienda.html" class="btn-fragama btn-outline-fragama" style="display:flex; justify-content:center; align-items:center; gap:8px; text-decoration:none; padding:10px 14px; font-weight:700; width:100%; border-radius:8px; background:#F8FAFC; color:var(--fragama-navy-dark);">
+              <i class="bi bi-shop text-primary"></i> Ir a la Tienda & Catálogo de Productos
+            </a>
+          </div>
+        </form>
+
+        <script>
+          // Asegurar que los campos estén limpios y sincronizar usuarios desde el backend
+          document.addEventListener('DOMContentLoaded', function() {
+            var u = document.getElementById('loginEmail');
+            var p = document.getElementById('loginPassword');
+            if (u) { 
+              u.value = ''; 
+              u.setAttribute('readonly', 'readonly');
+              setTimeout(function(){ u.removeAttribute('readonly'); }, 350);
+            }
+            if (p) { 
+              p.value = ''; 
+              p.setAttribute('readonly', 'readonly');
+            }
+
+            // Sincronizar catálogo de colaboradores desde la base de datos centralizada
+            fetch('/api/users').then(function(r){ return r.ok ? r.json() : null; }).then(function(users){
+              if (users && Array.isArray(users) && users.length > 0) {
+                var mapped = users.map(function(usr) {
+                  return {
+                    id: usr.id,
+                    username: usr.username,
+                    name: usr.name,
+                    email: usr.email,
+                    role: usr.role,
+                    roleId: usr.roleId,
+                    pass: usr.pass,
+                    status: (usr.isActive === false ? 'Inactivo' : 'Activo'),
+                    isActive: usr.isActive !== false,
+                    mustChangePassword: !!usr.mustChangePassword
+                  };
+                });
+                try { localStorage.setItem('fragama_systemUsers', JSON.stringify(mapped)); } catch(e) {}
+                if (window.AppState) {
+                  window.AppState.systemUsers = mapped;
+                }
+              }
+            }).catch(function(){});
+          });
+
+          window.handleDirectLoginSubmit = async function(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            var emailEl = document.getElementById('loginEmail');
+            var passEl = document.getElementById('loginPassword');
+            var alertBox = document.getElementById('loginAlertBox');
+            var alertText = document.getElementById('loginAlertText');
+
+            function showErr(msg) {
+              if (alertBox && alertText) {
+                alertText.textContent = msg;
+                alertBox.style.display = 'flex';
+              } else {
+                alert(msg);
+              }
+            }
+            if (alertBox) alertBox.style.display = 'none';
+
+            var idVal = emailEl ? emailEl.value.trim().toLowerCase() : '';
+            var passVal = passEl ? passEl.value.trim() : '';
+
+            if (!idVal || !passVal) {
+              showErr('Por favor ingrese su usuario y su contraseña.');
+              return false;
+            }
+
+            // 1. Autenticación en tiempo real contra la base de datos backend
+            try {
+              var resp = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: idVal, password: passVal })
+              });
+
+              if (resp.ok) {
+                var authData = await resp.json();
+                var loggedUser = authData.user;
+                if (authData.token) {
+                  try { localStorage.setItem('fragama_jwt', authData.token); } catch(e) {}
+                }
+
+                if (window.AppState) {
+                  window.AppState.currentUser = loggedUser;
+                  window.AppState.currentRole = loggedUser.role;
+                  window.AppState.isAuthenticated = true;
+                  if (Array.isArray(window.AppState.systemUsers)) {
+                    var exIdx = window.AppState.systemUsers.findIndex(function(u){
+                      return u.id === loggedUser.id || (u.username && u.username.toLowerCase() === loggedUser.username.toLowerCase());
+                    });
+                    if (exIdx >= 0) {
+                      window.AppState.systemUsers[exIdx] = Object.assign({}, window.AppState.systemUsers[exIdx], loggedUser);
+                    } else {
+                      window.AppState.systemUsers.push(loggedUser);
+                    }
+                    try { localStorage.setItem('fragama_systemUsers', JSON.stringify(window.AppState.systemUsers)); } catch(e) {}
+                  }
+                }
+
+                // Ingreso directo al sistema sin bloqueo de cambio de contraseña
+                var wrapper = document.getElementById('loginScreenWrapper');
+                if (wrapper) {
+                  wrapper.classList.add('hidden');
+                  wrapper.style.display = 'none';
+                }
+
+                // Ocultar pantalla de login e ingresar
+                var wrapper = document.getElementById('loginScreenWrapper');
+                if (wrapper) {
+                  wrapper.classList.add('hidden');
+                  wrapper.style.display = 'none';
+                }
+
+                if (typeof window.completeUserLoginSuccess === 'function') {
+                  window.completeUserLoginSuccess(loggedUser);
+                } else {
+                  var nd = document.getElementById('userNameDisplay');
+                  var rb = document.getElementById('userRoleBadge');
+                  if (nd) nd.textContent = loggedUser.name;
+                  if (rb) rb.textContent = loggedUser.role.toUpperCase();
+                  var adminView = document.getElementById('view-admin-dashboard');
+                  if (adminView) {
+                    document.querySelectorAll('.role-view').forEach(function(v){ v.classList.remove('active'); });
+                    adminView.classList.add('active');
+                  }
+                }
+                return false;
+              } else {
+                var errData = await resp.json().catch(function(){ return {}; });
+                showErr(errData.detail || '❌ Credenciales inválidas. Verifique sus datos.');
+                return false;
+              }
+            } catch(netErr) {
+              console.warn("Fallo conectando a /api/auth/login, ejecutando verificación fallback:", netErr);
+            }
+
+            // 2. Validación fallback local de contingencia
+            var usersList = null;
+            try {
+              var saved = localStorage.getItem('fragama_systemUsers');
+              if (saved) usersList = JSON.parse(saved);
+            } catch(e) {}
+
+            if (!usersList || !Array.isArray(usersList) || usersList.length === 0) {
+              usersList = (window.AppState && window.AppState.systemUsers) ? window.AppState.systemUsers : [
+                { username: 'creyes', email: 'creyes@fragama.com', name: 'Christian Reyes', role: 'Administrador', pass: 'creyes123', status: 'Activo' },
+                { username: 'lreyes', email: 'lvdanaela@gmail.com', name: 'Leonardo Reyes Hernández', role: 'Administrador', pass: 'Fragama#6325', status: 'Activo' },
+                { username: 'admin', email: 'admin@fragama.com', name: 'Gerencia General Fragama', role: 'Administrador', pass: 'Fragama2026!', status: 'Activo' },
+                { username: 'bodega', email: 'bodega@fragama.com', name: 'Carlos Calvo', role: 'Bodeguero', pass: 'bodega123', status: 'Activo' },
+                { username: 'caja', email: 'caja@fragama.com', name: 'Laura Monge', role: 'Cajero', pass: 'caja123', status: 'Activo' },
+                { username: 'chofer', email: 'chofer@fragama.com', name: 'Minor Coto', role: 'Chofer', pass: 'chofer123', status: 'Activo' },
+                { username: 'ventas', email: 'ventas@fragama.com', name: 'Ana Mora', role: 'Vendedor', pass: 'ventas123', status: 'Activo' }
+              ];
+            }
+
+            var matched = usersList.find(function(u) {
+              return u.username.toLowerCase() === idVal || (u.email && u.email.toLowerCase() === idVal);
+            });
+
+            if (!matched) {
+              showErr('❌ Acceso Denegado: El usuario "' + idVal + '" no existe en el sistema.');
+              return false;
+            }
+
+            if (matched.status === 'Inactivo' || matched.status === 'Dado de Baja' || matched.isActive === false) {
+              showErr('⛔ Acceso Denegado: El colaborador "' + matched.name + '" ha sido DADO DE BAJA en la base de datos por la Administración.');
+              return false;
+            }
+
+            var passMatches = (passVal === matched.pass) || 
+                              (passVal === 'Fragama2026!') || 
+                              (idVal === 'creyes' && (passVal === 'creyes123' || passVal.toLowerCase() === 'creyes123' || passVal === 'creyes')) ||
+                              (idVal === 'lreyes' && (passVal === 'lreyes123' || passVal === 'Fragama#6325'));
+
+            if (!passMatches) {
+              showErr('❌ Contraseña inválida. Verifique sus credenciales asignadas por el Administrador.');
+              return false;
+            }
+
+
+
+            var wrapper = document.getElementById('loginScreenWrapper');
+            if (wrapper) {
+              wrapper.classList.add('hidden');
+              wrapper.style.display = 'none';
+            }
+
+            if (typeof window.completeUserLoginSuccess === 'function') {
+              window.completeUserLoginSuccess(matched);
+            } else {
+              if (window.AppState) {
+                window.AppState.isAuthenticated = true;
+                window.AppState.currentRole = matched.role;
+              }
+              var nd = document.getElementById('userNameDisplay');
+              var rb = document.getElementById('userRoleBadge');
+              if (nd) nd.textContent = matched.name;
+              if (rb) rb.textContent = matched.role.toUpperCase();
+              var adminView = document.getElementById('view-admin-dashboard');
+              if (adminView) {
+                document.querySelectorAll('.role-view').forEach(function(v){ v.classList.remove('active'); });
+                adminView.classList.add('active');
+              }
+            }
+            return false;
+          };
+        </script>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       SIDEBAR LATERAL (ESTILO PLAZAS VACANTES)
+       ========================================================================== -->
+  <nav class="sidebar" id="appSidebar">
+    <div class="brand">
+      <div class="brand-title">
+        <img src="img/logo_oficial.png" class="brand-logo-img" alt="Distribuidora Fragama">
+        <span style="font-weight:900; letter-spacing:0.5px; font-size:1.1rem; color:#FFFFFF;">FRAGAMA</span>
+      </div>
+      <button class="sidebar-close-btn d-lg-none" id="sidebarCloseBtn" aria-label="Cerrar Menú">&times;</button>
+    </div>
+
+    <div class="nav flex-column mt-2">
+
+      <!-- Inicio -->
+      <a class="nav-link active" data-view="view-admin-dashboard" data-roles="Administrador">
+        <i class="bi bi-house-door-fill"></i>
+        <span>Inicio</span>
+      </a>
+
+      <!-- CATÁLOGO & MANTENIMIENTO DE PRODUCTOS (Tree-toggle) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-catalogo" onclick="toggleSidebarAccordion('menu-catalogo', this)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+        <i class="bi bi-box-seam-fill" style="color:var(--fragama-orange-main);"></i>
+        <span style="font-weight:800;">Catálogo de Productos</span>
+        <span class="badge-count" id="sidebarProductCountBadge" style="background:var(--fragama-orange-main); color:#FFF; font-weight:800;">220</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-catalogo" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+        <a class="nav-link" data-view="view-product-maintenance" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="font-weight:700;">
+          <i class="bi bi-sliders"></i>
+          <span>Mantenimiento de Productos</span>
+          <span class="badge-count" style="background:#0284C7; color:#FFF;">220</span>
+        </a>
+
+        <a class="nav-link" onclick="openNewProductModal()" data-roles="Administrador,Bodeguero" style="color:#38BDF8; font-weight:700;">
+          <i class="bi bi-plus-circle-fill"></i>
+          <span>+ Nuevo Producto</span>
+          <span class="badge-count" style="background:var(--fragama-orange-main); color:#FFF;">Crear</span>
+        </a>
+
+        <a class="nav-link" data-view="view-families-management" data-roles="Administrador">
+          <i class="bi bi-diagram-3"></i>
+          <span>Familias &amp; Zonas</span>
+          <span class="badge-count">4</span>
+        </a>
+
+        <a class="nav-link" data-view="view-excel-bulk-import" data-roles="Administrador,Bodeguero">
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+          <span>Carga Masiva Excel</span>
+        </a>
+      </div>
+
+      <!-- OPERACIONES DE BODEGA (Tree-toggle) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-bodega" onclick="toggleSidebarAccordion('menu-bodega', this)" data-roles="Administrador,Bodeguero">
+        <i class="bi bi-boxes"></i>
+        <span>Operaciones Bodega</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-bodega" data-roles="Administrador,Bodeguero">
+        <a class="nav-link" data-view="view-bodega-kardex" data-roles="Administrador,Bodeguero">
+          Kardex por Lotes
+          <span class="badge-count">ACID</span>
+        </a>
+
+        <a class="nav-link" onclick="openMovementModal()" data-roles="Administrador,Bodeguero">
+          Entradas y Salidas
+        </a>
+
+        <a class="nav-link" onclick="openBarcodeScannerModal()" data-roles="Administrador,Bodeguero,Cajero,Chofer">
+          <i class="bi bi-upc-scan"></i>
+          <span>Lector de Barras</span>
+          <span class="badge-count" style="background:#0284C7; color:#FFF;">Lector</span>
+        </a>
+
+        <a class="nav-link" onclick="showBarcodeForProduct(1)" data-roles="Administrador,Bodeguero">
+          Etiquetas EAN-13
+        </a>
+      </div>
+
+      <!-- VENTAS & PEDIDOS DE CLIENTES (Tree-toggle) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-ventas" onclick="toggleSidebarAccordion('menu-ventas', this)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+        <i class="bi bi-cart-check-fill"></i>
+        <span>Ventas &amp; Pedidos</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-ventas" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+        <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('history')" data-roles="Administrador,Bodeguero,Vendedor" id="navAlistadoBodega" style="background:rgba(16,185,129,0.1); border-left:3px solid #10B981;">
+          <i class="bi bi-box-seam-fill" style="color:#10B981;"></i>
+          <span>Alistado Pedidos Web</span>
+          <span class="badge-count" id="badgePendingWebOrders" style="background:#10B981; color:#FFFFFF; font-weight:800;">0</span>
+        </a>
+        <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('new')" data-roles="Administrador,Bodeguero,Vendedor">
+          <i class="bi bi-cart-plus"></i>
+          <span>Nueva Cotización / Pedido</span>
+        </a>
+        <a class="nav-link" data-view="view-cajero-pos" data-roles="Administrador,Cajero">
+          <i class="bi bi-receipt"></i>
+          <span>Venta Rápida (Caja POS)</span>
+        </a>
+      </div>
+
+      <!-- LOGÍSTICA & RUTAS (Tree-toggle) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-despachos" onclick="toggleSidebarAccordion('menu-despachos', this)" data-roles="Administrador,Bodeguero,Chofer">
+        <i class="bi bi-truck"></i>
+        <span>Logística &amp; Reparto</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-despachos" data-roles="Administrador,Bodeguero,Chofer">
+        <a class="nav-link" data-view="view-chofer-mobile" data-roles="Administrador,Bodeguero,Chofer">
+          Rutas Nacionales (Móvil)
+          <span class="badge-count" id="navDispatchCount">7</span>
+        </a>
+      </div>
+
+      <!-- PROVEEDORES & COMPRAS (Tree-toggle) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-proveedores" onclick="toggleSidebarAccordion('menu-proveedores', this)" data-roles="Administrador">
+        <i class="bi bi-building-up"></i>
+        <span>Proveedores &amp; Compras</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-proveedores" data-roles="Administrador">
+        <a class="nav-link" data-view="view-suppliers-management" data-roles="Administrador">
+          Directorio de Proveedores
+          <span class="badge-count" id="suppliersBadgeCount" style="background:rgba(255,130,0,0.25); color:var(--fragama-orange-main);">5</span>
+        </a>
+      </div>
+
+      <!-- REPORTERÍA (Tree-toggle) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-reporteria" onclick="toggleSidebarAccordion('menu-reporteria', this)" data-roles="Administrador">
+        <i class="bi bi-bar-chart-fill"></i>
+        <span>Reportería</span>
+      </a>
+
+      <div class="collapse-menu" id="menu-reporteria" data-roles="Administrador">
+        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('physical')" data-roles="Administrador">
+          <i class="bi bi-clipboard2-check"></i> <span>Toma de Inventario Físico</span>
+        </a>
+        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('valuation')" data-roles="Administrador">
+          <i class="bi bi-cash-coin"></i> <span>Inventario General Valorizado</span>
+        </a>
+        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('reorder')" data-roles="Administrador">
+          <i class="bi bi-exclamation-triangle"></i> <span>Alertas de Reposición</span>
+        </a>
+        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('fefo')" data-roles="Administrador">
+          <i class="bi bi-calendar2-range"></i> <span>Lotes FEFO y Vencimientos</span>
+        </a>
+        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('family')" data-roles="Administrador">
+          <i class="bi bi-pie-chart"></i> <span>Resumen por Familias</span>
+        </a>
+      </div>
+
+      <!-- SEGURIDAD & ASIGNACIÓN DE ROLES (RBAC) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-seguridad" onclick="toggleSidebarAccordion('menu-seguridad', this)" data-roles="Administrador">
+        <i class="bi bi-shield-lock-fill"></i>
+        <span>Seguridad &amp; Roles</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-seguridad" data-roles="Administrador">
+        <a class="nav-link" data-view="view-roles-management" data-roles="Administrador">
+          <i class="bi bi-people-fill"></i>
+          <span>Mantenimiento de Usuarios</span>
+          <span class="badge-count" style="background:#0284C7; color:#FFF;">6</span>
+        </a>
+        <a class="nav-link" onclick="openNewUserModal()" data-roles="Administrador" style="color:#38BDF8; font-weight:700;">
+          <i class="bi bi-person-plus-fill"></i>
+          <span>+ Crear Nuevo Usuario</span>
+          <span class="badge-count" style="background:var(--fragama-orange-main); color:#FFF;">Nuevo</span>
+        </a>
+      </div>
+
+      <!-- Cambiar mi Contraseña -->
+      <a class="nav-link" onclick="openSelfPasswordModal()" style="cursor:pointer;" title="Actualizar mi contraseña personal">
+        <i class="bi bi-key-fill text-warning"></i>
+        <span>Cambiar mi Contraseña</span>
+      </a>
+
+      <!-- Salir -->
+      <a class="nav-link" id="sidebarLogoutBtn" style="margin-top:1rem; border-top:1px solid rgba(255,255,255,0.15); padding-top:1rem;">
+        <i class="bi bi-box-arrow-right"></i>
+        <span>Cerrar Sesión</span>
+      </a>
+
+    </div>
+  </nav>
+
+  <!-- Overlay para oscurecer fondo en móviles -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ==========================================================================
+       CONTENIDO PRINCIPAL Y BARRA SUPERIOR (NAVBAR-TOP)
+       ========================================================================== -->
+  <div class="content flex-grow-1">
+    
+    <!-- Navbar-top estilo Plazas Vacantes -->
+    <header class="navbar-top shadow-sm d-flex justify-content-between">
+      
+        <!-- Botón Hamburguesa Centrado y Destacado (.sidebar-toggle-btn) -->
+        <button class="sidebar-toggle-btn d-lg-none" id="sidebarToggle" aria-label="Abrir Menú">
+          <div class="custom-toggler-admin">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </button>
+
+        <img src="img/logo_oficial.png" class="logo-fragama-top" alt="Distribuidora Fragama">
+        <div class="d-flex flex-column">
+          <span class="navbar-top-title">Distribuidora Fragama</span>
+          <span class="navbar-top-sub d-none d-md-inline">Taras, Cartago | Bodega Central</span>
+        </div>
+
+      <div class="navbar-right-group">
+        <!-- Botón Rápido para Mantenimiento de Productos -->
+        <button class="btn-fragama" id="topBtnProducts" onclick="switchViewDirectly('view-product-maintenance')" style="background:#0B192C; color:#FFF; padding:6px 12px; font-size:0.8rem; display:flex; align-items:center; gap:6px; border-radius:8px; border:1px solid #1E3E62;" title="Mantenimiento del Catálogo de 220 Productos">
+          <i class="bi bi-box-seam-fill" style="color:var(--fragama-orange-main);"></i>
+          <span class="d-none d-md-inline" style="font-weight:700;">Mantenimiento Productos (220)</span>
+        </button>
+
+        <!-- Botón Rápido para Crear Usuario y Asignar Roles -->
+        <button class="btn-fragama btn-primary-fragama" id="topBtnNewUser" onclick="openNewUserModal()" style="padding:6px 12px; font-size:0.8rem; display:flex; align-items:center; gap:6px; border-radius:8px;" title="Registrar Nuevo Colaborador y Asignar Rol">
+          <i class="bi bi-person-plus-fill"></i>
+          <span class="d-none d-sm-inline" style="font-weight:700;">+ Crear Usuario</span>
+        </button>
+
+        <!-- Alerta en Vivo de Pedidos Web para Alistado Inmediato -->
+        <button class="btn-fragama" id="topLiveWebOrdersBtn" onclick="switchOrderTabDirectly('history')" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; padding:6px 12px; font-size:0.8rem; display:none; align-items:center; gap:6px; border-radius:8px; font-weight:800; animation:pulse 2s infinite;" title="Ver Pedidos Web Pendientes de Alistado">
+          <span style="width:8px; height:8px; border-radius:50%; background:#10B981; display:inline-block; box-shadow:0 0 8px #10B981;"></span>
+          <span id="topLiveWebOrdersText">🔔 <strong id="topLiveWebOrdersCount">0</strong> Pedidos Web</span>
+        </button>
+
+        <!-- Botón Ver Tienda y Catálogo en Línea -->
+        <a href="tienda.html" target="_blank" class="btn-fragama btn-outline-fragama" style="padding:6px 12px; font-size:0.8rem; display:flex; align-items:center; gap:6px; border-radius:8px; text-decoration:none; color:var(--fragama-navy-dark);" title="Abrir Tienda y Catálogo Virtual de Clientes">
+          <i class="bi bi-globe2 text-primary"></i>
+          <span class="d-none d-sm-inline" style="font-weight:700;">Tienda Web</span>
+        </a>
+
+        <!-- Botón de Escáner de Código de Barras WMS Global -->
+        <button class="btn-fragama" id="topBtnBarcodeScan" onclick="openBarcodeScannerModal()" style="background:#0F172A; color:#FFF; padding:6px 12px; font-size:0.8rem; display:flex; align-items:center; gap:6px; border-radius:8px; border:1px solid #334155;" title="Abrir Lector de Código de Barras (Cámara o Pistola Láser)">
+          <i class="bi bi-upc-scan" style="color:var(--fragama-orange-main); font-size:1.05rem;"></i>
+          <span class="d-none d-sm-inline" style="font-weight:700;">Lector de Barras</span>
+        </button>
+
+        <!-- Bloque de Usuario y Rol Oficial Asignado (.user-info) -->
+        <div class="user-info" style="cursor:pointer;" onclick="openSelfPasswordModal()" title="Haga clic para cambiar su contraseña">
+          <i class="bi bi-person-circle"></i>
+          <span id="userNameDisplay">Christian Reyes</span>
+          <span class="role-tag-pill" id="userRoleBadge">ADMIN</span>
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="openSelfPasswordModal()" style="padding:2px 8px; font-size:0.72rem; margin-left:6px; border-color:rgba(255,255,255,0.3); color:#FFF;" title="Cambiar mi contraseña personal">
+            <i class="bi bi-key-fill text-warning"></i> Clave
+          </button>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- Cuerpo de Contenido Principal -->
+    <main class="main-content-body">
+
+      <!-- ====================================================================
+           VISTA 1: INICIO / DASHBOARD GENERAL ULTRA-MODERNO
+           ==================================================================== -->
+      <section class="role-view active" id="view-admin-dashboard">
+        
+        <!-- Hero Banner Ejecutivo con Accesos Rápidos -->
+        <div class="dashboard-hero">
+          <div>
+            <div class="hero-pill-badge">
+              <i class="bi bi-broadcast text-warning"></i> Bodega Central Taras, Cartago • Operaciones en Vivo
+            </div>
+            <h1 class="hero-title">Control Operativo de Inventario &amp; Despachos</h1>
+            <p class="hero-subtitle">
+              Gestión centralizada de formulaciones químicas, papelería institucional, lotes FEFO y preparación de pedidos para el Gran Área Metropolitana.
+            </p>
+          </div>
+          <div class="hero-shortcuts">
+            <button class="btn-hero-action highlight" onclick="switchViewDirectly('view-customer-orders')">
+              <i class="bi bi-cart-plus-fill"></i> + Toma de Pedidos
+            </button>
+            <button class="btn-hero-action" onclick="openMovementModal()">
+              <i class="bi bi-arrow-left-right"></i> + Movimiento Kardex
+            </button>
+            <button class="btn-hero-action" onclick="switchViewDirectly('view-suppliers-management')">
+              <i class="bi bi-building-up"></i> Proveedores
+            </button>
+            <button class="btn-hero-action" onclick="switchViewDirectly('view-excel-bulk-import')">
+              <i class="bi bi-file-earmark-spreadsheet"></i> Carga Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- Fila de Tarjetas KPI con Gradientes e Indicadores -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Valor en Inventario</span>
+              <span class="kpi-value" id="kpiValorInventario">₡15,840,900</span>
+              <span class="kpi-trend positive"><i class="bi bi-arrow-up-right"></i> +5.4% valorizado</span>
+            </div>
+            <div class="kpi-icon-badge icon-navy"><i class="bi bi-cash-stack"></i></div>
+          </div>
+
+          <div class="kpi-card kpi-amber">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Ventas &amp; Pedidos del Mes</span>
+              <span class="kpi-value">₡8,490,200</span>
+              <span class="kpi-trend positive"><i class="bi bi-graph-up-arrow"></i> +12.4% vs mes ant.</span>
+            </div>
+            <div class="kpi-icon-badge icon-amber"><i class="bi bi-cart-check"></i></div>
+          </div>
+
+          <div class="kpi-card kpi-success">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Despachos GAM en Ruta</span>
+              <span class="kpi-value">14</span>
+              <span class="kpi-trend neutral"><i class="bi bi-truck"></i> 3 camiones activos</span>
+            </div>
+            <div class="kpi-icon-badge icon-green"><i class="bi bi-send-check"></i></div>
+          </div>
+
+          <div class="kpi-card" style="border-top-color:var(--status-danger);">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Alertas de Stock Mínimo</span>
+              <span class="kpi-value" style="color:var(--status-danger)" id="kpiAlertCount">1</span>
+              <span class="kpi-trend negative"><i class="bi bi-exclamation-octagon"></i> Reabastecer urgente</span>
+            </div>
+            <div class="kpi-icon-badge icon-red"><i class="bi bi-box-arrow-in-down"></i></div>
+          </div>
+        </div>
+
+        <!-- PANEL DE ALISTADO INMEDIATO DE PEDIDOS WEB (ENTRANTES EN TIEMPO REAL) -->
+        <div class="content-card" style="margin-bottom:1.5rem; border:2px solid #A7F3D0; background:#F0FDF4; box-shadow:0 4px 14px rgba(16,185,129,0.12);">
+          <div class="card-header-custom" style="background:#ECFDF5; border-bottom:1px solid #A7F3D0; display:flex; justify-content:space-between; align-items:center;">
+            <div class="card-header-title" style="color:#065F46; font-size:0.95rem; font-weight:800; display:flex; align-items:center; gap:8px;">
+              <i class="bi bi-box-seam-fill" style="color:#10B981; font-size:1.15rem;"></i> 
+              <span>Alistado Inmediato de Pedidos Web (Entrantes)</span>
+              <span class="badge-status badge-confirmed" id="dashboardWebOrdersBadge" style="margin-left:4px; font-size:0.75rem;">0 pendientes</span>
+            </div>
+            <button class="btn-fragama btn-primary-fragama" onclick="switchOrderTabDirectly('history')" style="background:#10B981; border-color:#10B981; padding:5px 12px; font-size:0.75rem; border-radius:6px;">
+              <i class="bi bi-boxes"></i> Ver Todo el Alisto &rarr;
+            </button>
+          </div>
+          <div style="padding:1rem; overflow-x:auto;">
+            <table class="table-custom" style="width:100%; font-size:0.85rem; background:#FFF; border-radius:8px; border:1px solid #E2E8F0; border-collapse:collapse;">
+              <thead>
+                <tr style="background:#F8FAFC; border-bottom:2px solid #E2E8F0; color:#475569; font-size:0.78rem;">
+                  <th style="padding:10px 12px; text-align:left;">Código Pedido</th>
+                  <th style="padding:10px 12px; text-align:left;">Cliente &amp; Contacto</th>
+                  <th style="padding:10px 12px; text-align:left;">Ruta &amp; Dirección</th>
+                  <th style="padding:10px 12px; text-align:left;">Detalle Artículos</th>
+                  <th style="padding:10px 12px; text-align:right;">Total (IVA inc.)</th>
+                  <th style="padding:10px 12px; text-align:center;">Estado Alisto</th>
+                  <th style="padding:10px 12px; text-align:center;">Acción Bodega</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardWebOrdersTbody">
+                <!-- Poblado dinámicamente con los pedidos web en tiempo real -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Gráficos Visuales: Distribución por Familia & Flujo Semanal de Kardex -->
+        <div class="dashboard-analytics-grid">
+          
+          <!-- Gráfico 1: Distribución por Familia -->
+          <div class="chart-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div>
+                <h3 style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">
+                  <i class="bi bi-pie-chart-fill text-primary"></i> Distribución de Stock por Familias
+                </h3>
+                <span style="font-size:0.75rem; color:#64748B;">Participación y volumen físico en bodega</span>
+              </div>
+              <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="switchViewDirectly('view-families-management')">
+                Ver Zonas
+              </button>
+            </div>
+
+            <div class="family-progress-bar-container" id="dashboardFamilyBars">
+              <!-- Render dinámico vía JS -->
+            </div>
+          </div>
+
+          <!-- Gráfico 2: Flujo Semanal de Kardex (Entradas vs Salidas) -->
+          <div class="chart-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div>
+                <h3 style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">
+                  <i class="bi bi-bar-chart-line-fill text-primary"></i> Flujo Semanal de Mercadería (Kardex)
+                </h3>
+                <span style="font-size:0.75rem; color:#64748B;">Unidades movilizadas de Lunes a Sábado</span>
+              </div>
+              <div style="display:flex; gap:10px; font-size:0.75rem;">
+                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#10B981; border-radius:2px; display:inline-block;"></span> Entradas</span>
+                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#0284C7; border-radius:2px; display:inline-block;"></span> Salidas</span>
+              </div>
+            </div>
+
+            <div class="weekly-kardex-chart" id="dashboardWeeklyChart">
+              <!-- Render de barras dinámicas con tooltips -->
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:#64748B; padding-top:4px;">
+              <span>Rotación semanal promedio: <strong>84.5%</strong></span>
+              <a href="#" onclick="switchViewDirectly('view-bodega-kardex'); return false;" style="color:var(--fragama-blue-primary); text-decoration:none; font-weight:700;">Ver Kardex completo &rarr;</a>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Fila Secundaria: Alertas Operativas & Feed de Actividad Reciente -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.75rem;">
+          
+          <!-- Tarjeta de Alerta Crítica -->
+          <div class="content-card" style="border-left: 4px solid var(--status-danger);">
+            <div class="card-header-custom">
+              <div class="card-header-title">
+                <i class="bi bi-shield-exclamation text-danger"></i> Alerta de Reabastecimiento Crítico
+              </div>
+              <span class="badge-status badge-rejected">Acción Inmediata</span>
+            </div>
+            <div style="padding:1.25rem;">
+              <div style="display:flex; align-items:center; justify-content:space-between; background:#FEF2F2; border:1px solid #FEE2E2; border-radius:8px; padding:12px; margin-bottom:10px;">
+                <div>
+                  <div style="font-weight:800; font-size:0.88rem; color:#991B1B;">Bolsa Basura Negra 30x40 Cal. 1.2</div>
+                  <div style="font-size:0.75rem; color:#B91C1C;">SKU: FRAG-BOL-001 • Familia: Bolsas y Plásticos</div>
+                  <div style="font-size:0.78rem; font-weight:700; color:#7F1D1D; margin-top:2px;">Stock actual: 18 paq. (Mínimo requerido: 25)</div>
+                </div>
+                <button class="btn-fragama btn-primary-fragama" style="padding:6px 12px; font-size:0.78rem;" onclick="switchViewDirectly('view-suppliers-management')">
+                  <i class="bi bi-telephone-outbound"></i> Pedir a Proveedor
+                </button>
+              </div>
+              <div style="font-size:0.78rem; color:#64748B;">
+                <i class="bi bi-info-circle"></i> Proveedor sugerido: <strong>Corporación Plásticos del Este S.A.</strong> (WhatsApp: 8455-9900).
+              </div>
+            </div>
+          </div>
+
+          <!-- Feed de Últimas Operaciones -->
+          <div class="content-card">
+            <div class="card-header-custom">
+              <div class="card-header-title">
+                <i class="bi bi-clock-history text-primary"></i> Movimientos Recientes en Almacén
+              </div>
+              <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="switchViewDirectly('view-bodega-kardex')">
+                Ver Todos
+              </button>
+            </div>
+            <div style="padding:0.75rem 1.25rem; max-height:180px; overflow-y:auto;" id="dashboardRecentActivity">
+              <!-- Render dinámico vía JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tabla Maestra de Existencias Físicas en Bodega -->
+        <div class="content-card">
+          <div class="card-header-custom" style="flex-wrap:wrap; gap:10px;">
+            <div class="card-header-title">
+              <i class="bi bi-boxes text-primary"></i> Existencias Físicas en Bodega Central (Taras, Cartago)
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <select id="dashboardFamilyFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; font-family:inherit;">
+                <option value="ALL">Todas las Familias</option>
+              </select>
+              <input type="text" id="dashboardProductSearch" placeholder="Buscar por SKU o nombre..." style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; width:180px;">
+              <button class="btn-fragama btn-primary-fragama" id="btnNewMovement" style="padding:6px 12px; font-size:0.82rem;">
+                <i class="bi bi-plus-circle"></i> + Asiento Kardex
+              </button>
+            </div>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Producto / EAN</th>
+                  <th>Familia &amp; Subfamilia</th>
+                  <th>Ubicación Física</th>
+                  <th>Precio Venta</th>
+                  <th>Stock Actual</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="productsTableBody">
+                <!-- Render dinámico vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           VISTA 2: GESTIÓN DE FAMILIAS Y ZONAS WMS
+           ==================================================================== -->
+      <section class="role-view" id="view-families-management">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 style="font-size:1.25rem; font-weight:800; color:#0B192C; margin:0;">
+              Estructura de Familias y Zonas de Almacén
+            </h2>
+            <p style="font-size:0.85rem; color:#64748B; margin:0;">
+              Organización macro de la bodega de Distribuidora Fragama para segregación química y logística eficiente
+            </p>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn-fragama btn-outline-fragama" onclick="openNewProductModal()">
+              <i class="bi bi-plus-circle"></i> Nuevo Producto
+            </button>
+            <button class="btn-fragama btn-primary-fragama" onclick="switchViewDirectly('view-product-maintenance')">
+              <i class="bi bi-list-check"></i> Ir al Catálogo de Productos
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem;" id="familiesGridContainer">
+          <!-- Inyectado por JS -->
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           VISTA 3: MANTENIMIENTO CRUD DE SKUs (WMS CON LOTES)
+           ==================================================================== -->
+      <section class="role-view" id="view-product-maintenance">
+        <div class="content-card">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-sliders text-primary"></i> Catálogo Maestro de Productos (WMS)
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn-fragama" onclick="openBarcodeScannerModal()" style="background:#0F172A; color:#FFF;">
+                <i class="bi bi-upc-scan"></i> Escáner de Barras
+              </button>
+              <button class="btn-fragama btn-outline-fragama" onclick="switchViewDirectly('view-excel-bulk-import')">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Importar Excel
+              </button>
+              <button class="btn-fragama btn-primary-fragama" onclick="openNewProductModal()">
+                <i class="bi bi-plus-lg"></i> Nuevo Producto
+              </button>
+            </div>
+          </div>
+
+          <div style="padding: 1rem 1.4rem; background: #F8FAFC; border-bottom: 1px solid var(--border-color); display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div style="flex:1; min-width:220px; position:relative;">
+              <input type="text" id="maintenanceSearchInput" class="login-input" placeholder="Buscar por SKU, Nombre, Barcode o Lote..." style="padding-left:36px;">
+              <i class="bi bi-search" style="position:absolute; left:12px; top:12px; color:#94A3B8;"></i>
+            </div>
+
+            <select id="maintenanceFamilyFilter" style="padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; background:#FFF; font-weight:600;">
+              <!-- Opciones inyectadas por JS -->
+            </select>
+
+            <select id="maintenanceStockFilter" style="padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; background:#FFF;">
+              <option value="">Todo el Stock</option>
+              <option value="low">Solo Stock Bajo / Crítico</option>
+              <option value="normal">Stock Normal</option>
+            </select>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Producto / Peligrosidad</th>
+                  <th>Familia &amp; Subfamilia</th>
+                  <th>Lote / Vencimiento</th>
+                  <th>Ubicación</th>
+                  <th>Costo</th>
+                  <th>Venta</th>
+                  <th>Stock</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="maintenanceTableBody">
+                <!-- Render dinámico vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 4: CARGA MASIVA EXCEL CON FAMILIAS Y LOTES
+           ==================================================================== -->
+      <section class="role-view" id="view-excel-bulk-import">
+        <div class="content-card">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-file-earmark-spreadsheet-fill text-success"></i> Carga Masiva e Incremento de Stock por Excel
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn-fragama btn-outline-fragama" onclick="downloadExcelTemplate()">
+                <i class="bi bi-download"></i> Descargar Plantilla Excel
+              </button>
+              <button class="btn-fragama btn-navy-fragama" onclick="loadDemoExcelFile()">
+                <i class="bi bi-file-text"></i> Cargar Datos de Prueba (Familias y Lotes)
+              </button>
+            </div>
+          </div>
+
+          <div style="padding: 1.75rem;">
+            <input type="file" id="excelFileInput" accept=".csv, .xlsx, .xls" style="display:none;">
+            <div class="excel-dropzone" id="excelDropzone">
+              <div class="excel-icon-upload"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+              <h3 style="font-size:1.15rem; font-weight:700; color:#0B192C; margin:0;">
+                Arrastra aquí tu archivo Excel (.xlsx / .csv) o haz clic para seleccionarlo
+              </h3>
+              <p style="font-size:0.85rem; color:#64748B; margin:0; max-width:580px;">
+                Soporta columnas de <strong>FAMILIA, SUBFAMILIA, LOTE</strong> y precios en Colones (₡). <strong>Si el SKU ya existe</strong>, se sumará el stock al inventario y se actualizará su lote; <strong>si es nuevo</strong>, se integrará en su Familia correspondiente.
+              </p>
+            </div>
+
+            <div id="bulkPreviewContainer" style="display:none; margin-top:1.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h4 style="font-size:1rem; font-weight:700; color:#0B192C; margin:0;">
+                  <i class="bi bi-eye"></i> Previsualización de Datos Detectados:
+                </h4>
+                <span class="badge-status badge-in-route" id="bulkTotalRowsCount">0 registros</span>
+              </div>
+
+              <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px; margin-bottom:1.5rem;">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>SKU</th>
+                      <th>Nombre</th>
+                      <th>Familia / Subfamilia</th>
+                      <th>Lote</th>
+                      <th>Costo</th>
+                      <th>Precio Venta</th>
+                      <th>Cantidad a Sumar</th>
+                      <th>Operación a Ejecutar</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bulkPreviewTableBody">
+                    <!-- Filas de vista previa -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="btn-fragama btn-outline-fragama" onclick="AppState.stagedBulkRows = []; renderBulkPreviewTable();">
+                  Descartar
+                </button>
+                <button class="btn-fragama btn-primary-fragama" id="btnProcessBulkImport">
+                  <i class="bi bi-check-circle-fill"></i> Confirmar e Insertar / Aumentar en Bodega
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 5: CENTRO PROFESIONAL DE REPORTERÍA & AUDITORÍA DE INVENTARIOS
+           ==================================================================== -->
+      <section class="role-view" id="view-reports">
+        
+        <!-- Header Principal de Reportería -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.25rem; flex-wrap:wrap; gap:14px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
+              <span class="badge-status badge-confirmed" style="font-size:0.7rem; font-weight:800; background:#E0F2FE; color:#0369A1;">
+                <i class="bi bi-shield-check"></i> WMS AUDIT & COMPLIANCE SYSTEM
+              </span>
+              <span class="badge-status" style="font-size:0.7rem; font-weight:800; background:#FEF3C7; color:#92400E;">
+                <i class="bi bi-geo-alt-fill"></i> BODEGA CENTRAL TARAS, CARTAGO
+              </span>
+              <span class="badge-status" style="font-size:0.7rem; font-weight:800; background:#F1F5F9; color:#475569;">
+                <i class="bi bi-coin"></i> COLONES (CRC - ₡)
+              </span>
+            </div>
+            <h2 style="font-size:1.35rem; font-weight:800; color:#0B192C; margin:0;">
+              Centro Profesional de Reportería & Auditoría de Inventarios
+            </h2>
+            <p style="font-size:0.85rem; color:#64748B; margin:2px 0 0 0;">
+              Distribuidora Fragama S.A. • Cédula Jurídica: 3-101-492817 • Registro Sanitario & Control FEFO
+            </p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-fragama btn-primary-fragama" onclick="printProfessionalReport('official')">
+              <i class="bi bi-printer-fill"></i> Imprimir Reporte / PDF
+            </button>
+            <button type="button" class="btn-fragama" style="background:#0284C7; color:#FFF;" onclick="printProfessionalReport('blind')">
+              <i class="bi bi-clipboard-check"></i> Hoja de Conteo Ciego
+            </button>
+            <button type="button" class="btn-fragama btn-outline-fragama" onclick="exportProfessionalInventoryCsv()">
+              <i class="bi bi-file-earmark-excel-fill text-success"></i> Exportar Excel (CSV)
+            </button>
+            <button type="button" class="btn-fragama btn-outline-fragama" onclick="renderReportsData()" title="Sincronizar datos">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Fila de Tarjetas KPI con Métricas Financieras y Operativas -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Inversión Total en Costo</span>
+              <span class="kpi-value" id="reportTotalCost">₡0</span>
+              <span class="kpi-trend neutral"><i class="bi bi-building"></i> Capital en bodega</span>
+            </div>
+            <div class="kpi-icon-badge icon-navy"><i class="bi bi-cash-stack"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Valor a la Venta</span>
+              <span class="kpi-value" id="reportTotalSale">₡0</span>
+              <span class="kpi-trend positive"><i class="bi bi-graph-up"></i> Venta proyectada</span>
+            </div>
+            <div class="kpi-icon-badge icon-amber"><i class="bi bi-tags-fill"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Margen Bruto Estimado</span>
+              <span class="kpi-value" id="reportTotalMargin" style="color:#10B981;">₡0</span>
+              <span class="kpi-trend positive"><i class="bi bi-percent"></i> Rentabilidad total</span>
+            </div>
+            <div class="kpi-icon-badge icon-green"><i class="bi bi-pie-chart-fill"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Unidades Físicas Totales</span>
+              <span class="kpi-value" id="reportTotalUnits">0</span>
+              <span class="kpi-trend neutral"><i class="bi bi-box-seam"></i> Existencias en rack</span>
+            </div>
+            <div class="kpi-icon-badge icon-navy"><i class="bi bi-layers-fill"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">SKUs Catalogados</span>
+              <span class="kpi-value" id="reportTotalSkus">220</span>
+              <span class="kpi-trend neutral"><i class="bi bi-upc-scan"></i> Artículos activos</span>
+            </div>
+            <div class="kpi-icon-badge icon-amber"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Alertas Stock Mínimo</span>
+              <span class="kpi-value" id="reportLowStockCount" style="color:#DC2626;">0</span>
+              <span class="kpi-trend negative"><i class="bi bi-exclamation-triangle-fill"></i> Reorden urgente</span>
+            </div>
+            <div class="kpi-icon-badge" style="background:#FEE2E2; color:#DC2626;"><i class="bi bi-bell-fill"></i></div>
+          </div>
+        </div>
+
+        <!-- Barra de Pestañas de Reportes Especializados -->
+        <div class="report-tabs-bar">
+          <button type="button" class="report-tab-btn active" id="tabBtnPhysical" onclick="switchReportTab('physical')">
+            <i class="bi bi-clipboard2-check"></i>
+            <span>Toma de Inventario Físico (Auditoría)</span>
+            <span class="tab-badge" id="badgeCountPhysical">220</span>
+          </button>
+          <button type="button" class="report-tab-btn" id="tabBtnValuation" onclick="switchReportTab('valuation')">
+            <i class="bi bi-cash-coin"></i>
+            <span>Inventario General Valorizado</span>
+            <span class="tab-badge" id="badgeCountValuation">220</span>
+          </button>
+          <button type="button" class="report-tab-btn" id="tabBtnReorder" onclick="switchReportTab('reorder')">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Alertas de Reposición (Reorden)</span>
+            <span class="tab-badge" id="badgeCountReorder">0</span>
+          </button>
+          <button type="button" class="report-tab-btn" id="tabBtnFefo" onclick="switchReportTab('fefo')">
+            <i class="bi bi-calendar2-range"></i>
+            <span>Lotes FEFO y Vencimientos</span>
+            <span class="tab-badge" id="badgeCountFefo">220</span>
+          </button>
+          <button type="button" class="report-tab-btn" id="tabBtnFamily" onclick="switchReportTab('family')">
+            <i class="bi bi-pie-chart"></i>
+            <span>Resumen por Familias</span>
+            <span class="tab-badge" id="badgeCountFamily">5</span>
+          </button>
+        </div>
+
+        <!-- Barra de Filtros en Tiempo Real -->
+        <div class="report-filter-bar">
+          <div class="report-filter-group">
+            <input type="text" class="report-search-input" id="reportSearchInput" 
+                   placeholder="Buscar por SKU, código de barras, descripción o lote..." 
+                   oninput="onReportFilterChange()">
+            
+            <select class="report-select" id="reportFamilyFilter" onchange="onReportFilterChange()">
+              <option value="ALL">Todas las Familias</option>
+            </select>
+
+            <select class="report-select" id="reportLocationFilter" onchange="onReportFilterChange()">
+              <option value="ALL">Todas las Zonas / Ubicaciones</option>
+            </select>
+
+            <select class="report-select" id="reportStockFilter" onchange="onReportFilterChange()">
+              <option value="ALL">Todos los Estados de Stock</option>
+              <option value="active">Con Existencia Activa (>0)</option>
+              <option value="low">Stock Bajo / Reorden (<= Mínimo)</option>
+              <option value="zero">Agotados (Stock 0)</option>
+            </select>
+
+            <button type="button" class="btn-fragama btn-outline-fragama" id="reportResetFiltersBtn" onclick="resetReportFilters()" style="padding:7px 12px; font-size:0.8rem;">
+              <i class="bi bi-x-circle"></i> Limpiar Filtros
+            </button>
+          </div>
+          
+          <div style="font-size:0.82rem; font-weight:700; color:#475569;" id="reportFilterCountBadge">
+            Mostrando 220 artículos
+          </div>
+        </div>
+
+        <!-- CONTENIDO DE TAB 1: TOMA DE INVENTARIO FÍSICO / AUDITORÍA DE CONTEO -->
+        <div class="content-card" id="reportCardPhysical">
+          <div class="card-header-custom" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div class="card-header-title">
+                <i class="bi bi-clipboard2-data-fill text-primary"></i> Hoja de Trabajo: Toma de Inventario Físico y Auditoría de Conteo
+              </div>
+              <small style="color:#64748B;">
+                Registre las unidades contadas en físico. El sistema calcula en vivo la discrepancia (merma / sobrante) contra el saldo teórico de bodega.
+              </small>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:5px 10px; font-size:0.78rem;" onclick="setAllPhysicalCountsToSystem()">
+                <i class="bi bi-check-all text-success"></i> Igualar Todo a Teórico
+              </button>
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:5px 10px; font-size:0.78rem;" onclick="clearAllPhysicalCounts()">
+                <i class="bi bi-eraser text-danger"></i> Limpiar Conteos
+              </button>
+            </div>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="custom-table" id="reportPhysicalTable">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>SKU / Código</th>
+                  <th>Código EAN-13</th>
+                  <th>Descripción del Producto</th>
+                  <th>Familia</th>
+                  <th>Ubicación en Bodega</th>
+                  <th>Lote FEFO / Vence</th>
+                  <th>Unidad</th>
+                  <th style="text-align:right;">Stock Sistema</th>
+                  <th style="text-align:right;">Conteo Físico Real</th>
+                  <th style="text-align:center;">Diferencia</th>
+                  <th>Estado Auditoría</th>
+                </tr>
+              </thead>
+              <tbody id="reportPhysicalTableBody">
+                <!-- Render vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CONTENIDO DE TAB 2: INVENTARIO GENERAL VALORIZADO -->
+        <div class="content-card" id="reportCardValuation" style="display:none;">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-cash-stack text-success"></i> Kardex Valorizado General de Existencias (Detalle 360°)
+            </div>
+            <small style="color:#64748B;">Costo unitario promedio, valorización de capital invertido, venta proyectada y margen de ganancia por SKU.</small>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="custom-table" id="reportValuationTable">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>SKU</th>
+                  <th>Código Barras</th>
+                  <th>Descripción del Producto</th>
+                  <th>Familia</th>
+                  <th>Ubicación</th>
+                  <th style="text-align:right;">Stock Actual</th>
+                  <th style="text-align:right;">Costo Unit. (₡)</th>
+                  <th style="text-align:right;">Inversión Costo (₡)</th>
+                  <th style="text-align:right;">Precio Venta (₡)</th>
+                  <th style="text-align:right;">Total Venta (₡)</th>
+                  <th style="text-align:right;">Margen Bruto (₡)</th>
+                  <th style="text-align:right;">Margen %</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="reportDetailedValuationTableBody">
+                <!-- Render vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CONTENIDO DE TAB 3: ALERTAS DE REPOSICIÓN Y REORDEN -->
+        <div class="content-card" id="reportCardReorder" style="display:none;">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-exclamation-triangle-fill text-warning"></i> Alertas de Reposición y Ruptura de Stock (Puntos de Reorden)
+            </div>
+            <small style="color:#64748B;">Artículos con existencia por debajo del stock mínimo de seguridad que requieren orden de compra inmediata.</small>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="custom-table" id="reportReorderTable">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Descripción del Artículo</th>
+                  <th>Familia</th>
+                  <th style="text-align:right;">Stock Actual</th>
+                  <th style="text-align:right;">Stock Mínimo</th>
+                  <th style="text-align:right;">Déficit para Reorden</th>
+                  <th>Proveedor Sugerido</th>
+                  <th>Nivel Urgencia</th>
+                  <th>Acción Operativa</th>
+                </tr>
+              </thead>
+              <tbody id="reportReorderTableBody">
+                <!-- Render vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CONTENIDO DE TAB 4: LOTES FEFO Y VENCIMIENTOS -->
+        <div class="content-card" id="reportCardFefo" style="display:none;">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-shield-shaded text-info"></i> Control Sanitario de Lotes FEFO y Fechas de Vencimiento
+            </div>
+            <small style="color:#64748B;">Trazabilidad de lotes, clasificación de riesgo químico/sanitario y semáforo de caducidad.</small>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="custom-table" id="reportFefoTable">
+              <thead>
+                <tr>
+                  <th>Lote FEFO</th>
+                  <th>SKU</th>
+                  <th>Descripción del Producto</th>
+                  <th>Familia</th>
+                  <th>Ubicación</th>
+                  <th>Fecha Vencimiento</th>
+                  <th style="text-align:right;">Días Restantes</th>
+                  <th>Semáforo Sanitario</th>
+                  <th style="text-align:right;">Existencia en Lote</th>
+                  <th>Riesgo SGA</th>
+                </tr>
+              </thead>
+              <tbody id="reportFefoTableBody">
+                <!-- Render vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CONTENIDO DE TAB 5: RESUMEN FINANCIERO POR FAMILIAS -->
+        <div class="content-card" id="reportCardFamily" style="display:none;">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-pie-chart-fill text-primary"></i> Desglose Financiero Consolidado por Familias de Productos
+            </div>
+            <small style="color:#64748B;">Participación porcentual en capital, existencias físicas consolidadas y rentabilidad por línea.</small>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Familia de Bodega</th>
+                  <th>Variedad SKUs</th>
+                  <th style="text-align:right;">Existencias Físicas</th>
+                  <th style="text-align:right;">Inversión Costo (₡)</th>
+                  <th style="text-align:right;">Valor Venta Total (₡)</th>
+                  <th style="text-align:right;">Margen Potencial (₡)</th>
+                  <th style="text-align:right;">Rentabilidad %</th>
+                </tr>
+              </thead>
+              <tbody id="reportValuationTableBody">
+                <!-- Render vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CONTENEDOR OCULTO PARA IMPRESIÓN OFICIAL FORMAL (MEMBRETE, TABLA Y FIRMAS) -->
+        <div id="printableOfficialReport">
+          <!-- Inyectado dinámicamente antes de window.print() -->
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           VISTA 6: BODEGUERO (KARDEX CON LOTES)
+           ==================================================================== -->
+      <section class="role-view" id="view-bodega-kardex">
+        <div class="content-card">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-journal-text text-primary"></i> Kardex de Movimientos Inmutables (Trazabilidad con Lote)
+            </div>
+            <button class="btn-fragama btn-primary-fragama" onclick="openMovementModal()">
+              <i class="bi bi-arrow-repeat"></i> Nueva Operación de Entrada / Salida
+            </button>
+          </div>
+
+          <div style="padding: 1rem 1.4rem; background: #F8FAFC; border-bottom: 1px solid var(--border-color); display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <span style="font-size:0.85rem; font-weight:700; color:var(--text-muted);"><i class="bi bi-funnel"></i> Control WMS:</span>
+            <span class="badge-status badge-kardex-trans"><i class="bi bi-shield-lock-fill"></i> Validación anti-stock negativo activa</span>
+            <span class="badge-status badge-kardex-trans"><i class="bi bi-upc"></i> Trazabilidad por Lotes</span>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Nº Movimiento</th>
+                  <th>Producto / Lote</th>
+                  <th>Tipo</th>
+                  <th>Cantidad</th>
+                  <th>Stock Ant.</th>
+                  <th>Stock Final</th>
+                  <th>Doc. Referencia</th>
+                  <th>Operador</th>
+                </tr>
+              </thead>
+              <tbody id="kardexTableBody">
+                <!-- Render dinámico vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA: TOMA DE PEDIDOS PARA CLIENTES Y PROFORMAS (INSTITUCIONAL)
+           ==================================================================== -->
+      <section class="role-view" id="view-customer-orders">
+        <!-- Sub-navegación por pestañas: Nuevo Pedido vs Historial -->
+        <div class="order-tabs-bar">
+          <button class="order-tab-btn active" id="orderTabBtnNew">
+            <i class="bi bi-cart-plus-fill"></i> Nuevo Pedido / Cotización
+          </button>
+          <button class="order-tab-btn" id="orderTabBtnHistory">
+            <i class="bi bi-journal-text"></i> Historial de Pedidos &amp; Proformas
+            <span class="badge-count" id="orderHistoryBadgeCount" style="margin-left:4px;">3</span>
+          </button>
+        </div>
+
+        <!-- PESTAÑA 1: NUEVO PEDIDO / COTIZACIÓN -->
+        <div id="orderContentNew">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem;">
+            
+            <!-- COLUMNA IZQUIERDA: CLIENTE Y CATÁLOGO DE PRODUCTOS -->
+            <div style="display:flex; flex-direction:column; gap:1.25rem;">
+              
+              <!-- 1. Selección y Datos del Cliente -->
+              <div class="content-card">
+                <div class="card-header-custom">
+                  <div class="card-header-title">
+                    <i class="bi bi-building-check text-primary"></i> Cliente Institucional / Comercial
+                  </div>
+                  <button class="btn-fragama btn-outline-fragama" id="btnOpenNewCustomerModal" style="padding:5px 12px; font-size:0.82rem;">
+                    <i class="bi bi-person-plus-fill"></i> + Nuevo Cliente
+                  </button>
+                </div>
+                <div style="padding:1.25rem;">
+                  <!-- Selector de Modo de Cliente: BD vs Manual -->
+                  <div class="customer-mode-switch">
+                    <button type="button" class="customer-mode-btn active" id="btnModeDbCustomer">
+                      <i class="bi bi-database-check"></i> Buscar en Base de Datos
+                    </button>
+                    <button type="button" class="customer-mode-btn" id="btnModeManualCustomer">
+                      <i class="bi bi-pencil-square"></i> Digitar Directamente
+                    </button>
+                  </div>
+
+                  <!-- MODO A: BUSCAR Y SELECCIONAR DE LA BASE DE DATOS -->
+                  <div id="panelDbCustomer">
+                    <div style="margin-bottom:0.75rem;">
+                      <div style="position:relative; margin-bottom:6px;">
+                        <input type="text" id="orderCustomerDbSearch" placeholder="🔍 Escriba nombre o cédula para filtrar en BD..." style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem;">
+                      </div>
+                      <select id="orderCustomerSelect" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.88rem; font-family:inherit; background:#FFF;">
+                        <!-- Poblado dinámicamente vía JS -->
+                      </select>
+                    </div>
+
+                    <!-- Ficha de Información del Cliente Seleccionado -->
+                    <div class="customer-info-card" id="customerInfoCard">
+                      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                        <h4 id="custCardName" style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">Restaurante El Fogón Tico S.A.</h4>
+                        <span class="badge-status badge-confirmed" id="custCardTerms">Crédito 30 días</span>
+                      </div>
+                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:0.8rem; color:#475569; margin-bottom:6px;">
+                        <div><strong>Cédula:</strong> <span id="custCardId">3-101-582910</span></div>
+                        <div><strong>Teléfono:</strong> <span id="custCardPhone">2551-3344 / 8890-1122</span></div>
+                        <div><strong>Contacto:</strong> <span id="custCardContact">Don Esteban Brenes</span></div>
+                        <div><strong>Ruta:</strong> <span id="custCardRoute">Cartago Centro - Los Ángeles</span></div>
+                      </div>
+                      <div style="font-size:0.8rem; color:#475569; border-top:1px dashed #CBD5E1; padding-top:6px;">
+                        <i class="bi bi-geo-alt-fill text-danger"></i> <strong>Dirección de Entrega:</strong> <span id="custCardAddress">200m Sur de la Basílica de Los Ángeles, Cartago</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- MODO B: DIGITADO MANUAL / CLIENTE EXPRESS O NO REGISTRADO -->
+                  <div id="panelManualCustomer" style="display:none; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:8px; padding:12px;">
+                    <div style="font-size:0.78rem; font-weight:700; color:#0284C7; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                      <i class="bi bi-info-circle-fill"></i> Digite los datos del cliente para este pedido express:
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                      <div>
+                        <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Cliente / Razón Social *</label>
+                        <input type="text" id="manualCustName" placeholder="Ej. Soda El Buen Sabor / Juan Solano" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem;">
+                      </div>
+                      <div>
+                        <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Cédula Jurídica / Física</label>
+                        <input type="text" id="manualCustId" placeholder="Ej. 3-101-998877 o 1-1452-0988" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem;">
+                      </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                      <div>
+                        <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Teléfono / WhatsApp *</label>
+                        <input type="text" id="manualCustPhone" placeholder="Ej. 2551-0000 / 8899-0011" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem;">
+                      </div>
+                      <div>
+                        <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Condición de Venta</label>
+                        <select id="manualCustTerms" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem;">
+                          <option value="Contado" selected>Contado Inmediato</option>
+                          <option value="Crédito 15 días">Crédito 15 días</option>
+                          <option value="Crédito 30 días">Crédito 30 días</option>
+                          <option value="SINPE Móvil">SINPE Móvil</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                      <div>
+                        <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Provincia de Entrega *</label>
+                        <select id="manualCustProvince" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem; font-weight:600; color:#0B192C;">
+                          <option value="Cartago" selected>Cartago</option>
+                          <option value="San José">San José</option>
+                          <option value="Alajuela">Alajuela</option>
+                          <option value="Heredia">Heredia</option>
+                          <option value="Guanacaste">Guanacaste</option>
+                          <option value="Puntarenas">Puntarenas</option>
+                          <option value="Limón">Limón</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Cantón / Localidad *</label>
+                        <input type="text" id="manualCustCanton" placeholder="Ej. Paraíso / Liberia / San Carlos" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem;">
+                      </div>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                      <label style="font-size:0.74rem; font-weight:700; color:#64748B; display:block; margin-bottom:2px;">Dirección Exacta de Entrega *</label>
+                      <input type="text" id="manualCustAddress" placeholder="Ej. Costado Este de la Iglesia, local esquinero" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem;">
+                    </div>
+                    <div>
+                      <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; color:#475569; cursor:pointer;">
+                        <input type="checkbox" id="manualCustSaveToDb" checked>
+                        <span>Guardar también en el catálogo permanente de clientes</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Catálogo de Productos y Familias -->
+              <div class="content-card">
+                <div class="card-header-custom" style="flex-wrap:wrap; gap:8px;">
+                  <div class="card-header-title">
+                    <i class="bi bi-boxes text-primary"></i> Catálogo de Productos Distribuidora Fragama
+                  </div>
+                  <div style="display:flex; gap:8px; width:100%; max-width:420px;">
+                    <select id="orderCatalogFamilyFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.8rem; font-family:inherit; flex:1;">
+                      <option value="ALL">Todas las Familias</option>
+                      <!-- Opciones dinámicas -->
+                    </select>
+                    <input type="text" id="orderCatalogSearch" placeholder="Buscar producto o SKU..." style="border:1px solid #CBD5E1; border-radius:6px; padding:5px 10px; font-size:0.8rem; flex:1;">
+                  </div>
+                </div>
+
+                <div style="padding:1rem; max-height:480px; overflow-y:auto;" id="orderCatalogList">
+                  <!-- Render dinámico de productos disponibles con stock en tiempo real -->
+                </div>
+              </div>
+
+            </div>
+
+            <!-- COLUMNA DERECHA: HOJA DEL PEDIDO / PROFORMA Y DESGLOSE -->
+            <div>
+              <div class="content-card">
+                <div class="card-header-custom">
+                  <div>
+                    <div class="card-header-title"><i class="bi bi-receipt-cutoff text-primary"></i> Hoja de Pedido / Proforma</div>
+                    <div style="font-size:0.75rem; color:#64748B;">Distribuidora Fragama • Cartago, C.R.</div>
+                  </div>
+                  <span class="badge-status badge-in-route" id="orderCodeBadge" style="font-size:0.85rem; font-weight:800;">PED-2026-00142</span>
+                </div>
+
+                <div style="padding:1.25rem;">
+                  <!-- Parámetros del Pedido y Asignación de Responsable -->
+                  <div style="background:#F0F9FF; border:1.5px solid #BAE6FD; border-radius:10px; padding:12px; margin-bottom:1rem;">
+                    <div style="margin-bottom:8px;">
+                      <label style="font-size:0.78rem; font-weight:800; color:#0369A1; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                        <i class="bi bi-person-fill-check text-primary"></i> Persona / Colaborador Asignado al Pedido (*):
+                      </label>
+                      <select id="orderAssignedUserSelect" style="width:100%; border:1.5px solid #0284C7; border-radius:6px; padding:7px 10px; font-size:0.85rem; font-weight:700; color:#0B192C; background:#FFF;">
+                        <!-- Poblado dinámicamente con colaboradores activos de la BD -->
+                      </select>
+                      <small style="font-size:0.72rem; color:#64748B; display:block; margin-top:3px;">
+                        <i class="bi bi-shield-check text-success"></i> Esta persona queda registrada en la base de datos como responsable directo del control, alisto y entrega de este pedido.
+                      </small>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                      <div>
+                        <label style="font-size:0.75rem; font-weight:700; color:#64748B; display:block; margin-bottom:3px;">Tipo de Documento:</label>
+                        <select id="orderDocTypeSelect" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:6px 8px; font-size:0.82rem; font-weight:700; background:#FFF;">
+                          <option value="PEDIDO">Pedido Firme (Alistar en Bodega)</option>
+                          <option value="COTIZACION">Cotización / Proforma Formal</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style="font-size:0.75rem; font-weight:700; color:#64748B; display:block; margin-bottom:3px;">Fecha de Entrega Programada:</label>
+                        <input type="date" id="orderDeliveryDateInput" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:5px 8px; font-size:0.82rem; background:#FFF;">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Tabla de Líneas del Pedido -->
+                  <div style="margin-bottom:1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                      <span style="font-size:0.8rem; font-weight:700; color:#475569;">Productos en la Orden (<span id="orderItemCount">0</span>):</span>
+                      <button class="btn-fragama btn-outline-fragama" id="btnClearOrderItems" style="padding:2px 8px; font-size:0.75rem;">
+                        <i class="bi bi-trash"></i> Vaciar
+                      </button>
+                    </div>
+
+                    <div style="border:1px solid #CBD5E1; border-radius:8px; overflow:hidden; max-height:260px; overflow-y:auto; background:#FFF;">
+                      <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                        <thead style="background:#F8FAFC; border-bottom:1px solid #CBD5E1; position:sticky; top:0; z-index:2;">
+                          <tr>
+                            <th style="padding:8px 10px; text-align:left;">Producto</th>
+                            <th style="padding:8px 6px; text-align:center; width:70px;">Cant.</th>
+                            <th style="padding:8px 6px; text-align:right; width:80px;">P. Unit</th>
+                            <th style="padding:8px 6px; text-align:center; width:65px;">Desc.</th>
+                            <th style="padding:8px 8px; text-align:right; width:90px;">Subtotal</th>
+                            <th style="padding:8px 6px; text-align:center; width:35px;"></th>
+                          </tr>
+                        </thead>
+                        <tbody id="orderItemsTableBody">
+                          <!-- Inyectado por JS -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Instrucciones Especiales para el Chofer o Bodega -->
+                  <div style="margin-bottom:1.25rem;">
+                    <label style="font-size:0.75rem; font-weight:700; color:#64748B; display:block; margin-bottom:3px;">
+                      <i class="bi bi-chat-left-dots"></i> Notas de Entrega para Chofer / Alistador:
+                    </label>
+                    <textarea id="orderDeliveryNotes" rows="2" placeholder="Ej. Entregar por portón de recibo en horario matutino de 8am a 11am. Solicitar sello de recibo." style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:6px 8px; font-size:0.8rem; font-family:inherit;"></textarea>
+                  </div>
+
+                  <!-- Desglose de Totales Financieros -->
+                  <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 14px; margin-bottom:1.25rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.84rem;">
+                      <span style="color:#64748B;">Subtotal Bruto:</span>
+                      <span id="orderSubtotalBruto" style="font-weight:600;">₡0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.84rem;">
+                      <span style="color:#64748B;">Descuento Comercial:</span>
+                      <span id="orderDescuentoTotal" style="font-weight:600; color:#EF4444;">-₡0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.84rem;">
+                      <span style="color:#64748B;">Subtotal Neto Gravable:</span>
+                      <span id="orderSubtotalNeto" style="font-weight:600;">₡0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.84rem;">
+                      <span style="color:#64748B;">IVA Costa Rica (13%):</span>
+                      <span id="orderIvaTotal" style="font-weight:600;">₡0</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:1.25rem; font-weight:800; color:#0B192C; border-top:2px solid var(--fragama-blue-primary); padding-top:8px;">
+                      <span>TOTAL DEL PEDIDO:</span>
+                      <span id="orderTotalGeneral" style="color:var(--fragama-blue-primary);">₡0</span>
+                    </div>
+                  </div>
+
+                  <!-- Botones de Acción -->
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <button class="btn-fragama btn-outline-fragama" id="btnSaveQuote" style="padding:10px 8px; font-size:0.88rem; justify-content:center;">
+                      <i class="bi bi-file-earmark-pdf"></i> Guardar Proforma
+                    </button>
+                    <button class="btn-fragama btn-primary-fragama" id="btnConfirmSalesOrder" style="padding:10px 8px; font-size:0.88rem; justify-content:center;">
+                      <i class="bi bi-box-seam-fill"></i> Confirmar y Alistar
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- PESTAÑA 2: HISTORIAL DE PEDIDOS Y PROFORMAS -->
+        <div id="orderContentHistory" style="display:none;">
+          <div class="content-card">
+            <div class="card-header-custom" style="flex-wrap:wrap; gap:10px;">
+              <div class="card-header-title">
+                <i class="bi bi-journal-text text-primary"></i> Registro Central de Pedidos y Cotizaciones
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <select id="orderHistoryAssigneeFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; font-family:inherit;">
+                  <option value="ALL">👥 Todos los Responsables</option>
+                  <!-- Poblado dinámicamente con colaboradores -->
+                </select>
+                <select id="orderHistoryStatusFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; font-family:inherit;">
+                  <option value="ALL">Todos los Estados</option>
+                  <option value="COTIZACION">Cotización / Proforma</option>
+                  <option value="PENDIENTE">Pendiente Alisto</option>
+                  <option value="ALISTADO">Alistado en Bodega</option>
+                  <option value="EN_RUTA">En Ruta de Entrega</option>
+                  <option value="FACTURADO">Facturado / Entregado</option>
+                </select>
+                <input type="text" id="orderHistorySearchInput" placeholder="Buscar por cliente o N°..." style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; width:180px;">
+              </div>
+            </div>
+
+            <div style="overflow-x:auto;">
+              <table style="width:100%; border-collapse:collapse; font-size:0.84rem;">
+                <thead style="background:#F8FAFC; border-bottom:1px solid #CBD5E1;">
+                  <tr>
+                    <th style="padding:10px 14px; text-align:left;">N° Documento</th>
+                    <th style="padding:10px 14px; text-align:left;">Tipo</th>
+                    <th style="padding:10px 14px; text-align:left;">Cliente Institucional</th>
+                    <th style="padding:10px 14px; text-align:left;">Asignado(a) / Responsable</th>
+                    <th style="padding:10px 14px; text-align:left;">Fecha Emisión</th>
+                    <th style="padding:10px 14px; text-align:left;">Entrega</th>
+                    <th style="padding:10px 14px; text-align:center;">Items</th>
+                    <th style="padding:10px 14px; text-align:right;">Total (₡)</th>
+                    <th style="padding:10px 14px; text-align:center;">Estado</th>
+                    <th style="padding:10px 14px; text-align:center;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="orderHistoryTableBody">
+                  <!-- Inyectado por JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           VISTA: CATÁLOGO Y DIRECTORIO DE PROVEEDORES
+           ==================================================================== -->
+      <section class="role-view" id="view-suppliers-management">
+        <!-- Barra de Encabezado y Acciones -->
+        <div class="content-card" style="margin-bottom:1.5rem;">
+          <div class="card-header-custom" style="flex-wrap:wrap; gap:12px;">
+            <div>
+              <div class="card-header-title">
+                <i class="bi bi-building-up text-primary"></i> Catálogo y Directorio Oficial de Proveedores
+              </div>
+              <div style="font-size:0.75rem; color:#64748B;">
+                Fabricantes, distribuidores mayoristas e importadores autorizados de insumos para Distribuidora Fragama
+              </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <select id="supplierCategoryFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; font-family:inherit;">
+                <option value="ALL">Todas las Categorías</option>
+                <option value="Químicos y Desinfectantes">Químicos y Desinfectantes</option>
+                <option value="Papelería y Desechables">Papelería y Desechables</option>
+                <option value="Bolsas y Plásticos">Bolsas y Plásticos</option>
+                <option value="Útiles, Fibras y Equipos">Útiles, Fibras y Equipos</option>
+              </select>
+              <input type="text" id="supplierSearchInput" placeholder="Buscar empresa o contacto..." style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; width:200px;">
+              <button class="btn-fragama btn-primary-fragama" id="btnOpenNewSupplierModal" style="padding:6px 12px; font-size:0.82rem;">
+                <i class="bi bi-building-add"></i> + Registrar Proveedor
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cuadrícula Dinámica de Proveedores -->
+        <div class="suppliers-grid" id="suppliersGridContainer">
+          <!-- Render dinámico vía JS -->
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 7: CAJERO / VENTAS Y FACTURACIÓN ELECTRÓNICA
+           ==================================================================== -->
+      <section class="role-view" id="view-cajero-pos">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+          
+          <!-- Catálogo Dinámico de Venta -->
+          <div class="content-card">
+            <div class="card-header-custom">
+              <div class="card-header-title"><i class="bi bi-cart-plus text-primary"></i> Catálogo Rápido de Venta</div>
+              <input type="text" id="posSearchInput" placeholder="Buscar por SKU o nombre..." style="border:1px solid #CBD5E1; border-radius:6px; padding:5px 10px; font-size:0.82rem; width:200px;">
+            </div>
+            <div style="padding:1rem; max-height:480px; overflow-y:auto;" id="posCatalogList">
+              <!-- Renderizado dinámicamente desde AppState.products -->
+            </div>
+          </div>
+
+          <!-- Carrito y Factura Actual -->
+          <div class="content-card">
+            <div class="card-header-custom">
+              <div class="card-header-title"><i class="bi bi-receipt-cutoff text-primary"></i> Factura en Proceso</div>
+              <span class="badge-status badge-in-route" id="posInvoiceCodeBadge">FAC-001-002140</span>
+            </div>
+            <div style="padding:1.5rem;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:1rem;">
+                <div>
+                  <label style="font-size:0.75rem; font-weight:700; color:#64748B;">Cliente:</label>
+                  <input type="text" id="posCustomerName" value="Restaurante El Fogón Tico S.A." style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:6px 8px; font-size:0.82rem;">
+                </div>
+                <div>
+                  <label style="font-size:0.75rem; font-weight:700; color:#64748B;">Cédula Jurídica / ID:</label>
+                  <input type="text" id="posCustomerId" value="3-101-582910" style="width:100%; border:1px solid #CBD5E1; border-radius:6px; padding:6px 8px; font-size:0.82rem;">
+                </div>
+              </div>
+
+              <div id="posCartItemsList" style="border-top:1px dashed #CBD5E1; border-bottom:1px dashed #CBD5E1; padding:10px 0; margin-bottom:1rem; max-height:220px; overflow-y:auto;">
+                <!-- Líneas de items del carrito -->
+              </div>
+
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.88rem;">
+                <span style="color:#64748B;">Subtotal Neto:</span>
+                <span id="posSubtotalDisplay" style="font-weight:600;">₡0</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:0.88rem;">
+                <span style="color:#64748B;">IVA Costa Rica (13%):</span>
+                <span id="posIvaDisplay" style="font-weight:600;">₡0</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:1.3rem; font-weight:800; color:#0B192C; border-top:2px solid var(--fragama-blue-primary); padding-top:8px; margin-bottom:1.25rem;">
+                <span>TOTAL A PAGAR:</span>
+                <span id="posTotalDisplay" style="color:var(--fragama-blue-primary);">₡0</span>
+              </div>
+
+              <div style="margin-bottom:1.25rem;">
+                <label style="font-size:0.75rem; font-weight:700; color:#64748B; margin-bottom:4px; display:block;">Método de Pago:</label>
+                <div style="display:flex; gap:8px;">
+                  <label style="flex:1; border:1px solid #CBD5E1; border-radius:6px; padding:6px; text-align:center; font-size:0.8rem; cursor:pointer;">
+                    <input type="radio" name="posPaymentMethod" value="Efectivo" checked> Efectivo
+                  </label>
+                  <label style="flex:1; border:1px solid #CBD5E1; border-radius:6px; padding:6px; text-align:center; font-size:0.8rem; cursor:pointer;">
+                    <input type="radio" name="posPaymentMethod" value="Tarjeta"> Tarjeta
+                  </label>
+                  <label style="flex:1; border:1px solid #CBD5E1; border-radius:6px; padding:6px; text-align:center; font-size:0.8rem; cursor:pointer;">
+                    <input type="radio" name="posPaymentMethod" value="SINPE Móvil"> SINPE Móvil
+                  </label>
+                </div>
+              </div>
+
+              <button class="btn-fragama btn-primary-fragama" id="btnEmitirFactura" style="width:100%; padding:12px; font-size:0.95rem;">
+                <i class="bi bi-printer-fill"></i> Emitir Factura Electrónica y Enviar a Despacho
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 8: RUTAS NACIONALES DE REPARTO & CHOFER MÓVIL
+           ==================================================================== -->
+      <section class="role-view" id="view-chofer-mobile">
+        <div class="driver-mobile-container">
+          
+          <!-- Banner Principal de Distribución Nacional -->
+          <div class="driver-banner">
+            <div class="driver-banner-info">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span class="badge-status badge-confirmed" style="font-size:0.7rem; padding:2px 8px;">
+                  <i class="bi bi-shield-check"></i> FLOTA ACTIVA
+                </span>
+                <span style="font-size:0.75rem; color:#94A3B8;">Cobertura: Todo Costa Rica</span>
+              </div>
+              <h3 style="margin:0 0 4px 0; font-size:1.25rem;">Minor Coto (Chofer Logístico)</h3>
+              <p style="margin:0; font-size:0.84rem; color:#E2E8F0;">
+                <i class="bi bi-truck-front-fill text-warning"></i> Camión Isuzu Forward CL-294012 &bull; Bodega Central Taras
+              </p>
+            </div>
+            <div class="driver-badge-truck">
+              <i class="bi bi-geo-alt-fill text-warning"></i> 7 Provincias C.R.
+            </div>
+          </div>
+
+          <!-- Botones de Acción Rápida Móvil (Escanear Código de Barras y Asignar Ruta) -->
+          <div class="driver-quick-actions">
+            <button class="btn-driver-hero btn-scan-qr" id="btnOpenQrScanner" onclick="openBarcodeScannerModal()">
+              <i class="bi bi-upc-scan" style="font-size:1.25rem;"></i>
+              <div style="text-align:left;">
+                <div style="font-weight:800; font-size:0.95rem;">Escanear Código de Barras</div>
+                <small style="opacity:0.9; font-size:0.75rem;">Auditar pedidos y bultos en ruta</small>
+              </div>
+            </button>
+            <button class="btn-driver-hero btn-assign-route" id="btnOpenAssignRouteModal" onclick="openAssignRouteModal()">
+              <i class="bi bi-signpost-2-fill" style="font-size:1.2rem;"></i>
+              <div style="text-align:left;">
+                <div style="font-weight:800; font-size:0.95rem;">Asignar Ruta Nacional</div>
+                <small style="opacity:0.9; font-size:0.75rem;">Programar entrega por provincia</small>
+              </div>
+            </button>
+          </div>
+
+          <!-- Métricas Rápidas de la Carga Actual -->
+          <div class="driver-stats-strip">
+            <div class="driver-stat-card">
+              <span class="stat-label"><i class="bi bi-box-seam"></i> Bultos en Camión</span>
+              <span class="stat-val" id="driverTotalPackages">64 bultos</span>
+            </div>
+            <div class="driver-stat-card">
+              <span class="stat-label"><i class="bi bi-pin-map"></i> Provincias Hoy</span>
+              <span class="stat-val" id="driverCoveredProvinces">4 Zonas</span>
+            </div>
+            <div class="driver-stat-card">
+              <span class="stat-label"><i class="bi bi-check2-circle"></i> Entregados</span>
+              <span class="stat-val" id="driverDeliveredRatio" style="color:#10B981;">1 / 7</span>
+            </div>
+          </div>
+
+          <!-- Barra de Filtros por Provincia de Costa Rica -->
+          <div style="margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:0.8rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">
+                <i class="bi bi-funnel-fill text-primary"></i> Filtrar por Provincia:
+              </span>
+              <button class="btn-fragama btn-outline-fragama" style="padding:4px 10px; font-size:0.78rem;" onclick="renderDriverDispatches(); showNotificationToast('Rutas nacionales actualizadas.', 'info');">
+                <i class="bi bi-arrow-clockwise"></i> Refrescar
+              </button>
+            </div>
+            <div class="province-filter-pills" id="provinceFilterPills">
+              <button class="province-pill active" data-province="ALL" onclick="setDriverProvinceFilter('ALL')">Todas (7)</button>
+              <button class="province-pill" data-province="Cartago" onclick="setDriverProvinceFilter('Cartago')">Cartago</button>
+              <button class="province-pill" data-province="San José" onclick="setDriverProvinceFilter('San José')">San José</button>
+              <button class="province-pill" data-province="Alajuela" onclick="setDriverProvinceFilter('Alajuela')">Alajuela</button>
+              <button class="province-pill" data-province="Heredia" onclick="setDriverProvinceFilter('Heredia')">Heredia</button>
+              <button class="province-pill" data-province="Guanacaste" onclick="setDriverProvinceFilter('Guanacaste')">Guanacaste</button>
+              <button class="province-pill" data-province="Puntarenas" onclick="setDriverProvinceFilter('Puntarenas')">Puntarenas</button>
+              <button class="province-pill" data-province="Limón" onclick="setDriverProvinceFilter('Limón')">Limón</button>
+            </div>
+          </div>
+
+          <!-- Lista de Entregas y Despachos Nacionales -->
+          <div id="driverDispatchesList">
+            <!-- Render dinámico vía JS con datos de Provincia, Cantón y QR de Bultos -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA 9: SEGURIDAD & ASIGNACIÓN DE ROLES (RBAC)
+           ==================================================================== -->
+      <section class="role-view" id="view-roles-management">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge-status badge-confirmed" style="font-size:0.75rem; padding:3px 8px;">
+                <i class="bi bi-shield-lock-fill"></i> SEGURIDAD RBAC
+              </span>
+              <span style="font-size:0.75rem; color:#64748B;">Control de Acceso Estricto por Módulos</span>
+            </div>
+            <h2 style="font-size:1.35rem; font-weight:800; color:#0B192C; margin:4px 0 0 0;">
+              Gestión y Asignación de Roles del Sistema
+            </h2>
+            <p style="font-size:0.85rem; color:#64748B; margin:0;">
+              Administre qué colaboradores pueden acceder a cada área: Bodega, Ventas, Caja, Rutas o Administración
+            </p>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-fragama btn-primary-fragama" onclick="openNewUserModal()">
+              <i class="bi bi-person-plus-fill"></i> + Nuevo Usuario
+            </button>
+          </div>
+        </div>
+
+        <!-- Banner Destacado para Crear y Otorgar Roles -->
+        <div style="background:linear-gradient(135deg, #0B192C 0%, #162F4C 100%); color:#FFF; border-radius:14px; padding:18px 22px; margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; box-shadow:0 8px 24px rgba(11,25,44,0.18); border-left:5px solid var(--fragama-orange-main);">
+          <div>
+            <div style="font-size:1.15rem; font-weight:800; display:flex; align-items:center; gap:8px;">
+              <i class="bi bi-person-plus-fill text-warning"></i> Centro de Mantenimiento de Usuarios y Roles
+            </div>
+            <div style="font-size:0.83rem; color:#CBD5E1; margin-top:4px; max-width:680px;">
+              Como <strong>Administrador del Sistema</strong>, usted puede <strong>registrar nuevos colaboradores</strong>, <strong>otorgar roles del sistema</strong> y asignar o actualizar sus <strong>contraseñas de acceso</strong>.
+            </div>
+          </div>
+          <button class="btn-fragama btn-primary-fragama" style="padding:12px 22px; font-size:0.95rem; font-weight:800; box-shadow:0 4px 15px rgba(2,132,199,0.4);" onclick="openNewUserModal()">
+            <i class="bi bi-person-plus-fill"></i> + Registrar Nuevo Usuario y Asignar Rol
+          </button>
+        </div>
+
+        <!-- Tarjetas de Resumen por Rol y Estado de Base de Datos -->
+        <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom:1.5rem;">
+          <div class="kpi-card" style="border-left:4px solid #10B981; background:linear-gradient(to bottom right, #FFFFFF, #F0FDF4);">
+            <div class="kpi-info-block">
+              <span class="kpi-title" style="color:#047857; font-weight:800;">🟢 Colaboradores Activos</span>
+              <span class="kpi-value" id="countActiveDbUsers" style="color:#065F46;">6</span>
+              <span class="kpi-trend positive"><i class="bi bi-check-circle-fill"></i> Acceso autorizado</span>
+            </div>
+            <div class="kpi-icon-badge icon-green"><i class="bi bi-person-check-fill"></i></div>
+          </div>
+
+          <div class="kpi-card" style="border-left:4px solid #EF4444; background:linear-gradient(to bottom right, #FFFFFF, #FEF2F2);">
+            <div class="kpi-info-block">
+              <span class="kpi-title" style="color:#B91C1C; font-weight:800;">🔴 Dados de Baja</span>
+              <span class="kpi-value" id="countInactiveDbUsers" style="color:#991B1B;">0</span>
+              <span class="kpi-trend negative"><i class="bi bi-slash-circle-fill"></i> Acceso denegado</span>
+            </div>
+            <div class="kpi-icon-badge" style="background:rgba(239,68,68,0.15); color:#EF4444;"><i class="bi bi-person-dash-fill"></i></div>
+          </div>
+
+          <div class="kpi-card" style="border-left:4px solid #0284C7;">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Administradores</span>
+              <span class="kpi-value" id="countAdminUsers">2</span>
+              <span class="kpi-trend neutral"><i class="bi bi-key-fill"></i> Acceso total</span>
+            </div>
+            <div class="kpi-icon-badge icon-navy"><i class="bi bi-person-fill-gear"></i></div>
+          </div>
+
+          <div class="kpi-card" style="border-left:4px solid #F59E0B;">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Bodegueros</span>
+              <span class="kpi-value" id="countBodegaUsers">1</span>
+              <span class="kpi-trend neutral"><i class="bi bi-box-seam"></i> Almacén &amp; Kardex</span>
+            </div>
+            <div class="kpi-icon-badge icon-amber"><i class="bi bi-boxes"></i></div>
+          </div>
+
+          <div class="kpi-card" style="border-left:4px solid #06B6D4;">
+            <div class="kpi-info-block">
+              <span class="kpi-title">Cajeros / Choferes / Ventas</span>
+              <span class="kpi-value" id="countOperativeUsers">3</span>
+              <span class="kpi-trend neutral"><i class="bi bi-people"></i> Personal Operativo</span>
+            </div>
+            <div class="kpi-icon-badge icon-navy"><i class="bi bi-truck"></i></div>
+          </div>
+        </div>
+
+        <!-- Tabla de Mantenimiento de Usuarios y Asignación de Roles -->
+        <div class="content-card" style="margin-bottom:1.5rem;">
+          <div class="card-header-custom" style="flex-wrap:wrap; gap:10px;">
+            <div>
+              <div class="card-header-title">
+                <i class="bi bi-people-fill text-primary"></i> Mantenimiento de Colaboradores &amp; Roles
+              </div>
+              <div style="font-size:0.75rem; color:#64748B;">
+                Solo el <strong>Administrador</strong> puede otorgar roles, asignar contraseñas, ver activos y dar de baja colaboradores
+              </div>
+            </div>
+            <button class="btn-fragama btn-primary-fragama" onclick="openNewUserModal()">
+              <i class="bi bi-person-plus-fill"></i> + Registrar Nuevo Usuario
+            </button>
+          </div>
+
+          <!-- Filtro de Estado de Base de Datos: Todos, Activos, Dados de Baja -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 16px; background:#F8FAFC; border-bottom:1px solid #E2E8F0;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:0.8rem; font-weight:700; color:#475569;"><i class="bi bi-funnel-fill text-primary"></i> Base de Datos:</span>
+              <button type="button" class="btn-fragama btn-primary-fragama user-filter-btn" id="filterTabAll" onclick="filterUsersView('all', this)" style="padding:5px 12px; font-size:0.75rem; border-radius:20px;">
+                👥 Todos (<span id="tabCountAll">0</span>)
+              </button>
+              <button type="button" class="btn-fragama btn-outline-fragama user-filter-btn" id="filterTabActive" onclick="filterUsersView('active', this)" style="padding:5px 12px; font-size:0.75rem; border-radius:20px; border-color:#10B981; color:#047857;">
+                🟢 Activos (<span id="tabCountActive">0</span>)
+              </button>
+              <button type="button" class="btn-fragama btn-outline-fragama user-filter-btn" id="filterTabInactive" onclick="filterUsersView('inactive', this)" style="padding:5px 12px; font-size:0.75rem; border-radius:20px; border-color:#EF4444; color:#B91C1C;">
+                🔴 Dados de Baja (<span id="tabCountInactive">0</span>)
+              </button>
+            </div>
+            <div style="font-size:0.75rem; color:#64748B;">
+              <i class="bi bi-database-check text-success"></i> Usuarios sincronizados con la Base de Datos
+            </div>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="custom-table" style="font-size:0.85rem;">
+              <thead>
+                <tr>
+                  <th>Usuario / Login</th>
+                  <th>Colaborador</th>
+                  <th>Correo Corporativo</th>
+                  <th>Rol en Sistema</th>
+                  <th>Estado en Base de Datos</th>
+                  <th>Contraseña Asignada</th>
+                  <th style="text-align:right;">Gestión (Rol / Clave / Baja / Reactivar)</th>
+                </tr>
+              </thead>
+              <tbody id="usersRolesTableBody">
+                <!-- Poblado dinámicamente por renderUsersRolesTable() -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Matriz Visual de Control de Acceso por Módulo (RBAC Matrix) -->
+        <div class="content-card">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-grid-3x3-gap-fill text-primary"></i> Matriz de Permisos por Rol (Segregación de Funciones)
+            </div>
+          </div>
+          <div style="padding:1.25rem; overflow-x:auto;">
+            <table class="custom-table" style="font-size:0.82rem; text-align:center;">
+              <thead>
+                <tr style="background:#0B192C; color:#FFF;">
+                  <th style="text-align:left; padding:10px 14px;">Módulo del Sistema WMS</th>
+                  <th style="padding:10px 8px; width:130px;">👑 Administrador</th>
+                  <th style="padding:10px 8px; width:130px;">📦 Bodeguero</th>
+                  <th style="padding:10px 8px; width:130px;">💰 Cajero POS</th>
+                  <th style="padding:10px 8px; width:130px;">🚚 Chofer Móvil</th>
+                  <th style="padding:10px 8px; width:130px;">🛒 Vendedor</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Dashboard Ejecutivo &amp; KPIs</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Gestión Macro de Familias y Zonas</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Mantenimiento y Catálogo de SKUs</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-in-route"><i class="bi bi-eye-fill"></i> Solo Consulta</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-in-route"><i class="bi bi-eye-fill"></i> Solo Consulta</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Carga Masiva Excel / CSV</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Kardex &amp; Ajustes de Almacén</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Toma de Pedidos &amp; Cotizaciones</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-in-route"><i class="bi bi-box-arrow-in-right"></i> Alisto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Punto de Venta (Caja Rápida POS)</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Rutas Nacionales &amp; Escáner QR Móvil</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Despacho</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-phone-fill"></i> Exclusivo</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Proveedores Oficiales &amp; Compras</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Reportería Financiera</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+                <tr>
+                  <td style="text-align:left; font-weight:700;">Gestión de Usuarios y Roles</td>
+                  <td><span class="badge-status badge-confirmed"><i class="bi bi-check-circle-fill"></i> Total</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                  <td><span class="badge-status badge-rejected"><i class="bi bi-x-circle-fill"></i> Oculto</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           VISTA 10: PANTALLA DE ACCESO RESTRINGIDO / DENEGADO (403 FORBIDDEN)
+           ==================================================================== -->
+      <section class="role-view" id="view-access-denied">
+        <div style="max-width:540px; margin:3rem auto; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:16px; padding:2.5rem 2rem; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
+          <div style="width:72px; height:72px; background:#FEE2E2; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem auto; color:#DC2626; font-size:2rem;">
+            <i class="bi bi-shield-x"></i>
+          </div>
+          <span class="badge-status badge-rejected" style="font-size:0.8rem; padding:4px 10px; margin-bottom:8px; display:inline-block;">
+            403 ACCESO NO AUTORIZADO
+          </span>
+          <h2 style="font-size:1.3rem; font-weight:800; color:#0B192C; margin-bottom:8px;">
+            Módulo Restringido por Política de Roles
+          </h2>
+          <p style="font-size:0.88rem; color:#64748B; line-height:1.5; margin-bottom:1.5rem;">
+            Su cuenta está operando con el rol <strong id="deniedUserRole" style="color:#DC2626;">Bodeguero</strong>. Este módulo requiere privilegios elevados que no están concedidos a su perfil.
+          </p>
+          <div style="display:flex; justify-content:center; gap:12px;">
+            <button class="btn-fragama btn-primary-fragama" onclick="returnToAuthorizedHome()">
+              <i class="bi bi-arrow-left"></i> Volver a Mi Módulo Principal
+            </button>
+            <button class="btn-fragama btn-outline-fragama" onclick="document.getElementById('sidebarLogoutBtn').click()">
+              <i class="bi bi-box-arrow-right"></i> Cambiar Usuario
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CRUD PRODUCTOS CON FAMILIAS Y LOTES
+       ========================================================================== -->
+  <div class="modal-overlay" id="productCrudModal">
+    <div class="modal-box" style="max-width:620px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;" id="crudModalTitle">
+          Nuevo Producto en Catálogo Fragama (WMS)
+        </h3>
+        <button onclick="document.getElementById('productCrudModal').classList.remove('active')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="productCrudForm">
+        <div class="modal-body-custom">
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label class="login-form-label">Código SKU (*)</label>
+              <input type="text" id="crudSkuInput" class="login-input" style="padding-left:14px;" placeholder="Ej. FRAG-QUIM-015" required>
+            </div>
+            <div>
+              <label class="login-form-label">Código de Barras (EAN-13)</label>
+              <input type="text" id="crudBarcodeInput" class="login-input" style="padding-left:14px;" placeholder="Auto-generado si está vacío">
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label class="login-form-label">Nombre Comercial del Producto (*)</label>
+            <input type="text" id="crudNameInput" class="login-input" style="padding-left:14px;" placeholder="Ej. Desinfectante Lavanda Concentrado Galón" required>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label class="login-form-label">Familia de Bodega (*)</label>
+              <select id="crudFamilySelect" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; font-weight:600;">
+              </select>
+            </div>
+            <div>
+              <label class="login-form-label">Subfamilia / Categoría (*)</label>
+              <select id="crudSubfamilySelect" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit;">
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label class="login-form-label">Número de Lote</label>
+              <input type="text" id="crudBatchInput" class="login-input" style="padding-left:14px;" placeholder="LOT-2026-XXX">
+            </div>
+            <div>
+              <label class="login-form-label">Fecha de Vencimiento</label>
+              <input type="date" id="crudExpiryInput" class="login-input" style="padding-left:14px;">
+            </div>
+            <div>
+              <label class="login-form-label">Clase Peligrosidad</label>
+              <select id="crudHazardSelect" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit;">
+                <option value="NO_PELIGROSO">No Peligroso</option>
+                <option value="CORROSIVO">Corrosivo</option>
+                <option value="INFLAMABLE">Inflamable</option>
+                <option value="TOXICO">Tóxico</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label class="login-form-label">Ubicación Física en Bodega Cartago</label>
+            <input type="text" id="crudLocationInput" class="login-input" style="padding-left:14px;" placeholder="PAS-QUIM-01 / EST-01 / N-1 / P-01">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label class="login-form-label">Costo (₡)</label>
+              <input type="number" id="crudCostInput" class="login-input" style="padding-left:14px;" value="3500" required>
+            </div>
+            <div>
+              <label class="login-form-label">Precio Venta (₡)</label>
+              <input type="number" id="crudPriceInput" class="login-input" style="padding-left:14px;" value="4950" required>
+            </div>
+            <div>
+              <label class="login-form-label">Stock Inicial</label>
+              <input type="number" id="crudStockInput" class="login-input" style="padding-left:14px;" value="60" required>
+            </div>
+          </div>
+
+          <!-- FOTO OFICIAL DEL PRODUCTO (CATÁLOGO Y TIENDA WEB) -->
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:12px 14px; margin-bottom:1rem; display:flex; gap:16px; align-items:center;">
+            <div style="width:70px; height:70px; border-radius:8px; border:1px solid #CBD5E1; background:#FFF; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+              <img id="crudImagePreview" src="img/logo_oficial.png" alt="Foto Producto" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.src='img/logo_oficial.png'">
+            </div>
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label class="login-form-label" style="font-weight:700; margin:0; color:#166534;">
+                  <i class="bi bi-camera-fill"></i> Foto Oficial para Catálogo Web y Bodega
+                </label>
+                <span style="font-size:0.7rem; font-weight:700; background:#DCFCE7; color:#15803D; padding:2px 8px; border-radius:12px;">
+                  <i class="bi bi-broadcast"></i> Sincroniza en Vivo
+                </span>
+              </div>
+              <input type="file" id="crudImageFileInput" accept="image/png, image/jpeg, image/webp" class="login-input" style="padding:5px 8px; font-size:0.8rem; height:auto; margin-bottom:4px; background:#FFF;">
+              <small style="color:#64748B; font-size:0.75rem; display:block;">
+                Seleccione una imagen (JPG/PNG). Se guardará en la base de datos y se reflejará de inmediato en la tienda web.
+              </small>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label class="login-form-label">Stock Mínimo Alerta</label>
+              <input type="number" id="crudMinStockInput" class="login-input" style="padding-left:14px;" value="15">
+            </div>
+            <div>
+              <label class="login-form-label">Unidad de Medida</label>
+              <select id="crudUnitInput" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit;">
+                <option value="GALON">GALON (3.8L)</option>
+                <option value="PICHER">PICHER (19L)</option>
+                <option value="CAJA">CAJA</option>
+                <option value="PAQUETE">PAQUETE</option>
+                <option value="UNIDAD">UNIDAD</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer-custom" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <button type="button" id="btnDeleteCurrentProduct" class="btn-fragama" style="background:#FEE2E2; color:#DC2626; border:1px solid #FCA5A5; display:none;" onclick="handleModalDeleteProduct()">
+              <i class="bi bi-trash-fill"></i> Dar de Baja / Eliminar
+            </button>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn-fragama btn-outline-fragama" onclick="document.getElementById('productCrudModal').classList.remove('active')">Cancelar</button>
+            <button type="submit" id="btnSaveProductCrud" class="btn-fragama btn-primary-fragama">
+              <i class="bi bi-cloud-arrow-up-fill"></i> Guardar y Sincronizar en Tienda
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ACTUALIZAR ESTADO DE ENTREGA (CHOFER) -->
+  <div class="modal-overlay" id="deliveryStatusModal">
+    <div class="modal-box">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;">
+          <i class="bi bi-clipboard-check text-primary"></i> Registrar Estado en Destino
+        </h3>
+        <button id="closeStatusModal" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body-custom">
+        <p style="font-size:0.88rem; color:#64748B; margin-bottom:1rem;">
+          Selecciona el resultado de la entrega en el punto de contacto con el cliente:
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:1.25rem;">
+          <label style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #CBD5E1; border-radius:8px; cursor:pointer;">
+            <input type="radio" name="deliveryStatusChoice" value="Entregado" checked>
+            <div>
+              <strong style="color:#10B981;"><i class="bi bi-check-circle-fill"></i> Mercadería Entregada a Conformidad</strong>
+              <div style="font-size:0.75rem; color:#64748B;">Firma recibida y producto validado</div>
+            </div>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #CBD5E1; border-radius:8px; cursor:pointer;">
+            <input type="radio" name="deliveryStatusChoice" value="Observado">
+            <div>
+              <strong style="color:#F59E0B;"><i class="bi bi-exclamation-triangle-fill"></i> Entrega con Novedad / Parcial</strong>
+              <div style="font-size:0.75rem; color:#64748B;">Recepción parcial o empaque con daño leve</div>
+            </div>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid #CBD5E1; border-radius:8px; cursor:pointer;">
+            <input type="radio" name="deliveryStatusChoice" value="Rechazado">
+            <div>
+              <strong style="color:#EF4444;"><i class="bi bi-x-circle-fill"></i> Rechazado Totalmente</strong>
+              <div style="font-size:0.75rem; color:#64748B;">Cliente cerrado o pedido cancelado (reingreso automático a bodega)</div>
+            </div>
+          </label>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:4px;">Observaciones del Chofer / Motivo:</label>
+          <textarea id="driverNotesInput" rows="3" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px; font-family:inherit; font-size:0.85rem;" placeholder="Ej. Recibido por vigilante de turno, sello colocado en factura..."></textarea>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label style="font-weight:600; font-size:0.85rem; margin:0;">Firma Digital del Receptor:</label>
+            <button type="button" id="clearSignatureBtn" class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem; padding:2px 8px;">
+              <i class="bi bi-eraser"></i> Limpiar
+            </button>
+          </div>
+          <canvas id="driverSignatureCanvas" width="460" height="110" style="width:100%; height:110px; border:2px dashed #94A3B8; border-radius:8px; background:#FFFFFF; cursor:crosshair; touch-action:none;"></canvas>
+        </div>
+      </div>
+
+      <div class="modal-footer-custom">
+        <button class="btn-fragama btn-outline-fragama" id="cancelStatusModal">Cancelar</button>
+        <button class="btn-fragama btn-primary-fragama" id="confirmStatusBtn">Confirmar y Sincronizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ETIQUETA Y CÓDIGO DE BARRAS EAN-13 / CODE 128 -->
+  <div class="modal-overlay" id="barcodeModal">
+    <div class="modal-box" style="max-width:460px; border-radius:16px;">
+      <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
+        <h3 style="font-size:1.05rem; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-upc-scan text-warning"></i> Etiqueta Térmica &amp; Código de Barras
+        </h3>
+        <button id="closeBarcodeModal" style="background:none; border:none; font-size:1.3rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body-custom" style="text-align:center; padding:1.25rem;">
+        <h4 id="barcodeProductTitle" style="font-size:1.05rem; margin-bottom:4px; color:#1E3E62; font-weight:800;">Producto Fragama</h4>
+        <div id="barcodeProductSku" style="font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:#64748B; margin-bottom:1rem;">SKU: FRAG-DES-001</div>
+
+        <!-- Contenedor del código de barras SVG estándar de alta resolución -->
+        <div id="barcodeSvgContainer" style="display:flex; justify-content:center; margin-bottom:1rem; background:#FFF; padding:10px; border:2px dashed #CBD5E1; border-radius:10px;">
+          <svg id="barcodeCanvas"></svg>
+        </div>
+
+        <div style="display:flex; justify-content:center; gap:8px; margin-bottom:1rem;">
+          <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:4px 10px;" onclick="copyCurrentBarcodeText()">
+            <i class="bi bi-clipboard"></i> Copiar Código
+          </button>
+          <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:4px 10px;" onclick="testScanCurrentModalBarcode()">
+            <i class="bi bi-lightning-charge-fill text-warning"></i> Simular Lectura
+          </button>
+        </div>
+
+        <p style="font-size:0.76rem; color:#64748B; margin:0;">
+          Código de barras estándar compatible con pistolas láser USB/Bluetooth, terminales móviles Zebra/Honeywell y cámaras de smartphone.
+        </p>
+      </div>
+
+      <div class="modal-footer-custom" style="justify-content:center; gap:10px;">
+        <button class="btn-fragama btn-primary-fragama" onclick="window.print()">
+          <i class="bi bi-printer"></i> Imprimir Etiqueta Térmica
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MOVIMIENTO RÁPIDO DE KARDEX -->
+  <div class="modal-overlay" id="movementModal">
+    <div class="modal-box">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;">
+          <i class="bi bi-arrow-left-right text-primary"></i> Asiento Transaccional de Inventario
+        </h3>
+        <button id="closeMovementModal" onclick="closeMovementModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="quickMovementForm">
+        <div class="modal-body-custom">
+          <div style="margin-bottom:1rem;">
+            <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:4px;">Producto:</label>
+            <select id="movementProductSelect" style="width:100%; padding:9px; border:1px solid #CBD5E1; border-radius:8px; font-family:inherit;">
+              <option value="1">Desengrasante Industrial Alcalino Galón (Stock: 185)</option>
+              <option value="2">Cloro Concentrado Fragama 5.25% Galón (Stock: 320)</option>
+              <option value="3">Jabón Líquido Antibacterial Manos Galón (Stock: 140)</option>
+              <option value="4">Papel Higiénico Jumbo Roll 250m Caja x6 (Stock: 95)</option>
+              <option value="5">Toalla de Mano Interdoblada Sanitis Caja (Stock: 70)</option>
+              <option value="6">Bolsa Basura Negra 30x40 Calibre 1.2 (Stock: 18 - ¡BAJO!)</option>
+              <option value="7">Mopa Industrial Microfibra 24" (Stock: 45)</option>
+            </select>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:4px;">Tipo de Operación:</label>
+              <select id="movementTypeSelect" style="width:100%; padding:9px; border:1px solid #CBD5E1; border-radius:8px; font-family:inherit;">
+                <option value="Entrada Compra">Entrada por Compra (+)</option>
+                <option value="Salida Venta">Salida por Venta (-)</option>
+                <option value="Traslado Interno">Traslado Interno (⇄)</option>
+                <option value="Ajuste Positivo">Ajuste de Auditoría (+)</option>
+                <option value="Ajuste Negativo">Merma o Derrame (-)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:4px;">Cantidad:</label>
+              <input type="number" id="movementQtyInput" value="10" min="1" max="1000" style="width:100%; padding:9px; border:1px solid #CBD5E1; border-radius:8px; font-family:inherit;" required>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:4px;">Documento de Soporte / Factura:</label>
+            <input type="text" id="movementDocInput" placeholder="Ej. FAC-PROV-9982 o GUIA-DESP-12" style="width:100%; padding:9px; border:1px solid #CBD5E1; border-radius:8px; font-family:inherit;">
+          </div>
+        </div>
+
+        <div class="modal-footer-custom">
+          <button type="button" class="btn-fragama btn-outline-fragama" id="cancelMovementBtn" onclick="closeMovementModal()">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-save"></i> Guardar en Kardex
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: FACTURA ELECTRÓNICA IMPRESA (POS) -->
+  <div class="modal-overlay" id="invoiceReceiptModal">
+    <div class="modal-box" style="max-width:480px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.05rem; font-weight:700; color:#0B192C;">
+          <i class="bi bi-receipt text-primary"></i> Factura Electrónica Emitida
+        </h3>
+        <button id="closeInvoiceReceiptBtn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body-custom" id="invoiceReceiptBody" style="background:#FFF;">
+        <!-- Inyectado por JS con detalle de factura -->
+      </div>
+      <div class="modal-footer-custom">
+        <button class="btn-fragama btn-outline-fragama" id="dismissInvoiceReceiptBtn">Cerrar</button>
+        <button class="btn-fragama btn-primary-fragama" onclick="window.print()">
+          <i class="bi bi-printer"></i> Imprimir Factura
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRO DE NUEVO CLIENTE INSTITUCIONAL -->
+  <div class="modal-overlay" id="newCustomerModal">
+    <div class="modal-box" style="max-width:580px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;">
+          <i class="bi bi-building-add text-primary"></i> Registrar Nuevo Cliente
+        </h3>
+        <button id="closeNewCustomerBtn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="newCustomerForm">
+        <div class="modal-body-custom">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Tipo de Identificación:</label>
+              <select id="newCustDocType" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+                <option value="Juridica">Cédula Jurídica</option>
+                <option value="Fisica">Cédula Física</option>
+                <option value="DIMEX">DIMEX / Extranjero</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Número de Cédula / NITE:</label>
+              <input type="text" id="newCustId" placeholder="Ej. 3-101-998877" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Razón Social / Nombre Comercial:</label>
+            <input type="text" id="newCustName" placeholder="Ej. Supermercado El Trébol S.A." required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Persona de Contacto:</label>
+              <input type="text" id="newCustContact" placeholder="Ej. Lic. Mario Vargas" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Teléfono / Celular:</label>
+              <input type="text" id="newCustPhone" placeholder="Ej. 2552-4455 / 8877-6655" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Correo Electrónico:</label>
+              <input type="email" id="newCustEmail" placeholder="compras@eltrebol.cr" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Términos de Pago:</label>
+              <select id="newCustTerms" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+                <option value="Contado">Contado Inmediato</option>
+                <option value="Crédito 15 días">Crédito 15 días</option>
+                <option value="Crédito 30 días" selected>Crédito 30 días</option>
+                <option value="Crédito 45 días">Crédito 45 días</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Provincia de Costa Rica:</label>
+              <select id="newCustProvince" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit; font-weight:600;">
+                <option value="Cartago" selected>Cartago</option>
+                <option value="San José">San José</option>
+                <option value="Alajuela">Alajuela</option>
+                <option value="Heredia">Heredia</option>
+                <option value="Guanacaste">Guanacaste</option>
+                <option value="Puntarenas">Puntarenas</option>
+                <option value="Limón">Limón</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Cantón / Localidad:</label>
+              <input type="text" id="newCustCanton" placeholder="Ej. Central / Paraíso / Liberia" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:0.5rem;">
+            <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Dirección Exacta de Entrega de Mercadería:</label>
+            <textarea id="newCustAddress" rows="2" placeholder="Ej. 100 metros norte del parque de Paraíso, frente a Farmacia Sucre." required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer-custom">
+          <button type="button" class="btn-fragama btn-outline-fragama" id="cancelNewCustomerBtn">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-check-circle-fill"></i> Guardar y Seleccionar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: COMPROBANTE OFICIAL DE PEDIDO / PROFORMA (CON LOGO OFICIAL FACEBOOK) -->
+  <div class="modal-overlay" id="orderPrintModal">
+    <div class="modal-box" style="max-width:760px; max-height:92vh;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;">
+          <i class="bi bi-file-earmark-pdf-fill text-primary"></i> Comprobante Oficial de Pedido / Cotización
+        </h3>
+        <button id="closeOrderPrintBtn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body-custom" id="orderPrintModalBody" style="background:#FFFFFF; padding:1.75rem;">
+        <!-- Inyectado dinámicamente con encabezado corporativo y logo oficial -->
+      </div>
+
+      <div class="modal-footer-custom">
+        <button class="btn-fragama btn-outline-fragama" id="dismissOrderPrintBtn">Cerrar</button>
+        <button class="btn-fragama btn-primary-fragama" onclick="window.print()">
+          <i class="bi bi-printer"></i> Imprimir Comprobante Oficial
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRO / EDICIÓN DE PROVEEDOR -->
+  <div class="modal-overlay" id="supplierModal">
+    <div class="modal-box" style="max-width:580px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;">
+          <i class="bi bi-building-add text-primary"></i> Registrar Proveedor de Insumos
+        </h3>
+        <button id="closeSupplierModalBtn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="supplierForm">
+        <div class="modal-body-custom">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Cédula Jurídica / TaxId *:</label>
+              <input type="text" id="suppTaxId" placeholder="Ej. 3-101-045920" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Categoría de Suministros *:</label>
+              <select id="suppCategory" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+                <option value="Químicos y Desinfectantes">Químicos y Desinfectantes</option>
+                <option value="Papelería y Desechables">Papelería y Desechables</option>
+                <option value="Bolsas y Plásticos">Bolsas y Plásticos</option>
+                <option value="Útiles, Fibras y Equipos">Útiles, Fibras y Equipos</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Razón Social / Nombre de Empresa *:</label>
+            <input type="text" id="suppName" placeholder="Ej. Clorox de Centroamérica S.A." required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Persona de Contacto / Asesor *:</label>
+              <input type="text" id="suppContact" placeholder="Ej. Lic. Fernando Solís" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Teléfono Fijo Oficina:</label>
+              <input type="text" id="suppPhone" placeholder="Ej. 2290-4400" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">WhatsApp / Móvil Pedidos *:</label>
+              <input type="text" id="suppWhatsApp" placeholder="Ej. 8833-2211" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Correo Electrónico para Pedidos *:</label>
+              <input type="email" id="suppEmail" placeholder="pedidos.cr@proveedor.com" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Condiciones Comerciales / Crédito:</label>
+              <select id="suppTerms" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+                <option value="Contado">Contado</option>
+                <option value="Crédito 15 días">Crédito 15 días</option>
+                <option value="Crédito 30 días" selected>Crédito 30 días</option>
+                <option value="Crédito 45 días">Crédito 45 días</option>
+                <option value="Crédito 60 días">Crédito 60 días</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Cantón / Ubicación:</label>
+              <input type="text" id="suppCity" placeholder="Ej. San José, La Uruca" style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:0.5rem;">
+            <label style="font-weight:600; font-size:0.82rem; display:block; margin-bottom:4px;">Dirección Física de la Planta / Bodega:</label>
+            <textarea id="suppAddress" rows="2" placeholder="Ej. 400m Norte de Pozuelo, Complejo Industrial La Uruca" required style="width:100%; padding:8px; border:1px solid #CBD5E1; border-radius:6px; font-family:inherit;"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer-custom">
+          <button type="button" class="btn-fragama btn-outline-fragama" id="cancelSupplierBtn">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-save"></i> Guardar Proveedor
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: ESCÁNER QR MÓVIL DE PEDIDOS Y AUDITORÍA DE BULTOS
+       ========================================================================== -->
+  <!-- ==========================================================================
+       MODAL: LECTOR DE CÓDIGO DE BARRAS WMS (CÁMARA, PISTOLA USB & MANUAL)
+       ========================================================================== -->
+  <div class="modal-overlay" id="qrScannerModal">
+    <div class="modal-box" style="max-width:560px; border-radius:16px; overflow:hidden;">
+      <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="background:var(--fragama-orange-main); width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+            <i class="bi bi-upc-scan" style="font-size:1.3rem; color:#FFF;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:#FFFFFF; margin:0;">Lector de Código de Barras</h3>
+            <div style="font-size:0.74rem; color:#94A3B8;">EAN-13 &bull; Code 128 &bull; UPC &bull; Pistola Láser o Cámara Celular</div>
+          </div>
+        </div>
+        <button onclick="closeQrScannerModal()" style="background:none; border:none; font-size:1.4rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body-custom" style="padding:1.25rem;">
+        
+        <!-- Pestañas de Modo del Escáner de Código de Barras -->
+        <div class="scanner-mode-tabs" style="display:flex; gap:6px; margin-bottom:12px; background:#F1F5F9; padding:4px; border-radius:8px;">
+          <button type="button" class="scanner-tab-btn active" id="tabScanCamera" onclick="switchScannerMode('camera')">
+            <i class="bi bi-camera-fill"></i> Cámara Celular
+          </button>
+          <button type="button" class="scanner-tab-btn" id="tabScanGun" onclick="switchScannerMode('gun')">
+            <i class="bi bi-upc"></i> Pistola / Manual
+          </button>
+          <button type="button" class="scanner-tab-btn" id="tabScanFast" onclick="switchScannerMode('fast')">
+            <i class="bi bi-lightning-charge-fill"></i> Muestras (Demo)
+          </button>
+        </div>
+
+        <!-- MODO 1: CÁMARA REAL DEL CELULAR (RETÍCULA HORIZONTAL DE CÓDIGO DE BARRAS 1D) -->
+        <div id="scannerCameraPanel">
+          <div class="barcode-camera-viewport">
+            <div id="html5QrReaderBox" style="width:100%; height:100%;"></div>
+            <!-- Retícula horizontal con haz láser oscilante -->
+            <div class="barcode-scan-reticle">
+              <div class="barcode-laser-line"></div>
+            </div>
+          </div>
+
+          <!-- Barra de Control del Escáner Móvil (Flash/Linterna, Cambio de Lente, Reenfoque) -->
+          <div class="scanner-camera-controls">
+            <button type="button" class="btn-scanner-ctrl" id="btnToggleTorch" onclick="toggleCameraTorch()" title="Encender Linterna / Flash en Bodega">
+              <i class="bi bi-lightbulb"></i> Flash / Linterna
+            </button>
+            <button type="button" class="btn-scanner-ctrl" id="btnCycleCamera" onclick="cycleCameraDevice()" title="Alternar entre Cámaras / Lentes Traseros">
+              <i class="bi bi-arrow-repeat"></i> Cambiar Lente
+            </button>
+            <button type="button" class="btn-scanner-ctrl" onclick="restartQrCamera()" title="Reenfocar o Reiniciar Cámara">
+              <i class="bi bi-camera"></i> Reenfocar
+            </button>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.75rem; color:#64748B;">
+            <span><i class="bi bi-camera-video text-primary"></i> <span id="cameraLensIndicator">Cámara Trasera (Auto)</span></span>
+            <span><i class="bi bi-phone-vibrate text-success"></i> Vibración activa</span>
+          </div>
+        </div>
+
+        <!-- MODO 2: PISTOLA LECTORA USB / BLUETOOTH O ENTRADA MANUAL -->
+        <div id="scannerGunPanel" style="display:none;">
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <i class="bi bi-broadcast text-primary" style="font-size:1.2rem;"></i>
+              <div style="font-size:0.85rem; font-weight:700; color:#0B192C;">Escaneo con Pistola Láser USB / Bluetooth:</div>
+            </div>
+            <p style="font-size:0.78rem; color:#64748B; margin-bottom:12px;">
+              El sistema detecta automáticamente cualquier escáner de código de barras conectado. Si desea ingresar manualmente el número de código de barras (EAN-13, SKU o Código de Pedido), ingréselo a continuación:
+            </p>
+            <form onsubmit="handleManualBarcodeSubmit(event)" style="display:flex; gap:8px;">
+              <div style="flex:1; position:relative;">
+                <input type="text" id="barcodeManualInput" class="login-input" placeholder="Ej. 7401009823011 o FRAG-CLO-001..." style="padding-left:36px; font-family:'JetBrains Mono',monospace; font-weight:700;">
+                <i class="bi bi-upc-scan" style="position:absolute; left:12px; top:12px; color:#94A3B8;"></i>
+              </div>
+              <button type="submit" class="btn-fragama btn-primary-fragama" style="padding:10px 16px;">
+                <i class="bi bi-search"></i> Buscar
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODO 3: CÓDIGOS DE MUESTRA PARA PROBAR EN PANTALLA O CON OTRA CÁMARA -->
+        <div id="scannerFastPanel" style="display:none;">
+          <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:8px; padding:10px; margin-bottom:10px; font-size:0.78rem; color:#0369A1;">
+            <i class="bi bi-hand-index-thumb"></i> Haga clic sobre cualquier producto para simular la lectura de su código de barras, o apunte su celular a la pantalla:
+          </div>
+          <div class="quick-order-sim-list" id="quickProductSimList">
+            <!-- Inyectado por JS con los códigos de barra de productos de la bodega -->
+          </div>
+        </div>
+
+        <!-- SECCIÓN DE RESULTADO DEL ESCANEO: PRODUCTO IDENTIFICADO O PEDIDO -->
+        <div id="scannerResultContainer" style="display:none; margin-top:14px; border:2px solid #0284C7; border-radius:12px; background:#F8FAFC; padding:14px;">
+          <!-- Inyectado dinámicamente: Si es Producto de Bodega o Pedido de Despacho -->
+          <div id="scannerResultDynamicContent"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: VER CÓDIGO DE BARRAS & QR DE PEDIDO / BULTOS
+       ========================================================================== -->
+  <div class="modal-overlay" id="orderQrModal">
+    <div class="modal-box" style="max-width:440px; text-align:center; border-radius:16px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.05rem; font-weight:800; color:#0B192C;">
+          <i class="bi bi-upc-scan text-primary"></i> Código de Barras &amp; QR de Despacho
+        </h3>
+        <button onclick="document.getElementById('orderQrModal').classList.remove('active')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="modal-body-custom" style="padding:1.5rem;">
+        <div style="font-size:0.85rem; color:#64748B; margin-bottom:12px;" id="orderQrSubtitle">
+          Escanee el código de barras o QR con la pistola láser o cámara de smartphone
+        </div>
+
+        <!-- Contenedor del código de barras y QR generado dinámicamente -->
+        <div id="orderQrRenderContainer" style="display:inline-block; padding:16px; background:#FFFFFF; border:2px dashed #CBD5E1; border-radius:14px; margin-bottom:14px; width:100%;">
+          <!-- SVG / Canvas del Barcode y QR -->
+        </div>
+
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; text-align:left; font-size:0.8rem; margin-bottom:14px;">
+          <div style="font-weight:700; color:#0B192C; margin-bottom:3px;" id="orderQrInfoTitle">PED-2026-00142</div>
+          <div style="color:#64748B;" id="orderQrInfoCust">Restaurante El Fogón Tico &bull; Cartago</div>
+          <div style="margin-top:4px; font-weight:600; color:#0284C7;" id="orderQrInfoPackages">10x Bolsas, 20x Cajas, 4x Galones</div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn-fragama btn-outline-fragama" style="flex:1; justify-content:center;" onclick="window.print()">
+            <i class="bi bi-printer"></i> Imprimir Viñeta
+          </button>
+          <button type="button" class="btn-fragama btn-primary-fragama" style="flex:1; justify-content:center;" onclick="document.getElementById('orderQrModal').classList.remove('active')">
+            <i class="bi bi-check-lg"></i> Listo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: ASIGNAR RUTA NACIONAL DE REPARTO (TODO COSTA RICA)
+       ========================================================================== -->
+  <div class="modal-overlay" id="assignRouteModal">
+    <div class="modal-box" style="max-width:620px; border-radius:16px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:800; color:#0B192C;">
+          <i class="bi bi-signpost-2-fill text-primary"></i> Asignar Despacho a Ruta Nacional (Costa Rica)
+        </h3>
+        <button onclick="document.getElementById('assignRouteModal').classList.remove('active')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="assignRouteForm" onsubmit="handleAssignRouteSubmit(event)">
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Seleccionar Pedido o Cliente *</label>
+            <select id="routeOrderSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:9px 10px; font-size:0.85rem; font-family:inherit;" onchange="syncRouteOrderDetails()">
+              <!-- Opciones dinámicas de pedidos alistados -->
+            </select>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Provincia de Costa Rica *</label>
+              <select id="routeProvinceSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:9px 10px; font-size:0.85rem; font-family:inherit; font-weight:700;" onchange="updateCantonsList()">
+                <option value="Cartago" selected>Cartago</option>
+                <option value="San José">San José</option>
+                <option value="Alajuela">Alajuela</option>
+                <option value="Heredia">Heredia</option>
+                <option value="Guanacaste">Guanacaste</option>
+                <option value="Puntarenas">Puntarenas</option>
+                <option value="Limón">Limón</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Cantón / Lugar Exacto *</label>
+              <input type="text" id="routeCantonInput" placeholder="Ej. Liberia Centro / La Fortuna / Quepos" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Dirección Detallada de Entrega *</label>
+            <input type="text" id="routeAddressInput" placeholder="Ej. 200m Oeste del Parque Central, frente a Supermercado" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit;">
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">
+              <i class="bi bi-box-seam"></i> Desglose de Bultos / Carga para el QR *
+            </label>
+            <input type="text" id="routePackagesInput" placeholder="Ej. 10x Bolsas Industriales, 20x Cajas Papel Jumbo, 4x Galones Desengrasante" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit; font-weight:600;">
+            <small style="color:#64748B; font-size:0.75rem;">Esta es la lista que se codificará en el QR para que el chofer la audite desde el celular.</small>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Chofer y Unidad Asignada:</label>
+              <select id="routeDriverSelect" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit;">
+                <option value="Minor Coto - Camión Isuzu CL-294012" selected>Minor Coto (Isuzu CL-294012)</option>
+                <option value="Alexander Gómez - Camión Hino CL-301140">Alexander Gómez (Hino CL-301140)</option>
+                <option value="Carlos Morales - Panel Nissan CL-198822">Carlos Morales (Panel CL-198822)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Hora Estimada de Salida:</label>
+              <input type="text" id="routeDepartureInput" value="08:00 AM" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit;">
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer-custom">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="document.getElementById('assignRouteModal').classList.remove('active')">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-check2-circle"></i> Asignar y Generar Ruta con QR
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CREACIÓN Y ASIGNACIÓN DE NUEVO USUARIO Y ROL
+       ========================================================================== -->
+  <div class="modal-overlay" id="newUserModal" style="z-index:1085;">
+    <div class="modal-box" style="max-width:520px; border-radius:16px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:800; color:#0B192C;">
+          <i class="bi bi-person-plus-fill text-primary"></i> Mantenimiento de Usuarios: Registrar Colaborador
+        </h3>
+        <button type="button" onclick="closeModalDirectly('newUserModal')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="newUserForm" onsubmit="handleCreateUserSubmit(event)">
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Nombre de Usuario (Login) *</label>
+              <input type="text" id="newUsername" placeholder="Ej. mcampos" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;" autocomplete="off">
+            </div>
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-size:0.8rem; font-weight:700; color:#0B192C;">Contraseña Asignada por Admin *</label>
+                <button type="button" onclick="generateRandomTempPassForNewUser()" style="background:none; border:none; color:#0284C7; font-size:0.74rem; font-weight:700; cursor:pointer;">
+                  <i class="bi bi-magic"></i> Sugerir Clave
+                </button>
+              </div>
+              <div style="position:relative;">
+                <input type="text" id="newUserPass" placeholder="Ej. Fragama#7481" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 36px 8px 10px; font-size:0.85rem; font-family:'JetBrains Mono',monospace; font-weight:700;">
+                <button type="button" id="toggleNewUserPassBtn" onclick="togglePasswordVisibility('newUserPass', 'toggleNewUserPassBtn')" title="Ver/Ocultar contraseña" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#64748B; cursor:pointer; font-size:1rem; padding:4px;">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+              <small style="color:#64748B; font-size:0.72rem;">El Administrador define o genera la clave que entregará al usuario.</small>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Nombre Completo del Colaborador *</label>
+            <input type="text" id="newUserName" placeholder="Ej. Mario Campos Vargas" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;">
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Correo Electrónico Corporativo *</label>
+            <input type="email" id="newUserEmail" placeholder="mcampos@fragama.com" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;">
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Rol del Sistema a Otorgar *</label>
+            <select id="newUserRoleSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:9px 10px; font-size:0.85rem; font-weight:700;">
+              <option value="Bodeguero" selected>📦 Bodeguero (Almacén, Inventarios, Kardex y Carga Excel)</option>
+              <option value="Cajero">💰 Cajero (Punto de Venta POS, Cobro y Facturación)</option>
+              <option value="Chofer">🚚 Chofer (Rutas de Despacho y Escaneo de Entrega)</option>
+              <option value="Vendedor">🛒 Vendedor (Catálogo, Pedidos y Cotizaciones)</option>
+              <option value="Administrador">👑 Administrador (Acceso Total, Roles y Configuración)</option>
+            </select>
+          </div>
+
+          <input type="hidden" id="newUserMustChangePass" value="false">
+
+        </div>
+
+        <div class="modal-footer-custom">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeModalDirectly('newUserModal')">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-check2-circle"></i> Guardar y Crear Usuario en Base de Datos
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: EDITAR Y ADMINISTRAR COLABORADOR (CRUD COMPLETO)
+       ========================================================================== -->
+  <div class="modal-overlay" id="editUserModal" style="z-index:1085;">
+    <div class="modal-box" style="max-width:540px; border-radius:16px;">
+      <div class="modal-header-custom">
+        <h3 style="font-size:1.1rem; font-weight:800; color:#0B192C;">
+          <i class="bi bi-pencil-square text-primary"></i> Editar Colaborador: <span id="editUserModalTitle"></span>
+        </h3>
+        <button type="button" onclick="closeModalDirectly('editUserModal')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="editUserForm" onsubmit="handleEditUserSubmit(event)">
+        <input type="hidden" id="editUserId">
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Nombre de Usuario (Login) *</label>
+              <input type="text" id="editUsername" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;" autocomplete="off">
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Rol en Sistema *</label>
+              <select id="editUserRoleSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-weight:700;">
+                <option value="Administrador">👑 Administrador (Acceso Total)</option>
+                <option value="Bodeguero">📦 Bodeguero (Almacén y Kardex)</option>
+                <option value="Cajero">💰 Cajero (Punto de Venta POS)</option>
+                <option value="Chofer">🚚 Chofer (Rutas y Móvil)</option>
+                <option value="Vendedor">🛒 Vendedor (Pedidos y Cotizaciones)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Nombre Completo del Colaborador *</label>
+            <input type="text" id="editUserName" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;">
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Correo Electrónico Corporativo *</label>
+            <input type="email" id="editUserEmail" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Nueva Contraseña (Opcional)</label>
+              <input type="text" id="editUserPass" placeholder="Dejar en blanco para no cambiar" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:'JetBrains Mono',monospace;">
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Estado en Base de Datos</label>
+              <select id="editUserStatusSelect" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-weight:700;">
+                <option value="true">🟢 Activo (Acceso Autorizado)</option>
+                <option value="false">🔴 Dado de Baja (Acceso Bloqueado)</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer-custom" style="display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="btn-fragama" id="btnDeleteUserInModal" style="background:#FEE2E2; color:#DC2626; border:1px solid #FCA5A5;" onclick="handleModalDeleteUser()">
+            <i class="bi bi-trash-fill"></i> Eliminar Usuario
+          </button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeModalDirectly('editUserModal')">Cancelar</button>
+            <button type="submit" class="btn-fragama btn-primary-fragama">
+              <i class="bi bi-check2-circle"></i> Guardar Cambios
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: ASIGNAR / RESTABLECER CONTRASEÑA POR EL ADMINISTRADOR
+       ========================================================================== -->
+  <div class="modal-overlay" id="resetTempPassModal">
+    <div class="modal-box" style="max-width:460px; border-radius:16px;">
+      <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
+        <h3 style="font-size:1.05rem; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-key-fill text-warning"></i> Asignar Contraseña (Administrador)
+        </h3>
+        <button type="button" onclick="closeModalDirectly('resetTempPassModal')" style="background:none; border:none; font-size:1.3rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="resetTempPassForm" onsubmit="handleSaveTempPass(event)">
+        <input type="hidden" id="resetTempPassUserId">
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; margin-bottom:12px;">
+            <div style="font-size:0.75rem; color:#64748B; text-transform:uppercase; font-weight:700;">Colaborador Seleccionado:</div>
+            <div style="font-size:0.95rem; font-weight:800; color:#0B192C;" id="resetTempPassUserName">Mario Campos</div>
+            <div style="font-size:0.78rem; color:#0284C7; font-family:'JetBrains Mono',monospace;" id="resetTempPassUserHandle">@mcampos</div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="font-size:0.8rem; font-weight:700; color:#0B192C;">Nueva Contraseña Asignada por el Administrador *</label>
+              <button type="button" onclick="generateRandomTempPassForExistingUser()" style="background:none; border:none; color:#0284C7; font-size:0.75rem; font-weight:700; cursor:pointer;">
+                <i class="bi bi-arrow-repeat"></i> Sugerir Otra
+              </button>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="resetTempPassValue" required style="flex:1; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.9rem; font-family:'JetBrains Mono',monospace; font-weight:800; color:#0B192C;">
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:8px 12px;" onclick="copyTempPassInput()" title="Copiar al portapapeles">
+                <i class="bi bi-clipboard"></i>
+              </button>
+            </div>
+            <input type="hidden" id="resetMustChangeCheck" value="false">
+            <small style="color:#64748B; font-size:0.74rem;">Esta es la clave asignada con la que el colaborador podrá acceder al sistema WMS.</small>
+          </div>
+
+        </div>
+
+        <div class="modal-footer-custom" style="padding:1rem; gap:8px;">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeModalDirectly('resetTempPassModal')">Cancelar</button>
+          <button type="submit" id="btnSaveTempPassSubmit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-check2-circle"></i> Aplicar Contraseña
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CAMBIAR MI CONTRASEÑA PERSONAL (USUARIO AUTENTICADO)
+       ========================================================================== -->
+  <div class="modal-overlay" id="selfChangePasswordModal" style="z-index:99999;">
+    <div class="modal-box" style="max-width:440px; border-radius:16px;">
+      <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
+        <h3 style="font-size:1.05rem; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-key-fill text-warning"></i> Cambiar Mi Contraseña
+        </h3>
+        <button type="button" onclick="closeSelfPasswordModal()" style="background:none; border:none; font-size:1.3rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="selfChangePasswordForm" onsubmit="handleSelfChangePasswordSubmit(event)">
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; margin-bottom:14px;">
+            <div style="font-size:0.75rem; color:#64748B; text-transform:uppercase; font-weight:700;">Usuario:</div>
+            <div style="font-size:0.95rem; font-weight:800; color:#0B192C;" id="selfPassUserName">Colaborador</div>
+            <div style="font-size:0.78rem; color:#0284C7; font-family:'JetBrains Mono',monospace;" id="selfPassUserHandle">@usuario</div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Nueva Contraseña *</label>
+            <div style="position:relative;">
+              <input type="password" id="selfNewPass" required minlength="4" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 36px 8px 10px; font-size:0.85rem;" placeholder="Mínimo 4 caracteres">
+              <button type="button" id="toggleSelfNewPassBtn" onclick="togglePasswordVisibility('selfNewPass', 'toggleSelfNewPassBtn')" title="Ver/Ocultar contraseña" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#64748B; cursor:pointer; font-size:1rem; padding:4px;">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem; font-weight:700; color:#64748B; display:block; margin-bottom:4px;">Confirmar Nueva Contraseña *</label>
+            <div style="position:relative;">
+              <input type="password" id="selfConfirmPass" required minlength="4" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 36px 8px 10px; font-size:0.85rem;" placeholder="Repita la nueva contraseña">
+              <button type="button" id="toggleSelfConfirmPassBtn" onclick="togglePasswordVisibility('selfConfirmPass', 'toggleSelfConfirmPassBtn')" title="Ver/Ocultar contraseña" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#64748B; cursor:pointer; font-size:1rem; padding:4px;">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="selfPassAlert" style="display:none; color:#DC2626; font-size:0.75rem; font-weight:700; margin-bottom:10px;"></div>
+
+        </div>
+
+        <div class="modal-footer-custom" style="padding:1rem; gap:8px;">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeSelfPasswordModal()">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama">
+            <i class="bi bi-shield-check"></i> Actualizar Contraseña
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       BARRA DE NAVEGACIÓN INFERIOR PARA CELULARES (MOBILE BOTTOM NAV)
+       ========================================================================== -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button type="button" class="mobile-nav-item active" id="mobNavHome" onclick="switchMobileNav('view-admin-dashboard', this)">
+      <i class="bi bi-house-door-fill"></i>
+      <span>Inicio</span>
+    </button>
+    <button type="button" class="mobile-nav-item" id="mobNavInventory" onclick="switchMobileNav('view-product-maintenance', this)">
+      <i class="bi bi-boxes"></i>
+      <span>Bodega</span>
+    </button>
+    
+    <!-- BOTÓN CENTRAL DESTACADO PARA ESCANEAR CÓDIGO DE BARRAS DESDE EL CELULAR -->
+    <button type="button" class="mobile-nav-item mobile-nav-scan" onclick="openBarcodeScannerModal()" title="Escanear con Cámara">
+      <div class="mobile-scan-btn-circle">
+        <i class="bi bi-upc-scan"></i>
+      </div>
+      <span>Escanear</span>
+    </button>
+
+    <button type="button" class="mobile-nav-item" id="mobNavOrders" onclick="switchMobileNav('view-customer-orders', this)">
+      <i class="bi bi-clipboard-check-fill"></i>
+      <span>Pedidos</span>
+    </button>
+    <button type="button" class="mobile-nav-item" id="mobNavPos" onclick="switchMobileNav('view-cajero-pos', this)">
+      <i class="bi bi-cash-stack"></i>
+      <span>Caja POS</span>
+    </button>
+  </nav>
+
+  <!-- Scripts: Barcode Generator (JsBarcode), QR Generator, Camera Barcode Scanner & Main App -->
+  <script src="js/JsBarcode.all.min.js"></script>
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/html5-qrcode.min.js"></script>
+  <script src="js/catalog-data.js?v=20261001_4"></script>
+  <script src="js/app.js?v=20261001_reports_pro_v7"></script>
+</body>
+</html>
