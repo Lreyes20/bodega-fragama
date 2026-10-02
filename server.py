@@ -710,14 +710,14 @@ def get_orders():
                        so.TotalAmount as total,
                        so.Source as source,
                        so.CreatedAt as date,
-                       c.CustomerId as customerId,
-                       c.BusinessName as customerName,
-                       c.TaxId as customerTaxId,
-                       c.Phone as customerPhone,
-                       c.Address as customerAddress,
+                       COALESCE(c.CustomerId, so.CustomerId, 9999) as customerId,
+                       COALESCE(c.BusinessName, 'Cliente Tienda Web') as customerName,
+                       COALESCE(c.TaxId, 'N/A') as customerTaxId,
+                       COALESCE(c.Phone, '') as customerPhone,
+                       COALESCE(c.Address, '') as customerAddress,
                        so.AssignedToUserId as assignedUserId,
-                       u.FullName as assignedUserName,
-                       r.Name as assignedUserRole,
+                       COALESCE(u.FullName, 'Carlos Piedra (Ventas / Despacho)') as assignedUserName,
+                       COALESCE(r.Name, 'Vendedor') as assignedUserRole,
                        COALESCE(so.PreparedByName, '') as preparedByName,
                        COALESCE(so.PreparedByUserId, 0) as preparedByUserId,
                        COALESCE(so.DriverName, '') as driverName,
@@ -728,7 +728,7 @@ def get_orders():
                        so.DeliveredAt as deliveredAt,
                        so.DispatchedAt as dispatchedAt
                 FROM SalesOrders so
-                INNER JOIN Customers c ON so.CustomerId = c.CustomerId
+                LEFT JOIN Customers c ON so.CustomerId = c.CustomerId
                 LEFT JOIN Users u ON so.AssignedToUserId = u.UserId
                 LEFT JOIN Roles r ON u.RoleId = r.RoleId
                 ORDER BY so.SalesOrderId DESC

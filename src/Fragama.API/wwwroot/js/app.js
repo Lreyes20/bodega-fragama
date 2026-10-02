@@ -679,6 +679,26 @@ async function loadInitialDataFromSql() {
     if (ordersRes.status === 'fulfilled' && ordersRes.value && Array.isArray(ordersRes.value)) {
       AppState.salesOrders = ordersRes.value;
     }
+
+    // Integración con pedidos web almacenados en localStorage (contingencia local / offline)
+    try {
+      const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+      if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
+        const existingCodes = new Set(AppState.salesOrders.map(o => o.orderCode));
+        localWebOrders.forEach(lwo => {
+          if (!existingCodes.has(lwo.orderCode)) {
+            AppState.salesOrders.unshift(lwo);
+            existingCodes.add(lwo.orderCode);
+            // Sincronizar silenciosamente al servidor si no estaba asentado
+            fetch('/api/public/orders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(lwo)
+            }).catch(() => {});
+          }
+        });
+      }
+    } catch (e) {}
     if (custsRes.status === 'fulfilled' && custsRes.value && Array.isArray(custsRes.value) && custsRes.value.length > 0) {
       AppState.customers = custsRes.value;
     }
@@ -775,6 +795,11 @@ function initRealtimeOrderSync() {
         updateWebOrdersBadges();
         renderDashboardAnalytics();
         
+        // Refrescar bandeja dedicada de pedidos web si está disponible
+        if (typeof renderWebOrdersFullTable === 'function') {
+          renderWebOrdersFullTable();
+        }
+
         // Refrescar historial si está activo
         const historyTbody = document.getElementById('orderHistoryTableBody');
         if (historyTbody) {
@@ -812,15 +837,67 @@ function playOrderChime() {
   } catch (e) {}
 }
 
+function isWebOrder(o) {
+  if (!o) return false;
+  const dt = String(o.docType || '').toUpperCase().trim();
+  const src = String(o.source || '').toUpperCase().trim();
+  const code = String(o.orderCode || '').toUpperCase().trim();
+  return dt === 'PEDIDO_WEB' || src === 'TIENDA_WEB' || code.includes('WEB');
+}
+
+function isOrderPending(o) {
+  if (!o) return false;
+  const s = String(o.status || '').toUpperCase().trim();
+  return s === 'PENDIENTE' || s === 'SOLICITADO' || s === 'PENDIENTE ALISTO' || s === 'NUEVO';
+}
+
 function updateWebOrdersBadges() {
-  const pendingWeb = AppState.salesOrders.filter(o => 
-    (o.docType === 'PEDIDO_WEB' || o.source === 'TIENDA_WEB' || (o.orderCode && o.orderCode.includes('WEB'))) && 
-    o.status === 'PENDIENTE'
-  );
+  const webOrders = AppState.salesOrders.filter(isWebOrder);
+  const pendingWeb = webOrders.filter(isOrderPending);
   const count = pendingWeb.length;
   
   const sideBadge = document.getElementById('badgePendingWebOrders');
-  if (sideBadge) sideBadge.textContent = count;
+  if (sideBadge) {
+    sideBadge.textContent = count;
+    sideBadge.style.background = count > 0 ? '#F59E0B' : '#10B981';
+  }
+
+  const totalBadge = document.getElementById('badgeWebOrdersTotalBadge');
+  if (totalBadge) {
+    totalBadge.textContent = `${webOrders.length} pedidos web`;
+  }
+
+  const kpiPending = document.getElementById('kpiWebPending');
+  if (kpiPending) kpiPending.textContent = count;
+
+  const kpiPrepared = document.getElementById('kpiWebPrepared');
+  if (kpiPrepared) {
+    kpiPrepared.textContent = webOrders.filter(o => {
+      const s = String(o.status || '').toUpperCase().trim();
+      return s === 'ALISTADO' || s === 'EN_ALISTADO';
+    }).length;
+  }
+
+  const kpiInRoute = document.getElementById('kpiWebInRoute');
+  if (kpiInRoute) {
+    kpiInRoute.textContent = webOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
+  }
+
+  const kpiDelivered = document.getElementById('kpiWebDelivered');
+  if (kpiDelivered) {
+    kpiDelivered.textContent = webOrders.filter(o => {
+      const s = String(o.status || '').toUpperCase().trim();
+      return s === 'ENTREGADO' || s === 'FACTURADO';
+    }).length;
+  }
+
+  const kpiUndelivered = document.getElementById('kpiWebUndelivered');
+  if (kpiUndelivered) {
+    kpiUndelivered.textContent = webOrders.filter(o => {
+      const s = String(o.status || '').toUpperCase().trim();
+      return s === 'NO_ENTREGADO' || s === 'RECHAZADO';
+    }).length;
+  }
   
   const topCount = document.getElementById('topLiveWebOrdersCount');
   if (topCount) topCount.textContent = count;
@@ -881,6 +958,7 @@ function renderAllViews() {
   renderPosCatalog();
   renderPosCart();
   renderCustomerOrdersView();
+  renderWebOrdersView();
   renderSuppliersGrid();
   renderDriverDispatches();
   renderUsersRolesTable();
@@ -1386,6 +1464,7 @@ const RolePermissions = {
     homeView: 'view-admin-dashboard',
     allowedViews: [
       'view-admin-dashboard',
+      'view-alistado-web',
       'view-families-management',
       'view-product-maintenance',
       'view-excel-bulk-import',
@@ -1399,8 +1478,9 @@ const RolePermissions = {
     ]
   },
   'Bodeguero': {
-    homeView: 'view-bodega-kardex',
+    homeView: 'view-alistado-web',
     allowedViews: [
+      'view-alistado-web',
       'view-product-maintenance',
       'view-excel-bulk-import',
       'view-bodega-kardex',
@@ -1418,12 +1498,14 @@ const RolePermissions = {
   'Chofer': {
     homeView: 'view-chofer-mobile',
     allowedViews: [
+      'view-alistado-web',
       'view-chofer-mobile'
     ]
   },
   'Vendedor': {
     homeView: 'view-customer-orders',
     allowedViews: [
+      'view-alistado-web',
       'view-customer-orders',
       'view-product-maintenance'
     ]
@@ -1551,6 +1633,11 @@ window.switchViewDirectly = function(viewId) {
   const pageSubtitle = document.getElementById('pageSubtitle');
 
   switch (viewId) {
+    case 'view-alistado-web':
+      if (pageTitle) pageTitle.textContent = 'Alistado & Despacho de Pedidos Web';
+      if (pageSubtitle) pageSubtitle.textContent = 'Bandeja de pedidos entrantes de la Tienda Virtual Fragama | Picking, Asignación y Kardex';
+      renderWebOrdersView();
+      break;
     case 'view-admin-dashboard':
       if (pageTitle) pageTitle.textContent = 'Panel de Control - Distribuidora Fragama';
       if (pageSubtitle) pageSubtitle.textContent = 'Bodega Central Taras, Cartago | WMS con control de Familias y Lotes';
@@ -5224,7 +5311,24 @@ function renderOrderHistory() {
   const searchTerm = document.getElementById('orderHistorySearchInput')?.value.trim().toLowerCase() || '';
 
   const filtered = AppState.salesOrders.filter(order => {
-    const matchStatus = (statusFilter === 'ALL') || (order.status === statusFilter);
+    const st = (order.status || '').toUpperCase().trim();
+    let matchStatus = (statusFilter === 'ALL');
+    if (statusFilter === 'PENDIENTE') {
+      matchStatus = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+    } else if (statusFilter === 'ALISTADO') {
+      matchStatus = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+    } else if (statusFilter === 'EN_RUTA') {
+      matchStatus = (st === 'EN_RUTA');
+    } else if (statusFilter === 'FACTURADO' || statusFilter === 'ENTREGADO') {
+      matchStatus = (st === 'ENTREGADO' || st === 'FACTURADO');
+    } else if (statusFilter === 'NO_ENTREGADO') {
+      matchStatus = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+    } else if (statusFilter === 'COTIZACION') {
+      matchStatus = (st === 'COTIZACION');
+    } else if (statusFilter !== 'ALL') {
+      matchStatus = (order.status === statusFilter);
+    }
+
     const matchAssignee = (assigneeFilter === 'ALL') ||
       (String(order.assignedUserId) === assigneeFilter) ||
       (order.assignedUserHandle === assigneeFilter);
@@ -7553,3 +7657,225 @@ function renderSuppliersGrid(searchTerm = '', categoryFilter = 'ALL') {
     `;
   }).join('');
 }
+
+// ==============================================================================
+// BANDEJA DEDICADA DE ALISTADO Y DESPACHO DE PEDIDOS WEB
+// ==============================================================================
+let _currentWebOrderFilter = 'ALL';
+
+window.filterWebOrdersView = function(filterVal, btnElement) {
+  _currentWebOrderFilter = filterVal;
+  document.querySelectorAll('#webOrdersFilterGroup .web-filter-btn').forEach(btn => {
+    btn.classList.remove('btn-primary-fragama', 'active');
+    btn.classList.add('btn-outline-fragama');
+  });
+  if (btnElement) {
+    btnElement.classList.add('btn-primary-fragama', 'active');
+    btnElement.classList.remove('btn-outline-fragama');
+  }
+  renderWebOrdersFullTable();
+};
+
+window.renderWebOrdersView = function() {
+  updateWebOrdersBadges();
+  renderWebOrdersFullTable();
+};
+
+window.renderWebOrdersFullTable = function() {
+  const tbody = document.getElementById('webOrdersFullTableBody');
+  if (!tbody) return;
+
+  const searchInput = document.getElementById('webOrdersSearchInput');
+  const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+  // Filtrar solo pedidos web
+  const webOrders = AppState.salesOrders.filter(isWebOrder);
+
+  const filtered = webOrders.filter(order => {
+    const st = (order.status || 'PENDIENTE').toUpperCase().trim();
+    let matchFilter = true;
+    if (_currentWebOrderFilter === 'PENDIENTE') {
+      matchFilter = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+    } else if (_currentWebOrderFilter === 'ALISTADO') {
+      matchFilter = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+    } else if (_currentWebOrderFilter === 'EN_RUTA') {
+      matchFilter = (st === 'EN_RUTA');
+    } else if (_currentWebOrderFilter === 'ENTREGADO') {
+      matchFilter = (st === 'ENTREGADO' || st === 'FACTURADO');
+    } else if (_currentWebOrderFilter === 'NO_ENTREGADO') {
+      matchFilter = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+    }
+
+    const matchSearch = !searchTerm ||
+      (order.orderCode && order.orderCode.toLowerCase().includes(searchTerm)) ||
+      (order.customerName && order.customerName.toLowerCase().includes(searchTerm)) ||
+      (order.customerPhone && order.customerPhone.toLowerCase().includes(searchTerm)) ||
+      (order.deliveryRoute && order.deliveryRoute.toLowerCase().includes(searchTerm)) ||
+      (order.customerTaxId && order.customerTaxId.toLowerCase().includes(searchTerm));
+
+    return matchFilter && matchSearch;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding:3rem 1rem; color:#64748B;">
+          <i class="bi bi-inbox" style="font-size:2.2rem; color:#CBD5E1; display:block; margin-bottom:8px;"></i>
+          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos web coincidentes con el filtro actual</span>
+          <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
+            Los pedidos generados por clientes en la Tienda Virtual de Fragama ingresarán automáticamente a esta bandeja.
+          </p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(o => {
+    const st = (o.status || 'PENDIENTE').toUpperCase().trim();
+    const isPending = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+    const isPrepared = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+    const isInRoute = (st === 'EN_RUTA');
+    const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
+    const isUndelivered = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+
+    let badgeHtml = '';
+    if (isPending) {
+      badgeHtml = `<span class="badge-status badge-observed" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; font-weight:800;"><i class="bi bi-clock"></i> Pendiente Alisto</span>`;
+    } else if (isPrepared) {
+      badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:800;"><i class="bi bi-box-seam"></i> Alistado en Bodega</span>`;
+    } else if (isInRoute) {
+      badgeHtml = `<span class="badge-status" style="background:#F3E8FF; color:#6B21A8; border:1px solid #DDD6FE; font-weight:800;"><i class="bi bi-truck"></i> En Ruta</span>`;
+    } else if (isDelivered) {
+      badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-weight:800;"><i class="bi bi-check-circle-fill"></i> Entregado (Kardex Rebajado)</span>`;
+    } else if (isUndelivered) {
+      badgeHtml = `<span class="badge-status" style="background:#FEF2F2; color:#991B1B; border:1px solid #FCA5A5; font-weight:800;" title="${escapeHtml(o.undeliveredReason || 'Rechazado')}"><i class="bi bi-x-circle-fill"></i> No Entregado</span>`;
+    } else {
+      badgeHtml = `<span class="badge-status" style="background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; font-weight:700;">${st}</span>`;
+    }
+
+    const items = Array.isArray(o.items) ? o.items : [];
+    const itemsCount = items.length;
+    const totalUnits = items.reduce((s, it) => s + (Number(it.qty) || 1), 0);
+    const targetCode = o.orderCode || o.id;
+
+    const itemsSummary = items.length > 0 
+      ? items.slice(0, 3).map(it => `• <strong>${it.qty}x</strong> ${escapeHtml(it.name || it.sku)}`).join('<br>') + (items.length > 3 ? `<br><small style="color:#64748B;">(+${items.length - 3} artículos más...)</small>` : '')
+      : '<span style="color:#94A3B8;">Sin artículos detallados</span>';
+
+    return `
+      <tr style="border-bottom:1px solid #E2E8F0; ${isPending ? 'background:#F0FDF4;' : ''}">
+        <td style="padding:12px 14px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
+          ${o.orderCode}
+          ${isPending ? `<span style="display:inline-block; font-size:0.65rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:4px; font-weight:800; animation:pulse 2s infinite;">NUEVO</span>` : ''}
+          <div style="font-size:0.72rem; color:#64748B; font-family:inherit; font-weight:normal; margin-top:2px;">
+            ${o.date || 'Hoy'}
+          </div>
+        </td>
+        <td style="padding:12px 14px;">
+          <div style="font-weight:700; color:#0B192C;">${escapeHtml(o.customerName || 'Cliente')}</div>
+          <div style="font-size:0.75rem; color:#64748B;">Céd: ${escapeHtml(o.customerTaxId || 'N/A')}</div>
+          ${o.customerPhone ? `
+            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="font-size:0.75rem; color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; margin-top:2px;">
+              <i class="bi bi-whatsapp"></i> ${escapeHtml(o.customerPhone)}
+            </a>
+          ` : ''}
+        </td>
+        <td style="padding:12px 14px;">
+          <div style="font-weight:700; color:#0284C7;"><i class="bi bi-truck"></i> ${escapeHtml(o.deliveryRoute || o.deliveryDate || 'Cartago')}</div>
+          ${o.customerAddress ? `<div style="font-size:0.74rem; color:#475569; margin-top:2px; max-width:200px;"><i class="bi bi-geo-alt"></i> ${escapeHtml(o.customerAddress)}</div>` : ''}
+        </td>
+        <td style="padding:12px 14px; font-size:0.78rem;">
+          <div style="font-weight:700; color:#0F172A; margin-bottom:3px;">
+            ${itemsCount} líneas (${totalUnits} unidades)
+          </div>
+          <div style="color:#475569; line-height:1.35;">
+            ${itemsSummary}
+          </div>
+        </td>
+        <td style="padding:12px 14px; text-align:right; font-weight:800; color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace;">
+          ${formatCRC(o.total)}
+        </td>
+        <td style="padding:12px 14px;">
+          ${o.preparedByName ? `
+            <div style="font-size:0.75rem; color:#0369A1; font-weight:700;">
+              <i class="bi bi-box-seam-fill"></i> Alistó: ${escapeHtml(o.preparedByName)}
+            </div>
+          ` : `<span style="font-size:0.72rem; color:#94A3B8;">Alistador: Sin asignar</span>`}
+          ${o.driverName ? `
+            <div style="font-size:0.75rem; color:#6B21A8; font-weight:700; margin-top:2px;">
+              <i class="bi bi-truck"></i> Chofer: ${escapeHtml(o.driverName)}
+            </div>
+          ` : ''}
+          ${o.undeliveredReason ? `
+            <div style="font-size:0.72rem; color:#DC2626; font-weight:700; margin-top:2px; background:#FEF2F2; padding:2px 6px; border-radius:4px; border:1px solid #FECACA;">
+              <i class="bi bi-exclamation-circle-fill"></i> Motivo: ${escapeHtml(o.undeliveredReason)}
+            </div>
+          ` : ''}
+        </td>
+        <td style="padding:12px 14px; text-align:center;">
+          ${badgeHtml}
+        </td>
+        <td style="padding:12px 14px; text-align:center;">
+          <div style="display:flex; justify-content:center; gap:5px; flex-wrap:wrap;">
+            
+            <!-- 1. ALISTAR (PENDIENTE -> ALISTADO) -->
+            ${isPending ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:5px 10px; font-size:0.75rem; background:#10B981; border-color:#10B981; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido y Asignar Responsables">
+                <i class="bi bi-box-seam"></i> Alistar
+              </button>
+            ` : ''}
+
+            <!-- 2. DESPACHAR / RUTA -->
+            ${isPrepared ? `
+              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#7C3AED; color:#FFF; font-weight:700; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta con Chofer">
+                <i class="bi bi-truck"></i> A Ruta
+              </button>
+            ` : ''}
+
+            <!-- 3. ENTREGAR / CONFIRMAR KARDEX -->
+            ${(isPrepared || isInRoute) ? `
+              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#059669; color:#FFF; font-weight:700; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Rebajar Kardex">
+                <i class="bi bi-check-circle-fill"></i> Entregar
+              </button>
+              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#DC2626; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderUndeliveredModal('${targetCode}')" title="Registrar Motivo de No Entrega">
+                <i class="bi bi-x-circle-fill"></i> No Entregado
+              </button>
+            ` : ''}
+
+            <!-- 4. TRAZABILIDAD / AUDITORÍA -->
+            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Bitácora de Trazabilidad y Tiempos">
+              <i class="bi bi-clock-history"></i>
+            </button>
+
+            <!-- 5. IMPRIMIR COMPROBANTE -->
+            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id || 1})" title="Imprimir Comprobante Oficial">
+              <i class="bi bi-printer"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.triggerManualOrderSync = async function() {
+  try {
+    const res = await fetch('/api/orders');
+    if (res.ok) {
+      const orders = await res.json();
+      if (Array.isArray(orders)) {
+        AppState.salesOrders = orders;
+        renderAllViews();
+        if (typeof showNotificationToast === 'function') {
+          showNotificationToast(`✅ Bandeja sincronizada: ${orders.length} pedidos en total.`, 'success');
+        }
+      }
+    }
+  } catch (e) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('Aviso: Sincronizando con base de datos local.', 'info');
+    }
+  }
+};
+

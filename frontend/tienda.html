@@ -3001,9 +3001,24 @@
 
         const result = await response.json();
         const finalOrderCode = result.orderCode || generatedCode;
+        
+        // Guardar en localStorage para redundancia inmediata en el navegador
+        try {
+          const stored = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+          stored.unshift({ ...payload, orderCode: finalOrderCode, id: Date.now(), status: 'PENDIENTE' });
+          localStorage.setItem('fragama_web_orders', JSON.stringify(stored.slice(0, 50)));
+        } catch (e) {}
+
         showOrderSuccess(payload, finalOrderCode);
       } catch (err) {
         console.warn("API de Bodega en modo contingencia:", err);
+        // Guardar en localStorage para sincronizar cuando haya conexión
+        try {
+          const stored = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+          stored.unshift({ ...payload, orderCode: generatedCode, id: Date.now(), status: 'PENDIENTE' });
+          localStorage.setItem('fragama_web_orders', JSON.stringify(stored.slice(0, 50)));
+        } catch (e) {}
+
         showOrderSuccess(payload, generatedCode);
       } finally {
         submitBtn.disabled = false;

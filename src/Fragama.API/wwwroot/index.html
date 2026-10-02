@@ -367,7 +367,7 @@
       </a>
 
       <div class="collapse-menu show" id="menu-ventas" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
-        <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('history')" data-roles="Administrador,Bodeguero,Vendedor" id="navAlistadoBodega" style="background:rgba(16,185,129,0.1); border-left:3px solid #10B981;">
+        <a class="nav-link" data-view="view-alistado-web" data-roles="Administrador,Bodeguero,Vendedor,Chofer" id="navAlistadoBodega" style="background:rgba(16,185,129,0.12); border-left:3px solid #10B981;">
           <i class="bi bi-box-seam-fill" style="color:#10B981;"></i>
           <span>Alistado Pedidos Web</span>
           <span class="badge-count" id="badgePendingWebOrders" style="background:#10B981; color:#FFFFFF; font-weight:800;">0</span>
@@ -375,6 +375,10 @@
         <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('new')" data-roles="Administrador,Bodeguero,Vendedor">
           <i class="bi bi-cart-plus"></i>
           <span>Nueva Cotización / Pedido</span>
+        </a>
+        <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('history')" data-roles="Administrador,Bodeguero,Vendedor">
+          <i class="bi bi-journal-text"></i>
+          <span>Historial General de Pedidos</span>
         </a>
         <a class="nav-link" data-view="view-cajero-pos" data-roles="Administrador,Cajero">
           <i class="bi bi-receipt"></i>
@@ -1317,6 +1321,111 @@
               </thead>
               <tbody id="kardexTableBody">
                 <!-- Render dinámico vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           VISTA DEDICADA: BANDEJA DE ALISTADO Y DESPACHO DE PEDIDOS WEB
+           ==================================================================== -->
+      <section class="role-view" id="view-alistado-web">
+        <!-- Tarjeta de Encabezado Principal y Controles de Sincronización -->
+        <div class="content-card" style="margin-bottom:1.25rem; border:2px solid #A7F3D0; background:#F0FDF4; box-shadow:0 4px 16px rgba(16,185,129,0.12);">
+          <div class="card-header-custom" style="background:#ECFDF5; border-bottom:1px solid #A7F3D0; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div class="card-header-title" style="color:#065F46; font-size:1.05rem; font-weight:800; display:flex; align-items:center; gap:8px;">
+                <i class="bi bi-box-seam-fill" style="color:#10B981; font-size:1.3rem;"></i> 
+                <span>Bandeja Central de Alistado &amp; Despacho de Pedidos Web</span>
+                <span class="badge-status badge-confirmed" id="badgeWebOrdersTotalBadge" style="font-size:0.78rem; font-weight:800;">0 pedidos</span>
+              </div>
+              <p style="margin:4px 0 0 0; font-size:0.8rem; color:#047857;">
+                Pedidos entrantes desde la Tienda en Línea Fragama en tiempo real. Asigne colaboradores, gestione el picking y rebaje el Kardex al entregar.
+              </p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <button class="btn-fragama btn-outline-fragama" onclick="triggerManualOrderSync()" style="padding:6px 12px; font-size:0.8rem; background:#FFF; border-color:#10B981; color:#065F46; font-weight:700;" title="Sincronizar pedidos con la nube">
+                <i class="bi bi-arrow-clockwise"></i> Refrescar Bandeja
+              </button>
+              <a href="/tienda.html" target="_blank" class="btn-fragama btn-primary-fragama" style="padding:6px 12px; font-size:0.8rem; background:#10B981; border-color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+                <i class="bi bi-shop"></i> Abrir Tienda Web
+              </a>
+            </div>
+          </div>
+
+          <!-- Barra de Indicadores KPI del Ciclo de Vida -->
+          <div style="padding:1rem; display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; background:#FFF;">
+            <div style="background:#FEF3C7; border:1px solid #FCD34D; border-radius:10px; padding:10px 14px; text-align:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#92400E; display:block;">⏳ Pendientes Alisto</span>
+              <strong id="kpiWebPending" style="font-size:1.5rem; color:#B45309; font-family:'JetBrains Mono',monospace;">0</strong>
+            </div>
+            <div style="background:#E0F2FE; border:1px solid #BAE6FD; border-radius:10px; padding:10px 14px; text-align:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#0369A1; display:block;">📦 Alistados en Bodega</span>
+              <strong id="kpiWebPrepared" style="font-size:1.5rem; color:#0284C7; font-family:'JetBrains Mono',monospace;">0</strong>
+            </div>
+            <div style="background:#F3E8FF; border:1px solid #DDD6FE; border-radius:10px; padding:10px 14px; text-align:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#6B21A8; display:block;">🚚 En Ruta de Entrega</span>
+              <strong id="kpiWebInRoute" style="font-size:1.5rem; color:#7C3AED; font-family:'JetBrains Mono',monospace;">0</strong>
+            </div>
+            <div style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:10px; padding:10px 14px; text-align:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#065F46; display:block;">✅ Entregados (Kardex Rebajado)</span>
+              <strong id="kpiWebDelivered" style="font-size:1.5rem; color:#10B981; font-family:'JetBrains Mono',monospace;">0</strong>
+            </div>
+            <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px; padding:10px 14px; text-align:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#991B1B; display:block;">❌ No Entregados / Rechazados</span>
+              <strong id="kpiWebUndelivered" style="font-size:1.5rem; color:#DC2626; font-family:'JetBrains Mono',monospace;">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtros Rápidos y Buscador de Pedidos Web -->
+        <div class="content-card" style="margin-bottom:1rem; padding:12px 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;" id="webOrdersFilterGroup">
+              <button class="btn-fragama btn-primary-fragama web-filter-btn active" data-filter="ALL" onclick="filterWebOrdersView('ALL', this)" style="padding:5px 12px; font-size:0.8rem;">
+                Todos los Pedidos Web
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="PENDIENTE" onclick="filterWebOrdersView('PENDIENTE', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#F59E0B; color:#B45309;">
+                ⏳ Pendientes de Alisto
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ALISTADO" onclick="filterWebOrdersView('ALISTADO', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#0284C7; color:#0369A1;">
+                📦 Alistados en Bodega
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="EN_RUTA" onclick="filterWebOrdersView('EN_RUTA', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#7C3AED; color:#6B21A8;">
+                🚚 En Ruta
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ENTREGADO" onclick="filterWebOrdersView('ENTREGADO', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#10B981; color:#065F46;">
+                ✅ Entregados
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="NO_ENTREGADO" onclick="filterWebOrdersView('NO_ENTREGADO', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#DC2626; color:#991B1B;">
+                ❌ No Entregados
+              </button>
+            </div>
+            <div style="position:relative; min-width:240px; flex-grow:1; max-width:360px;">
+              <input type="text" id="webOrdersSearchInput" oninput="renderWebOrdersFullTable()" placeholder="🔍 Buscar por N° pedido, cliente, teléfono..." style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:7px 12px; font-size:0.82rem;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla Completa de Pedidos Web -->
+        <div class="content-card">
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.84rem;">
+              <thead style="background:#F8FAFC; border-bottom:2px solid #E2E8F0; color:#475569; font-size:0.78rem;">
+                <tr>
+                  <th style="padding:10px 14px; text-align:left;">N° Pedido</th>
+                  <th style="padding:10px 14px; text-align:left;">Cliente &amp; Contacto</th>
+                  <th style="padding:10px 14px; text-align:left;">Ruta &amp; Dirección</th>
+                  <th style="padding:10px 14px; text-align:left;">Artículos del Pedido</th>
+                  <th style="padding:10px 14px; text-align:right;">Total (₡)</th>
+                  <th style="padding:10px 14px; text-align:left;">Responsables (Alisto / Chofer)</th>
+                  <th style="padding:10px 14px; text-align:center;">Estado</th>
+                  <th style="padding:10px 14px; text-align:center;">Acciones Operativas</th>
+                </tr>
+              </thead>
+              <tbody id="webOrdersFullTableBody">
+                <!-- Poblado dinámicamente con los pedidos web -->
               </tbody>
             </table>
           </div>
@@ -3479,6 +3588,6 @@
   <script src="js/qrcode.min.js"></script>
   <script src="js/html5-qrcode.min.js"></script>
   <script src="js/catalog-data.js?v=20261001_4"></script>
-  <script src="js/app.js?v=20261001_reports_pro_v7"></script>
+  <script src="js/app.js?v=20261002_web_orders_pro_v8"></script>
 </body>
 </html>
