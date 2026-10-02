@@ -790,21 +790,20 @@ function initRealtimeOrderSync() {
         }
       });
 
-      if (hasNewOrders || serverOrders.length !== AppState.salesOrders.length) {
-        AppState.salesOrders = serverOrders;
-        updateWebOrdersBadges();
-        renderDashboardAnalytics();
-        
-        // Refrescar bandeja dedicada de pedidos web si está disponible
-        if (typeof renderWebOrdersFullTable === 'function') {
-          renderWebOrdersFullTable();
+      let hasStatusChange = false;
+      if (!hasNewOrders && serverOrders.length === AppState.salesOrders.length) {
+        for (const so of serverOrders) {
+          const ex = AppState.salesOrders.find(o => String(o.id) === String(so.id) || o.orderCode === so.orderCode);
+          if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
+            hasStatusChange = true;
+            break;
+          }
         }
+      }
 
-        // Refrescar historial si está activo
-        const historyTbody = document.getElementById('orderHistoryTableBody');
-        if (historyTbody) {
-          renderOrderHistory();
-        }
+      if (hasNewOrders || serverOrders.length !== AppState.salesOrders.length || hasStatusChange) {
+        AppState.salesOrders = serverOrders;
+        refreshAllOrderViews();
 
         // Si llegó un nuevo pedido web, emitir chime y notificación toast
         if (newestOrder) {
@@ -964,9 +963,60 @@ function renderAllViews() {
   renderUsersRolesTable();
 }
 
+// Actualización omnicanal de pedidos en todas las vistas de la bodega
+function refreshAllOrderViews() {
+  if (typeof renderOrderHistory === 'function') renderOrderHistory();
+  if (typeof renderWebOrdersFullTable === 'function') renderWebOrdersFullTable();
+  if (typeof updateWebOrdersBadges === 'function') updateWebOrdersBadges();
+  if (typeof renderDashboardAnalytics === 'function') renderDashboardAnalytics();
+  if (typeof renderDriverDispatches === 'function') renderDriverDispatches();
+}
+window.refreshAllOrderViews = refreshAllOrderViews;
+
 function formatCRC(amount) {
   return '₡' + Number(amount).toLocaleString('es-CR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
+
+// Sanitización contra inyección XSS en todos los campos renderizados desde la BD
+function escapeHtml(text) {
+  if (text === undefined || text === null) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Función rápida del dashboard para marcar un pedido como alistado sin abrir el modal completo
+window.markOrderAlistado = async function(orderIdentifier) {
+  if (!confirm(`¿Desea marcar el pedido ${orderIdentifier} como ALISTADO en bodega?`)) return;
+
+  try {
+    const payload = {
+      status: 'ALISTADO',
+      notes: 'Alistado rápido desde panel de control del dashboard.'
+    };
+
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderIdentifier)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    if (res.ok && result.success) {
+      const ord = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+      if (ord) ord.status = 'ALISTADO';
+      renderAllViews();
+      showNotificationToast(`✅ Pedido ${orderIdentifier} marcado como ALISTADO.`, 'success');
+    } else {
+      showNotificationToast(`Error: ${result.detail || result.message || 'No se pudo actualizar el estado.'}`, 'error');
+    }
+  } catch (err) {
+    showNotificationToast('Error de conexión al actualizar el pedido.', 'error');
+  }
+};
 
 // Función global robusta para ver/ocultar contraseñas mediante el icono de ojo
 window.togglePasswordVisibility = function(inputId, btnId) {
@@ -5113,9 +5163,15 @@ async function saveOrder(isQuote = false) {
 function openOrderPrintModal(order) {
   const modal = document.getElementById('orderPrintModal');
   const body = document.getElementById('orderPrintModalBody');
-  if (!modal || !body) return;
+  if (!modal || !body || !order) return;
 
   const isQuote = (order.docType === 'COTIZACION');
+  const printItems = Array.isArray(order.items) ? order.items : [];
+  const tot = Number(order.total) || 0;
+  const subBruto = (order.subtotalBruto !== undefined && order.subtotalBruto !== null) ? Number(order.subtotalBruto) : Math.round(tot / 1.13);
+  const descTot = (order.descuentoTotal !== undefined && order.descuentoTotal !== null) ? Number(order.descuentoTotal) : 0;
+  const subNeto = (order.subtotalNeto !== undefined && order.subtotalNeto !== null) ? Number(order.subtotalNeto) : (subBruto - descTot);
+  const ivaAmount = (order.iva !== undefined && order.iva !== null) ? Number(order.iva) : (tot - subNeto);
 
   body.innerHTML = `
     <!-- ENCABEZADO CORPORATIVO OFICIAL FRAGAMA CON LOGO DE FACEBOOK -->
@@ -5135,8 +5191,8 @@ function openOrderPrintModal(order) {
         <span style="display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:800; background:${isQuote ? '#E0F2FE' : '#DCFCE7'}; color:${isQuote ? '#0284C7' : '#15803D'}; border:1px solid ${isQuote ? '#38BDF8' : '#86EFAC'}; margin-bottom:4px;">
           ${isQuote ? 'PROFORMA / COTIZACIÓN' : 'ORDEN DE PEDIDO & ALISTO'}
         </span>
-        <div style="font-family:'JetBrains Mono',monospace; font-size:1.15rem; font-weight:800; color:#0B192C;">${order.orderCode}</div>
-        <div style="font-size:0.75rem; color:#64748B;">Emisión: ${order.date}</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:1.15rem; font-weight:800; color:#0B192C;">${escapeHtml(order.orderCode)}</div>
+        <div style="font-size:0.75rem; color:#64748B;">Emisión: ${escapeHtml(order.date || 'Hoy')}</div>
       </div>
     </div>
 
@@ -5144,19 +5200,19 @@ function openOrderPrintModal(order) {
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.82rem;">
       <div>
         <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Facturado / Dirigido a:</div>
-        <div style="font-weight:800; font-size:0.95rem; color:#0B192C;">${order.customerName}</div>
-        <div><strong>Cédula:</strong> ${order.customerTaxId || 'N/A'}</div>
-        <div><strong>Contacto:</strong> ${order.customerContact || 'N/A'}</div>
-        <div><strong>Teléfono:</strong> ${order.customerPhone || 'N/A'}</div>
+        <div style="font-weight:800; font-size:0.95rem; color:#0B192C;">${escapeHtml(order.customerName || 'Cliente')}</div>
+        <div><strong>Cédula:</strong> ${escapeHtml(order.customerTaxId || 'N/A')}</div>
+        <div><strong>Contacto:</strong> ${escapeHtml(order.customerContact || 'N/A')}</div>
+        <div><strong>Teléfono:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
       </div>
       <div>
         <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Datos de Despacho Nacional (Costa Rica):</div>
-        <div><strong>Responsable Asignado(a):</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-person-badge"></i> ${order.assignedUserName || 'Colaborador Fragama'} (${order.assignedUserRole || 'Encargado'})</span></div>
-        <div><strong>Provincia / Destino:</strong> <span style="font-weight:700; color:#0284C7;">${order.customerProvince || 'Cartago'} &bull; ${order.customerCanton || 'Central'}</span></div>
-        <div><strong>Fecha de Entrega:</strong> ${order.deliveryDate || order.date}</div>
-        <div><strong>Condición de Pago:</strong> ${order.terms || 'Contado'}</div>
-        <div><strong>Dirección:</strong> ${order.customerAddress || 'Retiro en Bodega'}</div>
-        ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${order.notes}</div>` : ''}
+        <div><strong>Responsable Asignado(a):</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-person-badge"></i> ${escapeHtml(order.assignedUserName || order.preparedByName || 'Colaborador Fragama')} (${escapeHtml(order.assignedUserRole || 'Encargado')})</span></div>
+        <div><strong>Provincia / Destino:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
+        <div><strong>Fecha de Entrega:</strong> ${escapeHtml(order.deliveryDate || order.date || 'Inmediata')}</div>
+        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado')}</div>
+        <div><strong>Dirección:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
+        ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${escapeHtml(order.notes)}</div>` : ''}
       </div>
     </div>
 
@@ -5168,7 +5224,7 @@ function openOrderPrintModal(order) {
       <div style="display:flex; justify-content:center;">
         <svg id="printOrderBarcodeSvg"></svg>
       </div>
-      <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${order.orderCode}')">
+      <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${escapeHtml(order.orderCode)}')">
         <i class="bi bi-search"></i> Probar Lectura de este Pedido
       </button>
     </div>
@@ -5195,7 +5251,7 @@ function openOrderPrintModal(order) {
       <div style="text-align:center;">
         <div id="printOrderQrBox" style="width:116px; height:116px; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:6px; display:flex; align-items:center; justify-content:center;">
         </div>
-        <span style="font-size:0.7rem; font-weight:800; color:#64748B; font-family:'JetBrains Mono',monospace; margin-top:3px; display:block;">${order.orderCode}</span>
+        <span style="font-size:0.7rem; font-weight:800; color:#64748B; font-family:'JetBrains Mono',monospace; margin-top:3px; display:block;">${escapeHtml(order.orderCode)}</span>
       </div>
     </div>
 
@@ -5212,16 +5268,24 @@ function openOrderPrintModal(order) {
         </tr>
       </thead>
       <tbody>
-        ${order.items.map((it, idx) => `
+        ${printItems.length === 0 ? `
+          <tr><td colspan="6" style="padding:16px; text-align:center; color:#64748B;">No hay líneas de artículos detalladas en este pedido.</td></tr>
+        ` : printItems.map((it, idx) => {
+          const qty = Number(it.qty || it.quantity || 1);
+          const uPrice = Number(it.unitPrice || 0);
+          const disc = Number(it.discountPct || 0);
+          const sub = Number(it.subtotal || (qty * uPrice));
+          return `
           <tr style="border-bottom:1px solid #E2E8F0; background:${idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA'};">
-            <td style="padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#475569;">${it.sku}</td>
-            <td style="padding:7px 10px; font-weight:600; color:#0B192C;">${it.name} <span style="font-size:0.7rem; color:#64748B;">(${it.unit || 'UND'})</span></td>
-            <td style="padding:7px 8px; text-align:center; font-weight:700;">${it.qty}</td>
-            <td style="padding:7px 10px; text-align:right;">${formatCRC(it.unitPrice)}</td>
-            <td style="padding:7px 8px; text-align:center; color:${it.discountPct > 0 ? '#DC2626' : '#64748B'};">${it.discountPct}%</td>
-            <td style="padding:7px 10px; text-align:right; font-weight:800; color:#0B192C;">${formatCRC(it.subtotal)}</td>
+            <td style="padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#475569;">${escapeHtml(it.sku || 'N/A')}</td>
+            <td style="padding:7px 10px; font-weight:600; color:#0B192C;">${escapeHtml(it.name || it.productName || 'Artículo')} <span style="font-size:0.7rem; color:#64748B;">(${escapeHtml(it.unit || 'UND')})</span></td>
+            <td style="padding:7px 8px; text-align:center; font-weight:700;">${qty}</td>
+            <td style="padding:7px 10px; text-align:right;">${formatCRC(uPrice)}</td>
+            <td style="padding:7px 8px; text-align:center; color:${disc > 0 ? '#DC2626' : '#64748B'};">${disc}%</td>
+            <td style="padding:7px 10px; text-align:right; font-weight:800; color:#0B192C;">${formatCRC(sub)}</td>
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
       </tbody>
     </table>
 
@@ -5230,23 +5294,23 @@ function openOrderPrintModal(order) {
       <div style="width:280px; font-size:0.84rem;">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
           <span style="color:#64748B;">Subtotal Bruto:</span>
-          <span style="font-weight:600;">${formatCRC(order.subtotalBruto)}</span>
+          <span style="font-weight:600;">${formatCRC(subBruto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#DC2626;">
           <span>Descuento Comercial:</span>
-          <span style="font-weight:600;">-${formatCRC(order.descuentoTotal)}</span>
+          <span style="font-weight:600;">-${formatCRC(descTot)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
           <span style="color:#64748B;">Subtotal Gravable:</span>
-          <span style="font-weight:600;">${formatCRC(order.subtotalNeto)}</span>
+          <span style="font-weight:600;">${formatCRC(subNeto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
           <span style="color:#64748B;">IVA Costa Rica (13%):</span>
-          <span style="font-weight:600;">${formatCRC(order.iva)}</span>
+          <span style="font-weight:600;">${formatCRC(ivaAmount)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:1.15rem; font-weight:900; color:#0B192C; border-top:2px solid #0284C7; padding-top:6px;">
           <span>TOTAL:</span>
-          <span style="color:#0284C7;">${formatCRC(order.total)}</span>
+          <span style="color:#0284C7;">${formatCRC(tot)}</span>
         </div>
       </div>
     </div>
@@ -5440,7 +5504,7 @@ function renderOrderHistory() {
             <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="showQrForOrder('${o.orderCode}')" title="Código QR de Carga y Bultos">
               <i class="bi bi-qr-code text-primary"></i>
             </button>
-            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id})" title="Ver e Imprimir Comprobante Oficial">
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Ver e Imprimir Comprobante Oficial">
               <i class="bi bi-printer"></i>
             </button>
 
@@ -5661,8 +5725,7 @@ window.handleConfirmOrderPicking = async function(event) {
         ord.driverName = driverName;
       }
       closeModalDirectly('orderPickingModal');
-      renderOrderHistory();
-      updateWebOrdersBadges();
+      refreshAllOrderViews();
       showNotificationToast(`✅ Pedido ${orderCode} Alistado con éxito por ${respName}. Asignado a ${driverName}.`, 'success');
     } else {
       alert(result.detail || "Error al registrar el alistado del pedido.");
@@ -5702,8 +5765,7 @@ window.dispatchOrderToRoute = async function(orderIdentifier) {
 
     if (res.ok) {
       order.status = 'EN_RUTA';
-      renderOrderHistory();
-      updateWebOrdersBadges();
+      refreshAllOrderViews();
       showNotificationToast(`🚚 Pedido ${order.orderCode} en ruta de entrega con ${driver}.`, 'info');
     }
   } catch(e) {
@@ -5752,10 +5814,7 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
         fetchProducts();
       }
       
-      renderOrderHistory();
-      updateWebOrdersBadges();
-      renderDashboardAnalytics();
-      
+      refreshAllOrderViews();
       showNotificationToast(`🎉 Pedido ${order.orderCode} entregado. ¡Inventario Kardex descontado automáticamente sin descuadre!`, 'success');
     } else {
       alert(result.detail || "Error al confirmar entrega.");
@@ -5839,8 +5898,7 @@ window.handleConfirmUndeliveredOrder = async function(event) {
         fetchProducts();
       }
 
-      renderOrderHistory();
-      updateWebOrdersBadges();
+      refreshAllOrderViews();
       showNotificationToast(`⚠️ Incidencia registrada para pedido ${orderCode}. Stock reingresado a bodega.`, 'warning');
     } else {
       alert(result.detail || "Error registrando no entrega.");
@@ -7486,7 +7544,7 @@ function renderDashboardAnalytics() {
                     <i class="bi bi-check-circle-fill"></i> Listo
                   </button>
                 `}
-                <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id || 1})" title="Imprimir Comprobante de Alisto">
+                <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${o.orderCode || o.id}')" title="Imprimir Comprobante de Alisto">
                   <i class="bi bi-printer"></i>
                 </button>
                 ${o.customerPhone ? `
@@ -7843,13 +7901,20 @@ window.renderWebOrdersFullTable = function() {
               </button>
             ` : ''}
 
-            <!-- 4. TRAZABILIDAD / AUDITORÍA -->
+            <!-- 4. REPROGRAMAR / REINTENTAR ALISTADO SI FUE RECHAZADO -->
+            ${isUndelivered ? `
+              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#F59E0B; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderPickingModal('${targetCode}')" title="Reintentar Alistado y Reprogramar Despacho">
+                <i class="bi bi-arrow-repeat"></i> Reprogramar
+              </button>
+            ` : ''}
+
+            <!-- 5. TRAZABILIDAD / AUDITORÍA -->
             <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Bitácora de Trazabilidad y Tiempos">
               <i class="bi bi-clock-history"></i>
             </button>
 
-            <!-- 5. IMPRIMIR COMPROBANTE -->
-            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id || 1})" title="Imprimir Comprobante Oficial">
+            <!-- 6. IMPRIMIR COMPROBANTE -->
+            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante Oficial">
               <i class="bi bi-printer"></i>
             </button>
           </div>

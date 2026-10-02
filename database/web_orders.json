@@ -22,7 +22,7 @@
       {
         "productId": 101,
         "sku": "BAN-BAG-099",
-        "name": "Bandeja 9x9 con o sin división Bagazo de Caña",
+        "name": "Bandeja 9x9 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
         "qty": 50,
         "unitPrice": 107.0,
         "subtotal": 5350.0
@@ -30,7 +30,7 @@
       {
         "productId": 102,
         "sku": "BAN-BAG-088",
-        "name": "Bandeja 8x8 con o sin división Bagazo de Caña",
+        "name": "Bandeja 8x8 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
         "qty": 50,
         "unitPrice": 79.0,
         "subtotal": 3950.0
@@ -41,7 +41,9 @@
     "subtotalNeto": 9300.0,
     "iva": 1209.0,
     "total": 10509.0,
-    "id": 103
+    "id": 103,
+    "preparedByName": "Leo Reyes",
+    "stockDeducted": 0
   },
   {
     "orderCode": "PED-WEB-99999",
@@ -102,7 +104,7 @@
       {
         "productId": 101,
         "sku": "BAN-BAG-099",
-        "name": "Bandeja 9x9 con o sin división Bagazo de Caña",
+        "name": "Bandeja 9x9 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
         "qty": 50,
         "unitPrice": 107.0,
         "subtotal": 5350.0
@@ -114,10 +116,10 @@
     "iva": 695.5,
     "total": 6045.5,
     "id": 101,
-    "preparedByName": "Leonardo Reyes Hernández",
+    "preparedByName": "Leonardo Reyes Hern\u00e1ndez",
     "driverName": "Mauricio Brenes (Chofer)",
     "stockDeducted": 0,
-    "undeliveredReason": "Cliente se encontraba de viaje y no hubo quien recibiera. Mercadería devuelta a bodega intacta."
+    "undeliveredReason": "Cliente se encontraba de viaje y no hubo quien recibiera. Mercader\u00eda devuelta a bodega intacta."
   },
   {
     "id": 1790876838,
@@ -142,7 +144,7 @@
       {
         "productId": 103,
         "sku": "BAN-BAG-066",
-        "name": "Bandeja Hamburguesa 6x6 Bagazo de Caña",
+        "name": "Bandeja Hamburguesa 6x6 Bagazo de Ca\u00f1a",
         "qty": 50,
         "unitPrice": 48.0,
         "subtotal": 2400.0
@@ -162,7 +164,7 @@
     "customerId": 9999,
     "customerName": "Soda El Manantial (Test)",
     "customerTaxId": "1-1234-0567",
-    "customerAddress": "100m Este del Parque Central de Paraíso, Cartago",
+    "customerAddress": "100m Este del Parque Central de Para\u00edso, Cartago",
     "customerPhone": "8899-7766",
     "assignedUserId": 6,
     "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
@@ -172,12 +174,12 @@
     "deliveryDate": "Cartago (Lunes y Jueves)",
     "terms": "Contado / Contra Entrega",
     "status": "PENDIENTE",
-    "notes": "Entregar en horario de la mañana",
+    "notes": "Entregar en horario de la ma\u00f1ana",
     "items": [
       {
         "productId": 101,
         "sku": "BAN-BAG-099",
-        "name": "Bandeja 9x9 con o sin división Bagazo de Caña",
+        "name": "Bandeja 9x9 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
         "qty": 50,
         "unitPrice": 107.0,
         "subtotal": 5350.0
@@ -185,7 +187,7 @@
       {
         "productId": 803,
         "sku": "CLO-GOY-004",
-        "name": "Cloro al 4% Goyca (Galón 3.8L)",
+        "name": "Cloro al 4% Goyca (Gal\u00f3n 3.8L)",
         "qty": 4,
         "unitPrice": 1150.0,
         "subtotal": 4600.0
