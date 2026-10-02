@@ -1,32 +1,28 @@
 # ==============================================================================
-# Multi-stage Dockerfile for Distribuidora Fragama Warehouse API
+# Dockerfile para Distribuidora Fragama (FastAPI + SQLite + Frontend Completo)
+# Soporte oficial para Render.com y contenedores Cloud
 # ==============================================================================
+FROM python:3.11-slim
 
-# Etapa 1: Build y compilación
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copiar csproj y restaurar dependencias para aprovechar caché de capas Docker
-COPY src/Fragama.Domain/*.csproj src/Fragama.Domain/
-COPY src/Fragama.Application/*.csproj src/Fragama.Application/
-COPY src/Fragama.Infrastructure/*.csproj src/Fragama.Infrastructure/
-COPY src/Fragama.API/*.csproj src/Fragama.API/
+# Instalar dependencias del sistema mínimas
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN dotnet restore src/Fragama.API/Fragama.API.csproj
+# Copiar e instalar dependencias de Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar todo el código fuente y publicar
-COPY src/ ./src/
-WORKDIR /app/src/Fragama.API
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+# Copiar todo el código fuente, base de datos SQLite y assets del frontend
+COPY . .
 
-# Etapa 2: Runtime ligero y seguro
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
-WORKDIR /app
+# Variables de entorno por defecto
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8080
-EXPOSE 8081
 
-# Usuario no root para mejores prácticas de seguridad
-USER app
-
-COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "Fragama.API.dll"]
+# Iniciar servidor FastAPI en el puerto asignado dinámicamente por Render ($PORT)
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8080}"]

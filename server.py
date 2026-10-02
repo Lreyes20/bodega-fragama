@@ -1406,23 +1406,29 @@ def get_inventory_movements():
 # ==============================================================================
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
+DEFAULT_PAGE = os.environ.get("DEFAULT_PAGE", "bodega").strip().lower()
+
 @app.get("/")
 def serve_home():
-    """Página principal: Tienda y Catálogo Oficial para clientes externos."""
-    return FileResponse(os.path.join(FRONTEND_DIR, "tienda.html"))
+    """Página principal según configuración del entorno."""
+    if DEFAULT_PAGE in ("tienda", "catalogo", "pedidos", "store"):
+        return FileResponse(os.path.join(FRONTEND_DIR, "tienda.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 @app.get("/tienda")
+@app.get("/tienda.html")
 @app.get("/catalogo")
 @app.get("/pedidos")
 def serve_tienda():
-    """Rutas directas a la tienda y catálogo web."""
+    """Ruta directa y exclusiva para la Tienda & Catálogo de Clientes."""
     return FileResponse(os.path.join(FRONTEND_DIR, "tienda.html"))
 
 @app.get("/bodega")
+@app.get("/index.html")
 @app.get("/admin")
 @app.get("/wms")
 def serve_bodega():
-    """Acceso al sistema interno de bodega y alistado."""
+    """Ruta directa y exclusiva para el Sistema WMS de Bodega e Inventarios."""
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 if os.path.exists(FRONTEND_DIR):
