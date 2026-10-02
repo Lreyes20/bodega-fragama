@@ -5249,22 +5249,27 @@ function renderOrderHistory() {
   }
 
   tbody.innerHTML = filtered.map(o => {
-    let badgeClass = 'badge-in-route';
-    let badgeLabel = o.status;
+    let badgeHtml = '';
+    const st = (o.status || 'PENDIENTE').toUpperCase();
 
-    if (o.status === 'COTIZACION') {
-      badgeClass = 'badge-in-route';
-      badgeLabel = 'Cotización';
-    } else if (o.status === 'ALISTADO') {
-      badgeClass = 'badge-confirmed';
-      badgeLabel = 'Alistado en Bodega';
-    } else if (o.status === 'FACTURADO') {
-      badgeClass = 'badge-delivered';
-      badgeLabel = 'Facturado / Entregado';
-    } else if (o.status === 'PENDIENTE') {
-      badgeClass = 'badge-observed';
-      badgeLabel = 'Pendiente Alisto';
+    if (st === 'COTIZACION') {
+      badgeHtml = `<span class="badge-status badge-in-route"><i class="bi bi-file-earmark-text"></i> Cotización</span>`;
+    } else if (st === 'ALISTADO' || st === 'EN_ALISTADO') {
+      badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:800;"><i class="bi bi-box-seam"></i> Alistado en Bodega</span>`;
+    } else if (st === 'EN_RUTA') {
+      badgeHtml = `<span class="badge-status" style="background:#F3E8FF; color:#6B21A8; border:1px solid #DDD6FE; font-weight:800;"><i class="bi bi-truck"></i> En Ruta de Entrega</span>`;
+    } else if (st === 'ENTREGADO' || st === 'FACTURADO') {
+      badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-weight:800;"><i class="bi bi-check-circle-fill"></i> Entregado (Kardex Rebajado)</span>`;
+    } else if (st === 'NO_ENTREGADO' || st === 'RECHAZADO') {
+      badgeHtml = `<span class="badge-status" style="background:#FEF2F2; color:#991B1B; border:1px solid #FCA5A5; font-weight:800;" title="${escapeHtml(o.undeliveredReason || 'Rechazado')}"><i class="bi bi-x-circle-fill"></i> No Entregado</span>`;
+    } else if (st === 'CANCELADO') {
+      badgeHtml = `<span class="badge-status" style="background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; font-weight:700;"><i class="bi bi-slash-circle"></i> Cancelado</span>`;
+    } else {
+      badgeHtml = `<span class="badge-status badge-observed" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; font-weight:800;"><i class="bi bi-clock"></i> Pendiente Alisto</span>`;
     }
+
+    const itemsCount = Array.isArray(o.items) ? o.items.length : 0;
+    const targetCode = o.orderCode || o.id;
 
     return `
       <tr style="border-bottom:1px solid #E2E8F0;">
@@ -5283,48 +5288,102 @@ function renderOrderHistory() {
           `}
         </td>
         <td style="padding:10px 14px;">
-          <div style="font-weight:700; color:#0B192C;">${o.customerName}</div>
-          <div style="font-size:0.75rem; color:#64748B;">Céd: ${o.customerTaxId || 'N/A'} • ${o.terms}</div>
+          <div style="font-weight:700; color:#0B192C;">${escapeHtml(o.customerName || '')}</div>
+          <div style="font-size:0.75rem; color:#64748B;">Céd: ${escapeHtml(o.customerTaxId || 'N/A')} &bull; ${escapeHtml(o.terms || 'Contado')}</div>
+          ${o.customerAddress ? `<div style="font-size:0.72rem; color:#475569; margin-top:2px;"><i class="bi bi-geo-alt"></i> ${escapeHtml(o.customerAddress)}</div>` : ''}
         </td>
         <td style="padding:10px 14px;">
-          <div style="font-weight:700; color:#0B192C; display:flex; align-items:center; gap:5px;">
-            <i class="bi bi-person-badge text-primary" style="font-size:0.95rem;"></i>
-            <span>${o.assignedUserName || 'Sin Asignar'}</span>
+          <!-- Responsables del Ciclo de Vida -->
+          <div style="font-size:0.8rem; font-weight:700; color:#0B192C;">
+            <i class="bi bi-person-badge text-primary"></i> ${escapeHtml(o.assignedUserName || 'Ventas General')}
           </div>
-          <div style="font-size:0.72rem; color:#64748B; margin-left:18px;">
-            <span style="background:#F1F5F9; color:#334155; padding:1px 6px; border-radius:4px; font-weight:600;">${o.assignedUserRole || 'Colaborador'}</span>
-            ${o.assignedUserHandle ? `&bull; @${o.assignedUserHandle}` : ''}
-          </div>
+          ${o.preparedByName ? `
+            <div style="font-size:0.74rem; color:#0369A1; font-weight:700; margin-top:2px;">
+              <i class="bi bi-box-seam-fill"></i> Alistó: ${escapeHtml(o.preparedByName)}
+            </div>
+          ` : ''}
+          ${o.driverName ? `
+            <div style="font-size:0.74rem; color:#6B21A8; font-weight:700; margin-top:1px;">
+              <i class="bi bi-truck"></i> Chofer: ${escapeHtml(o.driverName)}
+            </div>
+          ` : ''}
+          ${o.undeliveredReason ? `
+            <div style="font-size:0.72rem; color:#DC2626; font-weight:700; margin-top:2px; background:#FEF2F2; padding:2px 6px; border-radius:4px; border:1px solid #FECACA;">
+              <i class="bi bi-exclamation-circle-fill"></i> Motivo: ${escapeHtml(o.undeliveredReason)}
+            </div>
+          ` : ''}
         </td>
         <td style="padding:10px 14px; font-size:0.8rem; color:#475569;">${o.date}</td>
-        <td style="padding:10px 14px; font-size:0.8rem; color:#475569;">${o.deliveryDate || '-'}</td>
-        <td style="padding:10px 14px; text-align:center; font-weight:700;">${o.items.length}</td>
-        <td style="padding:10px 14px; text-align:right; font-weight:800; color:var(--fragama-blue-primary);">
+        <td style="padding:10px 14px; font-size:0.8rem; color:#475569;">
+          <div>${escapeHtml(o.deliveryRoute || o.deliveryDate || 'Cartago')}</div>
+        </td>
+        <td style="padding:10px 14px; text-align:center; font-weight:700;">${itemsCount}</td>
+        <td style="padding:10px 14px; text-align:right; font-weight:800; color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace;">
           ${formatCRC(o.total)}
         </td>
         <td style="padding:10px 14px; text-align:center;">
-          <span class="badge-status ${badgeClass}">${badgeLabel}</span>
+          ${badgeHtml}
         </td>
         <td style="padding:10px 14px; text-align:center;">
-          <div style="display:flex; justify-content:center; gap:6px;">
-            <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="showQrForOrder('${o.orderCode}')" title="Ver Código QR de Carga y Bultos">
-              <i class="bi bi-qr-code text-primary"></i> QR
+          <div style="display:flex; justify-content:center; gap:5px; flex-wrap:wrap;">
+            
+            <!-- 1. Trazabilidad / Bitácora Cronológica -->
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Bitácora de Trazabilidad y Tiempos">
+              <i class="bi bi-clock-history"></i>
             </button>
-            <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id})" title="Ver e Imprimir Comprobante Oficial">
+
+            <!-- 2. QR de Bultos & Imprimir -->
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="showQrForOrder('${o.orderCode}')" title="Código QR de Carga y Bultos">
+              <i class="bi bi-qr-code text-primary"></i>
+            </button>
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id})" title="Ver e Imprimir Comprobante Oficial">
               <i class="bi bi-printer"></i>
             </button>
-            ${(o.status === 'PENDIENTE' || o.docType === 'PEDIDO_WEB' || (o.orderCode && o.orderCode.includes('WEB'))) && o.status !== 'FACTURADO' ? `
-              <button class="btn-fragama btn-primary-fragama" style="padding:4px 8px; font-size:0.75rem; background:#10B981; border-color:#10B981;" onclick="markOrderAlistado(${o.id})" title="Marcar como Alistado en Bodega">
+
+            <!-- 3. FLUJO POR ESTADO: ALISTAR (PENDIENTE -> ALISTADO) -->
+            ${(st === 'PENDIENTE' || st === 'SOLICITADO') ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 9px; font-size:0.75rem; background:#10B981; border-color:#10B981; font-weight:700;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido y Asignar Responsables">
                 <i class="bi bi-box-seam"></i> Alistar
               </button>
             ` : ''}
-            ${o.status === 'COTIZACION' ? `
+
+            <!-- 4. FLUJO POR ESTADO: DESPACHAR / ENTREGAR / NO ENTREGADO (ALISTADO O EN_RUTA) -->
+            ${(st === 'ALISTADO' || st === 'EN_ALISTADO') ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 7px; font-size:0.75rem; background:#8B5CF6; border-color:#8B5CF6;" onclick="dispatchOrderToRoute('${targetCode}')" title="Poner en Ruta de Entrega">
+                <i class="bi bi-truck"></i> En Ruta
+              </button>
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 7px; font-size:0.75rem; background:#059669; border-color:#059669;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Descontar Kardex">
+                <i class="bi bi-check-circle-fill"></i> Entregar
+              </button>
+              <button class="btn-fragama" style="padding:4px 7px; font-size:0.75rem; background:#EF4444; color:#FFF; border:none; border-radius:6px;" onclick="openOrderUndeliveredModal('${targetCode}')" title="Registrar Rechazo / No Entrega (Justificación Obligatoria)">
+                <i class="bi bi-x-circle-fill"></i>
+              </button>
+            ` : ''}
+
+            ${st === 'EN_RUTA' ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 8px; font-size:0.75rem; background:#059669; border-color:#059669; font-weight:700;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Descontar Kardex">
+                <i class="bi bi-check-circle-fill"></i> Entregar
+              </button>
+              <button class="btn-fragama" style="padding:4px 7px; font-size:0.75rem; background:#EF4444; color:#FFF; border:none; border-radius:6px;" onclick="openOrderUndeliveredModal('${targetCode}')" title="Registrar Rechazo / No Entrega (Justificación Obligatoria)">
+                <i class="bi bi-x-circle-fill"></i> No Entregado
+              </button>
+            ` : ''}
+
+            ${(st === 'NO_ENTREGADO' || st === 'RECHAZADO') ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 8px; font-size:0.75rem; background:#F59E0B; border-color:#F59E0B;" onclick="openOrderPickingModal('${targetCode}')" title="Reintentar Alistado y Reprogramar">
+                <i class="bi bi-arrow-repeat"></i> Reprogramar
+              </button>
+            ` : ''}
+
+            ${st === 'COTIZACION' ? `
               <button class="btn-fragama btn-primary-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="convertQuoteToSalesOrder(${o.id})" title="Convertir a Pedido Firme">
                 <i class="bi bi-check-circle"></i>
               </button>
             ` : ''}
+
+            <!-- 5. WhatsApp directo con cliente -->
             ${o.customerPhone ? `
-              <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" class="btn-fragama" style="background:#25D366; color:#FFF; padding:4px 8px; font-size:0.75rem; text-decoration:none; display:inline-flex; align-items:center;" title="Contactar Cliente por WhatsApp">
+              <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName || '')},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" class="btn-fragama" style="background:#25D366; color:#FFF; padding:4px 7px; font-size:0.75rem; text-decoration:none; display:inline-flex; align-items:center;" title="Contactar Cliente por WhatsApp">
                 <i class="bi bi-whatsapp"></i>
               </a>
             ` : ''}
@@ -5336,33 +5395,450 @@ function renderOrderHistory() {
 }
 
 
-window.markOrderAlistado = async function(orderId) {
-  const order = AppState.salesOrders.find(o => o.id === orderId || o.orderCode === String(orderId));
-  if (!order) return;
-  order.status = 'ALISTADO';
+// ==============================================================================
+// 1. MODAL DE ALISTADO & PICKING CON ASIGNACIÓN DE RESPONSABLES
+// ==============================================================================
+window.openOrderPickingModal = async function(orderIdentifier) {
+  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  if (!order) {
+    alert("No se encontró el pedido seleccionado.");
+    return;
+  }
+
+  document.getElementById('pickingOrderId').value = order.id;
+  document.getElementById('pickingOrderCode').value = order.orderCode;
+  document.getElementById('pickingModalSubtitle').textContent = `Pedido #${order.orderCode} • Emisión: ${order.date || 'Hoy'}`;
+  document.getElementById('pickingCustomerName').textContent = order.customerName || 'Cliente';
+  document.getElementById('pickingCustomerPhone').textContent = order.customerPhone ? `Tel: ${order.customerPhone}` : 'Sin teléfono';
+  document.getElementById('pickingDeliveryRoute').textContent = order.deliveryRoute || 'Cartago';
+  document.getElementById('pickingDeliveryAddress').textContent = order.customerAddress || 'Entrega en punto comercial';
+  document.getElementById('pickingOrderTotal').textContent = formatCRC(order.total || 0);
+  document.getElementById('pickingPackingNotes').value = order.notes || '';
+
+  // Renderizar artículos para picking
+  const tbody = document.getElementById('pickingItemsTableBody');
+  const items = Array.isArray(order.items) ? order.items : [];
   
-  // Persistir en base de datos inmediatamente
+  if (items.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:14px; text-align:center; color:#64748B;">No hay líneas de detalle registradas en este pedido.</td></tr>`;
+  } else {
+    tbody.innerHTML = items.map((it, idx) => {
+      // Buscar información adicional del producto en catálogo (ubicación, categoría)
+      const prod = AppState.products.find(p => p.id === it.productId || p.sku === it.sku) || {};
+      const loc = prod.location || prod.zone || (prod.categoryLabel ? `ZONA-${prod.categoryLabel.substring(0, 8).toUpperCase()}` : 'BOD-CARTAGO / PAB-A');
+      
+      return `
+        <tr style="border-bottom:1px solid #E2E8F0;">
+          <td style="padding:8px 10px; text-align:center;">
+            <input type="checkbox" class="picking-item-checkbox" id="pickItem_${idx}" checked style="width:16px; height:16px; accent-color:#10B981; cursor:pointer;">
+          </td>
+          <td style="padding:8px 10px;">
+            <div style="font-weight:700; color:#0B192C;">${escapeHtml(it.name || it.productName || 'Producto')}</div>
+            <div style="font-size:0.74rem; color:#64748B; font-family:'JetBrains Mono',monospace;">SKU: ${escapeHtml(it.sku || 'N/A')}</div>
+          </td>
+          <td style="padding:8px 10px;">
+            <span style="background:#F1F5F9; color:#0369A1; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.75rem;">
+              <i class="bi bi-geo-alt-fill text-primary"></i> ${escapeHtml(loc)}
+            </span>
+          </td>
+          <td style="padding:8px 10px; text-align:center; font-weight:800; font-size:0.9rem; color:#0B192C;">
+            ${it.qty || it.quantity || 1}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Cargar lista de colaboradores (Bodegueros y Choferes)
+  await loadStaffSelectors();
+
+  // Pre-seleccionar usuario actual en bodeguero si aplica
+  const curUser = AppState.currentUser || {};
+  const respSelect = document.getElementById('pickingResponsibleSelect');
+  if (curUser && curUser.id && respSelect) {
+    for (let i = 0; i < respSelect.options.length; i++) {
+      if (Number(respSelect.options[i].value) === Number(curUser.id)) {
+        respSelect.selectedIndex = i;
+        break;
+      }
+    }
+  }
+
+  document.getElementById('orderPickingModal').classList.add('active');
+};
+
+window.checkAllPickingItems = function() {
+  document.querySelectorAll('.picking-item-checkbox').forEach(cb => cb.checked = true);
+};
+
+async function loadStaffSelectors() {
+  const respSelect = document.getElementById('pickingResponsibleSelect');
+  const driverSelect = document.getElementById('pickingDriverSelect');
+  const reporterSelect = document.getElementById('undeliveredReporterSelect');
+
+  let staffData = null;
   try {
-    const targetCode = order.orderCode || order.id;
-    await fetch(`/api/orders/${encodeURIComponent(targetCode)}/status`, {
+    const res = await fetch('/api/staff');
+    if (res.ok) {
+      staffData = await res.json();
+    }
+  } catch(e) {}
+
+  const allStaff = staffData ? staffData.all : (AppState.systemUsers || [
+    { id: 7, name: "Leonardo Reyes Hernández", role: "Administrador" },
+    { id: 9, name: "Carlos Calvo (Bodega Central)", role: "Bodeguero" },
+    { id: 2, name: "Esteban Quirós (Bodeguero)", role: "Bodeguero" },
+    { id: 11, name: "Minor Coto (Chofer Rutas)", role: "Chofer" },
+    { id: 4, name: "Mauricio Brenes (Chofer)", role: "Chofer" },
+    { id: 6, name: "Carlos Piedra (Ventas / Despacho)", role: "Vendedor" }
+  ]);
+
+  if (respSelect) {
+    respSelect.innerHTML = allStaff.map(u => `
+      <option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.role)})</option>
+    `).join('');
+  }
+
+  if (driverSelect) {
+    driverSelect.innerHTML = allStaff.map(u => `
+      <option value="${u.id}" ${u.role === 'Chofer' ? 'selected' : ''}>${escapeHtml(u.name)} (${escapeHtml(u.role)})</option>
+    `).join('');
+  }
+
+  if (reporterSelect) {
+    reporterSelect.innerHTML = allStaff.map(u => `
+      <option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.role)})</option>
+    `).join('');
+  }
+}
+
+window.handleConfirmOrderPicking = async function(event) {
+  event.preventDefault();
+  const orderCode = document.getElementById('pickingOrderCode').value;
+  const orderId = document.getElementById('pickingOrderId').value;
+  
+  const respSelect = document.getElementById('pickingResponsibleSelect');
+  const driverSelect = document.getElementById('pickingDriverSelect');
+  const packingNotes = document.getElementById('pickingPackingNotes').value.trim();
+
+  const respId = respSelect ? Number(respSelect.value) : 1;
+  const respName = respSelect ? respSelect.options[respSelect.selectedIndex].text.split(' (')[0] : 'Colaborador';
+  
+  const driverId = driverSelect ? Number(driverSelect.value) : 1;
+  const driverName = driverSelect ? driverSelect.options[driverSelect.selectedIndex].text.split(' (')[0] : 'Chofer';
+
+  const submitBtn = document.getElementById('btnConfirmPickingSubmit');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Guardando Trazabilidad...`;
+
+  try {
+    const payload = {
+      status: 'ALISTADO',
+      responsibleUserId: respId,
+      responsibleUserName: respName,
+      driverUserId: driverId,
+      driverName: driverName,
+      notes: packingNotes ? `Alistado verificado. ${packingNotes}` : 'Alistado completado en bodega y preparado para ruta.'
+    };
+
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderCode || orderId)}/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ALISTADO' })
+      body: JSON.stringify(payload)
     });
+
+    const result = await res.json();
+    if (res.ok && result.success) {
+      // Actualizar pedido local en AppState
+      const ord = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === String(orderCode));
+      if (ord) {
+        ord.status = 'ALISTADO';
+        ord.preparedByName = respName;
+        ord.driverName = driverName;
+      }
+      closeModalDirectly('orderPickingModal');
+      renderOrderHistory();
+      updateWebOrdersBadges();
+      showNotificationToast(`✅ Pedido ${orderCode} Alistado con éxito por ${respName}. Asignado a ${driverName}.`, 'success');
+    } else {
+      alert(result.detail || "Error al registrar el alistado del pedido.");
+    }
   } catch(e) {
-    console.warn("Aviso de sincronización de estado:", e);
-  }
-
-  renderOrderHistory();
-  updateWebOrdersBadges();
-  renderDashboardAnalytics();
-
-  if (typeof showNotificationToast === 'function') {
-    showNotificationToast(`✅ Pedido ${order.orderCode} marcado como Alistado en Bodega para Despacho.`, 'success');
-  } else {
-    alert(`✅ Pedido ${order.orderCode} alistado correctamente.`);
+    console.error("Error guardando alistado:", e);
+    alert("Error conectando con el servidor al registrar alistado.");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="bi bi-check2-circle"></i> Confirmar Alistado y Dejar Listo`;
   }
 };
+
+
+// ==============================================================================
+// 2. DESPACHO A RUTA (ALISTADO -> EN_RUTA)
+// ==============================================================================
+window.dispatchOrderToRoute = async function(orderIdentifier) {
+  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  if (!order) return;
+
+  const driver = order.driverName || 'Chofer de Ruta';
+  if (!confirm(`¿Confirmar que el pedido #${order.orderCode} ha salido de bodega en ruta con ${driver}?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(order.orderCode || order.id)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'EN_RUTA',
+        responsibleUserName: driver,
+        notes: `Cargado en vehículo de reparto y despachado hacia dirección del cliente.`
+      })
+    });
+
+    if (res.ok) {
+      order.status = 'EN_RUTA';
+      renderOrderHistory();
+      updateWebOrdersBadges();
+      showNotificationToast(`🚚 Pedido ${order.orderCode} en ruta de entrega con ${driver}.`, 'info');
+    }
+  } catch(e) {
+    alert("Error actualizando a En Ruta.");
+  }
+};
+
+
+// ==============================================================================
+// 3. CONFIRMAR ENTREGA Y DESCUENTO AUTOMÁTICO EN KARDEX (ALISTADO/EN_RUTA -> ENTREGADO)
+// ==============================================================================
+window.confirmOrderDelivered = async function(orderIdentifier) {
+  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  if (!order) return;
+
+  const confirmMsg = `¿CONFIRMAR ENTREGA DEL PEDIDO #${order.orderCode} AL CLIENTE?\n\n` +
+                     `📦 Cliente: ${order.customerName}\n` +
+                     `💰 Total: ${formatCRC(order.total)}\n\n` +
+                     `⚠️ IMPORTANTE: Al confirmar la entrega, el sistema descontará automáticamente las cantidades del inventario y registrará la salida oficial en el Kardex para que no existan diferencias físicas.`;
+
+  if (!confirm(confirmMsg)) return;
+
+  const curUser = AppState.currentUser || {};
+  const reporterName = curUser.name || order.driverName || 'Colaborador Fragama';
+  const reporterId = curUser.id || 1;
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(order.orderCode || order.id)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'ENTREGADO',
+        responsibleUserId: reporterId,
+        responsibleUserName: reporterName,
+        notes: 'Mercadería entregada a entera satisfacción del cliente. Stock rebajado en Kardex.'
+      })
+    });
+
+    const result = await res.json();
+    if (res.ok && result.success) {
+      order.status = 'ENTREGADO';
+      order.stockDeducted = 1;
+      
+      // Recargar catálogo de productos para actualizar stocks en pantalla
+      if (typeof fetchProducts === 'function') {
+        fetchProducts();
+      }
+      
+      renderOrderHistory();
+      updateWebOrdersBadges();
+      renderDashboardAnalytics();
+      
+      showNotificationToast(`🎉 Pedido ${order.orderCode} entregado. ¡Inventario Kardex descontado automáticamente sin descuadre!`, 'success');
+    } else {
+      alert(result.detail || "Error al confirmar entrega.");
+    }
+  } catch(e) {
+    console.error("Error confirmando entrega:", e);
+    alert("Error de conexión al confirmar entrega.");
+  }
+};
+
+
+// ==============================================================================
+// 4. REGISTRAR NO ENTREGA / RECHAZO (JUSTIFICACIÓN OBLIGATORIA)
+// ==============================================================================
+window.openOrderUndeliveredModal = async function(orderIdentifier) {
+  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  if (!order) return;
+
+  document.getElementById('undeliveredOrderId').value = order.id;
+  document.getElementById('undeliveredOrderCode').value = order.orderCode;
+  document.getElementById('undeliveredModalSubtitle').textContent = `Pedido #${order.orderCode} • Cliente: ${order.customerName}`;
+  document.getElementById('undeliveredPredefinedReason').value = '';
+  document.getElementById('undeliveredJustificationText').value = '';
+  document.getElementById('undeliveredErrorAlert').style.display = 'none';
+
+  await loadStaffSelectors();
+  document.getElementById('orderUndeliveredModal').classList.add('active');
+};
+
+window.handlePredefinedReasonChange = function() {
+  const select = document.getElementById('undeliveredPredefinedReason');
+  const txt = document.getElementById('undeliveredJustificationText');
+  if (select.value && select.value !== 'OTRO') {
+    txt.value = select.value;
+  }
+};
+
+window.handleConfirmUndeliveredOrder = async function(event) {
+  event.preventDefault();
+  const orderCode = document.getElementById('undeliveredOrderCode').value;
+  const orderId = document.getElementById('undeliveredOrderId').value;
+  const justification = document.getElementById('undeliveredJustificationText').value.trim();
+  const errDiv = document.getElementById('undeliveredErrorAlert');
+  
+  if (!justification || justification.length < 5) {
+    errDiv.textContent = "❌ Es obligatorio ingresar una justificación detallada (mínimo 5 caracteres).";
+    errDiv.style.display = 'block';
+    return;
+  }
+  errDiv.style.display = 'none';
+
+  const repSelect = document.getElementById('undeliveredReporterSelect');
+  const repId = repSelect ? Number(repSelect.value) : 1;
+  const repName = repSelect ? repSelect.options[repSelect.selectedIndex].text.split(' (')[0] : 'Chofer';
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderCode || orderId)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'NO_ENTREGADO',
+        justification: justification,
+        responsibleUserId: repId,
+        responsibleUserName: repName,
+        notes: `No entregado. Motivo: ${justification}`
+      })
+    });
+
+    const result = await res.json();
+    if (res.ok && result.success) {
+      const ord = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === String(orderCode));
+      if (ord) {
+        ord.status = 'NO_ENTREGADO';
+        ord.undeliveredReason = justification;
+        ord.stockDeducted = 0;
+      }
+      closeModalDirectly('orderUndeliveredModal');
+      
+      // Si hubo reversión de inventario, recargar catálogo
+      if (typeof fetchProducts === 'function') {
+        fetchProducts();
+      }
+
+      renderOrderHistory();
+      updateWebOrdersBadges();
+      showNotificationToast(`⚠️ Incidencia registrada para pedido ${orderCode}. Stock reingresado a bodega.`, 'warning');
+    } else {
+      alert(result.detail || "Error registrando no entrega.");
+    }
+  } catch(e) {
+    alert("Error de conexión al registrar justificación.");
+  }
+};
+
+
+// ==============================================================================
+// 5. BITÁCORA Y TRAZABILIDAD CRONOLÓGICA (TIMELINE AUDIT TRAIL)
+// ==============================================================================
+window.openOrderAuditTimeline = async function(orderIdentifier) {
+  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  const targetCode = order ? order.orderCode : orderIdentifier;
+
+  document.getElementById('auditModalSubtitle').textContent = `Pedido #${targetCode} • Trazabilidad Operativa`;
+  
+  if (order) {
+    document.getElementById('auditCurrentStatusBadge').textContent = order.status || 'PENDIENTE';
+    document.getElementById('auditStockDeductedBadge').textContent = order.stockDeducted ? '✅ Sí (Stock rebajado)' : '❌ No (Sin descontar aún)';
+    document.getElementById('auditStockDeductedBadge').style.color = order.stockDeducted ? '#10B981' : '#64748B';
+    document.getElementById('auditPreparedBySpan').textContent = order.preparedByName || 'Pendiente de alistar';
+    document.getElementById('auditDriverSpan').textContent = order.driverName || 'Sin chofer asignado';
+  }
+
+  const container = document.getElementById('auditTimelineContainer');
+  container.innerHTML = `<div style="text-align:center; padding:20px; color:#64748B;"><span class="spinner-border spinner-border-sm"></span> Cargando bitácora de trazabilidad...</div>`;
+
+  document.getElementById('orderAuditTimelineModal').classList.add('active');
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(targetCode)}/audit-log`);
+    if (res.ok) {
+      const logs = await res.json();
+      renderTimelineItems(logs);
+    } else {
+      container.innerHTML = `<div style="padding:15px; color:#DC2626;">Error cargando la bitácora del pedido.</div>`;
+    }
+  } catch(e) {
+    container.innerHTML = `<div style="padding:15px; color:#DC2626;">Fallo de conexión al consultar bitácora.</div>`;
+  }
+};
+
+function renderTimelineItems(logs) {
+  const container = document.getElementById('auditTimelineContainer');
+  if (!logs || logs.length === 0) {
+    container.innerHTML = `<div style="padding:15px; color:#64748B;">No se registran eventos previos para este pedido.</div>`;
+    return;
+  }
+
+  container.innerHTML = logs.map(item => {
+    let itemClass = '';
+    let dotIcon = 'bi-circle';
+    const st = (item.newStatus || '').toUpperCase();
+
+    if (st === 'ALISTADO' || st === 'EN_ALISTADO') {
+      itemClass = 'warning';
+      dotIcon = 'bi-box-seam';
+    } else if (st === 'EN_RUTA') {
+      itemClass = 'purple';
+      dotIcon = 'bi-truck';
+    } else if (st === 'ENTREGADO' || st === 'FACTURADO') {
+      itemClass = 'success';
+      dotIcon = 'bi-check2-circle';
+    } else if (st === 'NO_ENTREGADO' || st === 'RECHAZADO') {
+      itemClass = 'danger';
+      dotIcon = 'bi-x-circle';
+    } else if (st === 'SOLICITADO' || st === 'PENDIENTE') {
+      itemClass = '';
+      dotIcon = 'bi-cart-check';
+    }
+
+    return `
+      <div class="timeline-item ${itemClass}">
+        <div class="timeline-dot">
+          <i class="bi ${dotIcon}"></i>
+        </div>
+        <div class="timeline-content">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <div class="timeline-title">${escapeHtml(item.newStatus)}</div>
+            <div class="timeline-time">${escapeHtml(item.timestamp)}</div>
+          </div>
+          <div class="timeline-body">
+            <strong>Responsable:</strong> ${escapeHtml(item.userName || 'Sistema')} (${escapeHtml(item.userRole || 'Colaborador')})
+          </div>
+          ${item.notes ? `
+            <div style="font-size:0.78rem; color:#475569; margin-top:3px;">
+              <i class="bi bi-chat-left-text"></i> ${escapeHtml(item.notes)}
+            </div>
+          ` : ''}
+          ${item.justification ? `
+            <div class="timeline-justification">
+              <strong><i class="bi bi-exclamation-triangle-fill"></i> Justificación Obligatoria:</strong> ${escapeHtml(item.justification)}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
 window.viewSavedOrderPrint = function(orderId) {
   const order = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === orderId);

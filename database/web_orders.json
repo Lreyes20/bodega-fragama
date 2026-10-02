@@ -96,7 +96,7 @@
     "deliveryDate": "Cartago (Lunes y Jueves)",
     "deliveryRoute": "Cartago (Lunes y Jueves)",
     "terms": "Contado / Contra Entrega",
-    "status": "PENDIENTE",
+    "status": "NO_ENTREGADO",
     "notes": "Ruta: Cartago (Lunes y Jueves).",
     "items": [
       {
@@ -113,7 +113,11 @@
     "subtotalNeto": 5350.0,
     "iva": 695.5,
     "total": 6045.5,
-    "id": 101
+    "id": 101,
+    "preparedByName": "Leonardo Reyes Hernández",
+    "driverName": "Mauricio Brenes (Chofer)",
+    "stockDeducted": 0,
+    "undeliveredReason": "Cliente se encontraba de viaje y no hubo quien recibiera. Mercadería devuelta a bodega intacta."
   },
   {
     "id": 1790876838,

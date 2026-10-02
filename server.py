@@ -108,6 +108,79 @@ def get_sqlite_conn():
     conn.execute("PRAGMA foreign_keys=ON;")
     return conn
 
+def init_database_schema():
+    """Inicializa tablas de Trazabilidad, Kardex y columnas de alistado en SQLite."""
+    try:
+        conn = get_sqlite_conn()
+        cur = conn.cursor()
+        
+        # 1. Tabla de Movimientos de Kardex
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS InventoryMovements (
+                MovementId INTEGER PRIMARY KEY AUTOINCREMENT,
+                MovementNumber TEXT UNIQUE,
+                MovementDate TEXT NOT NULL,
+                ProductId INTEGER NOT NULL,
+                Sku TEXT,
+                ProductName TEXT,
+                MovementType TEXT NOT NULL,
+                Quantity INTEGER NOT NULL,
+                PreviousStock INTEGER NOT NULL,
+                FinalStock INTEGER NOT NULL,
+                UnitCost REAL DEFAULT 0.0,
+                TotalAmount REAL DEFAULT 0.0,
+                ReferenceDocument TEXT,
+                UserId INTEGER,
+                UserName TEXT,
+                Notes TEXT,
+                CreatedAt TEXT NOT NULL
+            );
+        """)
+        
+        # 2. Tabla de Bitácora / Auditoría de Pedidos (Audit Trail)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS OrderAuditLog (
+                LogId INTEGER PRIMARY KEY AUTOINCREMENT,
+                OrderId INTEGER,
+                OrderCode TEXT NOT NULL,
+                Timestamp TEXT NOT NULL,
+                PreviousStatus TEXT,
+                NewStatus TEXT NOT NULL,
+                UserId INTEGER,
+                UserName TEXT NOT NULL,
+                UserRole TEXT,
+                Notes TEXT,
+                Justification TEXT
+            );
+        """)
+        
+        # 3. Columnas de trazabilidad en SalesOrders
+        cur.execute("PRAGMA table_info(SalesOrders)")
+        existing_cols = set(r[1] for r in cur.fetchall())
+        
+        cols_to_add = [
+            ("PreparedByUserId", "INTEGER"),
+            ("PreparedByName", "TEXT"),
+            ("PreparedAt", "TEXT"),
+            ("DriverUserId", "INTEGER"),
+            ("DriverName", "TEXT"),
+            ("DispatchedAt", "TEXT"),
+            ("DeliveredAt", "TEXT"),
+            ("UndeliveredReason", "TEXT"),
+            ("StockDeducted", "INTEGER DEFAULT 0")
+        ]
+        
+        for col_name, col_type in cols_to_add:
+            if col_name not in existing_cols:
+                cur.execute(f"ALTER TABLE SalesOrders ADD COLUMN {col_name} {col_type};")
+                
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Aviso inicializando esquema de trazabilidad: {e}")
+
+init_database_schema()
+
 def try_get_mssql_conn():
     """Intenta conectar a Microsoft SQL Server 2022."""
     try:
@@ -250,8 +323,13 @@ class OrderCreateRequest(BaseModel):
     total: float
 
 class OrderStatusUpdateRequest(BaseModel):
-    status: str = Field(..., pattern="^(PENDIENTE|ALISTADO|FACTURADO|EN_RUTA|ENTREGADO|CANCELADO)$")
+    status: str = Field(..., pattern="^(SOLICITADO|PENDIENTE|EN_ALISTADO|ALISTADO|EN_RUTA|ENTREGADO|FACTURADO|NO_ENTREGADO|RECHAZADO|CANCELADO)$")
+    responsibleUserId: Optional[int] = None
+    responsibleUserName: Optional[str] = None
+    driverUserId: Optional[int] = None
+    driverName: Optional[str] = None
     notes: Optional[str] = None
+    justification: Optional[str] = None
 
 class CustomerCreateRequest(BaseModel):
     taxId: str = Field(..., min_length=5, max_length=30)
@@ -639,7 +717,16 @@ def get_orders():
                        c.Address as customerAddress,
                        so.AssignedToUserId as assignedUserId,
                        u.FullName as assignedUserName,
-                       r.Name as assignedUserRole
+                       r.Name as assignedUserRole,
+                       COALESCE(so.PreparedByName, '') as preparedByName,
+                       COALESCE(so.PreparedByUserId, 0) as preparedByUserId,
+                       COALESCE(so.DriverName, '') as driverName,
+                       COALESCE(so.DriverUserId, 0) as driverUserId,
+                       COALESCE(so.UndeliveredReason, '') as undeliveredReason,
+                       COALESCE(so.StockDeducted, 0) as stockDeducted,
+                       so.PreparedAt as preparedAt,
+                       so.DeliveredAt as deliveredAt,
+                       so.DispatchedAt as dispatchedAt
                 FROM SalesOrders so
                 INNER JOIN Customers c ON so.CustomerId = c.CustomerId
                 LEFT JOIN Users u ON so.AssignedToUserId = u.UserId
@@ -731,51 +818,288 @@ def get_orders():
 @app.post("/api/orders/{order_id}/status")
 @app.put("/api/orders/{order_id}/status")
 def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
-    """Actualiza el estado de un pedido (ej. PENDIENTE -> ALISTADO en bodega)."""
-    new_status = req.status
-    updated = False
-    
-    # Actualizar en SQLite
-    try:
-        conn = get_sqlite_conn()
-        cur = conn.cursor()
-        cur.execute("UPDATE SalesOrders SET Status = ? WHERE SalesOrderId = ? OR OrderNumber = ?", (new_status, order_id, order_id))
-        conn.commit()
+    """
+    Actualiza el estado de un pedido con:
+    1. Asignación de colaboradores responsables (Bodeguero / Chofer).
+    2. Bitácora de auditoría y trazabilidad cronológica (Audit Trail).
+    3. Descuento automático de stock en Kardex (InventoryMovements) al entregar.
+    4. Reingreso automático de stock si el pedido se rechaza/cancela tras haber sido entregado.
+    5. Validación obligatoria de motivo/justificación en caso de no entrega o rechazo.
+    """
+    new_status = req.status.strip().upper()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_date = datetime.now().strftime("%Y-%m-%d")
+
+    # Validación obligatoria: si el pedido no se pudo entregar o se cancela, se requiere justificación
+    if new_status in ("NO_ENTREGADO", "RECHAZADO", "CANCELADO"):
+        justification = (req.justification or req.notes or "").strip()
+        if not justification or len(justification) < 5:
+            raise HTTPException(
+                status_code=400,
+                detail="Campo Obligatorio: Debe ingresar una justificación detallada (mínimo 5 caracteres) indicando el motivo por el cual no se pudo entregar o se canceló el pedido."
+            )
+    else:
+        justification = (req.justification or "").strip()
+
+    notes = (req.notes or "").strip()
+    resp_name = (req.responsibleUserName or "Colaborador Fragama").strip()
+    resp_id = req.responsibleUserId or 1
+    driver_name = (req.driverName or "").strip()
+    driver_id = req.driverUserId
+
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+
+    # Buscar pedido en SalesOrders
+    cur.execute("""
+        SELECT SalesOrderId, OrderNumber, Status, StockDeducted, PreparedByName, DriverName, DeliveryNotes, TotalAmount
+        FROM SalesOrders
+        WHERE SalesOrderId = ? OR OrderNumber = ?
+    """, (order_id, order_id))
+    order_row = cur.fetchone()
+
+    if not order_row:
         conn.close()
-        updated = True
-    except Exception as e:
-        logger.error(f"Error actualizando status en SQLite: {e}")
+        raise HTTPException(status_code=404, detail=f"No se encontró el pedido '{order_id}'.")
 
-    # Actualizar en SQL Server si está conectado
-    mssql_conn = try_get_mssql_conn()
-    if mssql_conn:
+    sql_order_id = order_row["SalesOrderId"]
+    order_code = order_row["OrderNumber"]
+    prev_status = order_row["Status"] or "PENDIENTE"
+    stock_deducted = int(order_row["StockDeducted"] or 0)
+
+    # 1. Manejo de Alistado: Si pasa a ALISTADO o EN_ALISTADO, registrar bodeguero
+    prepared_by_id = resp_id if new_status in ("ALISTADO", "EN_ALISTADO") else None
+    prepared_by_name = resp_name if new_status in ("ALISTADO", "EN_ALISTADO") else None
+    prepared_at = now_str if new_status in ("ALISTADO", "EN_ALISTADO") else None
+
+    # 2. Manejo de Despacho: Si pasa a EN_RUTA, registrar chofer
+    dispatched_at = now_str if new_status == "EN_RUTA" else None
+
+    # 3. ACTUALIZACIÓN AUTOMÁTICA DE INVENTARIO Y KARDEX (Al marcar ENTREGADO)
+    inventory_affected = False
+    if new_status in ("ENTREGADO", "FACTURADO") and stock_deducted == 0:
+        cur.execute("""
+            SELECT ProductId, Sku, ProductName, Quantity, UnitPrice
+            FROM SalesOrderDetails
+            WHERE SalesOrderId = ?
+        """, (sql_order_id,))
+        items = cur.fetchall()
+
+        for it in items:
+            p_id = it["ProductId"]
+            p_qty = it["Quantity"]
+            p_sku = it["Sku"]
+            p_name = it["ProductName"]
+
+            cur.execute("SELECT Stock, CostPrice, Name FROM Products WHERE ProductId = ?", (p_id,))
+            p_row = cur.fetchone()
+            if p_row:
+                prev_stock = p_row["Stock"] or 0
+                cost = p_row["CostPrice"] or 0.0
+                new_stock = max(0, prev_stock - p_qty)
+
+                # Descontar stock
+                cur.execute("UPDATE Products SET Stock = ? WHERE ProductId = ?", (new_stock, p_id))
+
+                # Registrar movimiento en Kardex
+                mov_num = f"MOV-SAL-{int(time.time()) % 1000000:06d}"
+                cur.execute("""
+                    INSERT INTO InventoryMovements 
+                    (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock, UnitCost, TotalAmount, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+                    VALUES (?, ?, ?, ?, ?, 'SALIDA_VENTA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    mov_num, now_date, p_id, p_sku, p_name, -p_qty, prev_stock, new_stock, cost, (p_qty * cost),
+                    order_code, resp_id, resp_name, f"Despacho y entrega confirmada de pedido {order_code}", now_str
+                ))
+
+        stock_deducted = 1
+        inventory_affected = True
+        logger.info(f"📦 Inventario descontado con éxito para el pedido {order_code} ({len(items)} líneas).")
+
+    # 4. REVERSIÓN DE INVENTARIO (Si se cancela o rechaza un pedido que ya había sido descontado)
+    elif new_status in ("NO_ENTREGADO", "RECHAZADO", "CANCELADO") and stock_deducted == 1:
+        cur.execute("""
+            SELECT ProductId, Sku, ProductName, Quantity, UnitPrice
+            FROM SalesOrderDetails
+            WHERE SalesOrderId = ?
+        """, (sql_order_id,))
+        items = cur.fetchall()
+
+        for it in items:
+            p_id = it["ProductId"]
+            p_qty = it["Quantity"]
+            p_sku = it["Sku"]
+            p_name = it["ProductName"]
+
+            cur.execute("SELECT Stock, CostPrice FROM Products WHERE ProductId = ?", (p_id,))
+            p_row = cur.fetchone()
+            if p_row:
+                prev_stock = p_row["Stock"] or 0
+                cost = p_row["CostPrice"] or 0.0
+                new_stock = prev_stock + p_qty
+
+                # Reingresar stock
+                cur.execute("UPDATE Products SET Stock = ? WHERE ProductId = ?", (new_stock, p_id))
+
+                # Registrar movimiento de reingreso en Kardex
+                mov_num = f"MOV-REING-{int(time.time()) % 1000000:06d}"
+                cur.execute("""
+                    INSERT INTO InventoryMovements 
+                    (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock, UnitCost, TotalAmount, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+                    VALUES (?, ?, ?, ?, ?, 'REINGRESO_RECHAZO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    mov_num, now_date, p_id, p_sku, p_name, p_qty, prev_stock, new_stock, cost, (p_qty * cost),
+                    order_code, resp_id, resp_name, f"Reingreso por no entrega/rechazo de {order_code}. Justificación: {justification}", now_str
+                ))
+
+        stock_deducted = 0
+        inventory_affected = True
+        logger.info(f"↩️ Stock reingresado a bodega por pedido no entregado {order_code}.")
+
+    # 5. ACTUALIZAR ENCABEZADO DEL PEDIDO
+    update_fields = ["Status = ?"]
+    update_params = [new_status]
+
+    if prepared_by_name:
+        update_fields.extend(["PreparedByUserId = ?", "PreparedByName = ?", "PreparedAt = ?"])
+        update_params.extend([prepared_by_id, prepared_by_name, prepared_at])
+
+    if driver_name:
+        update_fields.extend(["DriverUserId = ?", "DriverName = ?"])
+        update_params.extend([driver_id, driver_name])
+
+    if dispatched_at:
+        update_fields.append("DispatchedAt = ?")
+        update_params.append(dispatched_at)
+
+    if new_status in ("ENTREGADO", "FACTURADO"):
+        update_fields.append("DeliveredAt = ?")
+        update_params.append(now_str)
+
+    if justification:
+        update_fields.append("UndeliveredReason = ?")
+        update_params.append(justification)
+
+    update_fields.append("StockDeducted = ?")
+    update_params.append(stock_deducted)
+
+    update_params.append(sql_order_id)
+    cur.execute(f"UPDATE SalesOrders SET {', '.join(update_fields)} WHERE SalesOrderId = ?", update_params)
+
+    # 6. REGISTRAR EN BITÁCORA DE TRAZABILIDAD (OrderAuditLog)
+    audit_notes = notes or (f"Estado cambiado a {new_status} por {resp_name}")
+    cur.execute("""
+        INSERT INTO OrderAuditLog 
+        (OrderId, OrderCode, Timestamp, PreviousStatus, NewStatus, UserId, UserName, UserRole, Notes, Justification)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Colaborador', ?, ?)
+    """, (sql_order_id, order_code, now_str, prev_status, new_status, resp_id, resp_name, audit_notes, justification))
+
+    conn.commit()
+    conn.close()
+
+    # 7. Sincronizar catálogo estático si cambió el inventario
+    if inventory_affected:
         try:
-            m_cur = mssql_conn.cursor()
-            m_cur.execute("UPDATE SalesOrders SET Status = %s WHERE SalesOrderId = %s OR OrderNumber = %s", (new_status, order_id, order_id))
-            mssql_conn.commit()
-        except Exception:
-            pass
-        finally:
-            mssql_conn.close()
+            if os.path.exists(CATALOG_JSON_FILE):
+                with open(CATALOG_JSON_FILE, "r", encoding="utf-8") as f:
+                    cat = json.load(f)
+                c_conn = get_sqlite_conn()
+                c_cur = c_conn.cursor()
+                for p in cat:
+                    c_cur.execute("SELECT Stock FROM Products WHERE ProductId = ?", (p.get("id"),))
+                    s_row = c_cur.fetchone()
+                    if s_row:
+                        p["stock"] = s_row["Stock"]
+                c_conn.close()
+                sync_catalog_files(cat)
+        except Exception as e:
+            logger.warning(f"Aviso sincronizando catálogo tras movimiento: {e}")
 
-    # Actualizar en JSON
+    # 8. Replicar a JSON de contingencia
     web_orders = load_local_web_orders()
     for wo in web_orders:
         if str(wo.get("id")) == str(order_id) or str(wo.get("orderCode")) == str(order_id):
             wo["status"] = new_status
-            updated = True
+            if prepared_by_name:
+                wo["preparedByName"] = prepared_by_name
+            if driver_name:
+                wo["driverName"] = driver_name
+            if justification:
+                wo["undeliveredReason"] = justification
+            wo["stockDeducted"] = stock_deducted
             break
-            
-    if updated:
-        try:
-            with open(WEB_ORDERS_FILE, "w", encoding="utf-8") as f:
-                json.dump(web_orders, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+    try:
+        with open(WEB_ORDERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(web_orders, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
     return {
         "success": True,
-        "message": f"Pedido {order_id} actualizado a estado: {new_status}"
+        "message": f"Pedido {order_code} actualizado a estado '{new_status}'.",
+        "orderCode": order_code,
+        "previousStatus": prev_status,
+        "newStatus": new_status,
+        "stockDeducted": bool(stock_deducted),
+        "inventoryUpdated": inventory_affected,
+        "preparedBy": prepared_by_name,
+        "driver": driver_name,
+        "justification": justification
+    }
+
+@app.get("/api/orders/{order_id}/audit-log")
+def get_order_audit_log(order_id: str):
+    """Retorna la bitácora completa de trazabilidad cronológica de un pedido."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT LogId as id, OrderId as orderId, OrderCode as orderCode,
+               Timestamp as timestamp, PreviousStatus as prevStatus, NewStatus as newStatus,
+               UserId as userId, UserName as userName, UserRole as userRole,
+               Notes as notes, Justification as justification
+        FROM OrderAuditLog
+        WHERE OrderId = ? OR OrderCode = ?
+        ORDER BY LogId ASC
+    """, (order_id, order_id))
+    rows = cur.fetchall()
+    conn.close()
+    
+    audit_list = [dict(r) for r in rows]
+    
+    if not audit_list:
+        audit_list.append({
+            "id": 1,
+            "orderCode": order_id,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "prevStatus": None,
+            "newStatus": "SOLICITADO",
+            "userName": "Sistema Tienda Web",
+            "userRole": "Sistema",
+            "notes": "Pedido recibido y registrado en plataforma",
+            "justification": None
+        })
+        
+    return audit_list
+
+@app.get("/api/staff")
+def get_staff_members():
+    """Retorna colaboradores activos divididos por roles para asignación de pedidos."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT u.UserId as id, u.FullName as name, u.Username as username, r.Name as role
+        FROM Users u
+        INNER JOIN Roles r ON u.RoleId = r.RoleId
+        WHERE u.IsActive = 1
+        ORDER BY u.FullName ASC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    staff = [dict(r) for r in rows]
+    return {
+        "all": staff,
+        "bodegueros": [u for u in staff if u["role"] in ("Bodeguero", "Administrador")],
+        "choferes": [u for u in staff if u["role"] in ("Chofer", "Vendedor", "Administrador")]
     }
 
 @app.post("/api/orders")
@@ -1395,11 +1719,39 @@ def create_supplier(req: SupplierCreateRequest):
 
 @app.get("/api/inventory/movements")
 def get_inventory_movements():
-    """Movimientos de inventario (Kardex)."""
-    return [
-        { "id": 101, "code": "ENT-20261001-001", "product": "Bandeja 9x9 con o sin división Bagazo de Caña", "type": "ENTRADA", "qty": 500, "prevStock": 100, "postStock": 600, "doc": "FAC-GOY-9912", "user": "Esteban Quirós (Bodega)", "date": "2026-10-01 08:30" },
-        { "id": 102, "code": "SAL-20261001-002", "product": "Bandeja Hamburguesa 6x6 Bagazo de Caña", "type": "SALIDA", "qty": 50, "prevStock": 200, "postStock": 150, "doc": "PED-WEB-29914", "user": "Sistema Tienda Web", "date": "2026-10-01 11:47" }
-    ]
+    """Retorna los movimientos reales de Kardex registrados en la base de datos."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT m.MovementId as id,
+               m.MovementNumber as code,
+               m.MovementDate as date,
+               m.ProductId as productId,
+               m.Sku as sku,
+               m.ProductName as product,
+               m.MovementType as type,
+               ABS(m.Quantity) as qty,
+               m.PreviousStock as prevStock,
+               m.FinalStock as postStock,
+               m.ReferenceDocument as doc,
+               m.UserName as user,
+               m.Notes as notes,
+               m.CreatedAt as createdAt
+        FROM InventoryMovements m
+        ORDER BY m.MovementId DESC
+        LIMIT 200
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    
+    movements = [dict(r) for r in rows]
+    if not movements:
+        # Valores de ejemplo inicial si la tabla acaba de crearse
+        return [
+            { "id": 101, "code": "ENT-20261001-001", "product": "Bandeja 9x9 con o sin división Bagazo de Caña", "type": "ENTRADA", "qty": 500, "prevStock": 100, "postStock": 600, "doc": "FAC-GOY-9912", "user": "Esteban Quirós (Bodega)", "date": "2026-10-01 08:30" },
+            { "id": 102, "code": "SAL-20261001-002", "product": "Bandeja Hamburguesa 6x6 Bagazo de Caña", "type": "SALIDA_VENTA", "qty": 50, "prevStock": 200, "postStock": 150, "doc": "PED-WEB-29914", "user": "Sistema Tienda Web", "date": "2026-10-01 11:47" }
+        ]
+    return movements
 
 # ==============================================================================
 # ARCHIVOS ESTÁTICOS Y ENRUTAMIENTO SPA

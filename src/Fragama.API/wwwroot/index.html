@@ -2343,6 +2343,302 @@
     </div>
   </div>
 
+  <!-- ==========================================================================
+       MODAL 1: ALISTADO Y PICKING DE PEDIDO EN BODEGA (ASIGNACIÓN DE RESPONSABLES)
+       ========================================================================== -->
+  <div class="modal-overlay" id="orderPickingModal" style="z-index:99999;">
+    <div class="modal-box" style="max-width:760px; border-radius:16px;">
+      <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
+        <div>
+          <h3 style="font-size:1.15rem; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
+            <i class="bi bi-box-seam-fill text-warning"></i> Alistar Pedido &bull; Picking y Asignación de Despacho
+          </h3>
+          <div style="font-size:0.78rem; color:#94A3B8;" id="pickingModalSubtitle">
+            Pedido # - &bull; Cliente: -
+          </div>
+        </div>
+        <button type="button" onclick="closeModalDirectly('orderPickingModal')" style="background:none; border:none; font-size:1.4rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="orderPickingForm" onsubmit="handleConfirmOrderPicking(event)">
+        <input type="hidden" id="pickingOrderId" value="">
+        <input type="hidden" id="pickingOrderCode" value="">
+
+        <div class="modal-body-custom" style="padding:1.25rem; max-height:75vh; overflow-y:auto;">
+          
+          <!-- Resumen de Destino y Ruta -->
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; margin-bottom:14px;">
+            <div>
+              <div style="font-size:0.72rem; color:#64748B; font-weight:700; text-transform:uppercase;">Cliente / Contacto:</div>
+              <div style="font-size:0.9rem; font-weight:800; color:#0B192C;" id="pickingCustomerName">-</div>
+              <div style="font-size:0.76rem; color:#0284C7;" id="pickingCustomerPhone">-</div>
+            </div>
+            <div>
+              <div style="font-size:0.72rem; color:#64748B; font-weight:700; text-transform:uppercase;">Ruta de Entrega:</div>
+              <div style="font-size:0.9rem; font-weight:800; color:#FF6500;" id="pickingDeliveryRoute">-</div>
+              <div style="font-size:0.76rem; color:#475569;" id="pickingDeliveryAddress">-</div>
+            </div>
+            <div>
+              <div style="font-size:0.72rem; color:#64748B; font-weight:700; text-transform:uppercase;">Condición / Total:</div>
+              <div style="font-size:0.95rem; font-weight:900; color:#10B981; font-family:'JetBrains Mono',monospace;" id="pickingOrderTotal">₡0,00</div>
+              <div style="font-size:0.75rem; color:#64748B;">I.V.A. Incluido</div>
+            </div>
+          </div>
+
+          <!-- Checklist de Picking (Artículos a Alistar) -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <label style="font-size:0.85rem; font-weight:800; color:#0B192C; display:flex; align-items:center; gap:6px;">
+                <i class="bi bi-check2-square text-success"></i> Lista de Picking &bull; Verificar Mercadería en Estantes:
+              </label>
+              <button type="button" class="btn-fragama btn-outline-fragama" onclick="checkAllPickingItems()" style="padding:2px 8px; font-size:0.72rem;">
+                <i class="bi bi-check-all"></i> Marcar Todos
+              </button>
+            </div>
+            
+            <div style="border:1px solid #CBD5E1; border-radius:10px; overflow:hidden;">
+              <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+                <thead style="background:#F1F5F9; color:#475569; font-weight:700;">
+                  <tr>
+                    <th style="padding:8px 10px; text-align:center; width:45px;">Listo</th>
+                    <th style="padding:8px 10px; text-align:left;">Producto / SKU</th>
+                    <th style="padding:8px 10px; text-align:left;">Ubicación Bodega</th>
+                    <th style="padding:8px 10px; text-align:center;">Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody id="pickingItemsTableBody">
+                  <!-- Inyectado por JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ASIGNACIÓN OBLIGATORIA DE RESPONSABLES -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#0B192C; display:block; margin-bottom:4px;">
+                <i class="bi bi-person-fill-gear text-primary"></i> Bodeguero que Alista el Pedido *
+              </label>
+              <select id="pickingResponsibleSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit; background:#FFF; font-weight:600;">
+                <!-- Opciones de bodegueros -->
+              </select>
+              <small style="font-size:0.72rem; color:#64748B;">Colaborador que verificó y empacó los bultos en bodega.</small>
+            </div>
+
+            <div>
+              <label style="font-size:0.8rem; font-weight:700; color:#0B192C; display:block; margin-bottom:4px;">
+                <i class="bi bi-truck text-warning"></i> Chofer / Transportista Asignado para Entrega *
+              </label>
+              <select id="pickingDriverSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit; background:#FFF; font-weight:600;">
+                <!-- Opciones de choferes -->
+              </select>
+              <small style="font-size:0.72rem; color:#64748B;">Encargado de la ruta y entrega física en el destino.</small>
+            </div>
+          </div>
+
+          <!-- Observaciones de Empaque y Bultos -->
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#0B192C; display:block; margin-bottom:4px;">
+              Notas de Alistado &bull; Bultos / Embalaje / Precintos:
+            </label>
+            <input type="text" id="pickingPackingNotes" placeholder="Ej. Alistado en 2 cajas selladas con cinta institucional Fragama y 1 saco de químicos..." style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem;">
+          </div>
+
+        </div>
+
+        <div class="modal-footer-custom" style="padding:1rem; gap:10px;">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeModalDirectly('orderPickingModal')">Cancelar</button>
+          <button type="submit" id="btnConfirmPickingSubmit" class="btn-fragama btn-primary-fragama" style="background:#10B981; border-color:#10B981;">
+            <i class="bi bi-check2-circle"></i> Confirmar Alistado y Dejar Listo
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 2: REGISTRAR NO ENTREGA / RECHAZO (JUSTIFICACIÓN OBLIGATORIA)
+       ========================================================================== -->
+  <div class="modal-overlay" id="orderUndeliveredModal" style="z-index:99999;">
+    <div class="modal-box" style="max-width:520px; border-radius:16px;">
+      <div class="modal-header-custom" style="background:#DC2626; color:#FFFFFF;">
+        <div>
+          <h3 style="font-size:1.1rem; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
+            <i class="bi bi-exclamation-octagon-fill"></i> Registrar No Entrega / Rechazo
+          </h3>
+          <div style="font-size:0.75rem; color:#FEE2E2;" id="undeliveredModalSubtitle">
+            Pedido # -
+          </div>
+        </div>
+        <button type="button" onclick="closeModalDirectly('orderUndeliveredModal')" style="background:none; border:none; font-size:1.4rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="orderUndeliveredForm" onsubmit="handleConfirmUndeliveredOrder(event)">
+        <input type="hidden" id="undeliveredOrderId" value="">
+        <input type="hidden" id="undeliveredOrderCode" value="">
+
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          
+          <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:0.8rem; color:#991B1B; line-height:1.4;">
+            <i class="bi bi-shield-exclamation text-danger"></i> <strong>Aviso de Auditoría:</strong>
+            Para garantizar el control de existencias, si el pedido ya había sido entregado, el sistema reingresará automáticamente las unidades al Kardex de la bodega. Es <strong>obligatorio</strong> registrar el motivo.
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-size:0.8rem; font-weight:700; color:#0B192C; display:block; margin-bottom:4px;">Motivo Común:</label>
+            <select id="undeliveredPredefinedReason" onchange="handlePredefinedReasonChange()" style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit; background:#FFF;">
+              <option value="">Seleccione una causa frecuente...</option>
+              <option value="Cliente ausente en dirección / Local comercial cerrado">Cliente ausente / Local cerrado en horario de visita</option>
+              <option value="Dirección incorrecta o teléfono no contesta">Dirección errónea o teléfono no responde</option>
+              <option value="Cliente cancela el pedido en sitio por falta de fondos / decisión propia">Cliente cancela en sitio (fondos insuficientes o desistimiento)</option>
+              <option value="Inconformidad del cliente con el producto o faltante">Inconformidad con el pedido / producto</option>
+              <option value="Mercadería dañada durante el traslado en ruta">Mercadería con daño en trayecto</option>
+              <option value="OTRO">Otro motivo específico (Digitar abajo)</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-size:0.8rem; font-weight:800; color:#DC2626; display:block; margin-bottom:4px;">
+              Justificación Detallada del Chofer / Colaborador *
+            </label>
+            <textarea id="undeliveredJustificationText" required minlength="5" rows="3" placeholder="Describa con precisión lo ocurrido (ej. Se llegó a las 11:30am, el local estaba cerrado y nadie contestó el teléfono)..." style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit;"></textarea>
+            <div id="undeliveredErrorAlert" style="display:none; color:#DC2626; font-size:0.75rem; font-weight:700; margin-top:4px;"></div>
+          </div>
+
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#0B192C; display:block; margin-bottom:4px;">
+              Colaborador que reporta la incidencia *
+            </label>
+            <select id="undeliveredReporterSelect" required style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:8px 10px; font-size:0.85rem; font-family:inherit; background:#FFF; font-weight:600;">
+              <!-- Opciones de colaboradores -->
+            </select>
+          </div>
+
+        </div>
+
+        <div class="modal-footer-custom" style="padding:1rem; gap:10px;">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeModalDirectly('orderUndeliveredModal')">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama" style="background:#DC2626; border-color:#DC2626;">
+            <i class="bi bi-x-octagon"></i> Registrar Rechazo y Reingresar Stock
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 3: BITÁCORA Y TRAZABILIDAD CRONOLÓGICA (TIMELINE DEL PEDIDO)
+       ========================================================================== -->
+  <div class="modal-overlay" id="orderAuditTimelineModal" style="z-index:99999;">
+    <div class="modal-box" style="max-width:620px; border-radius:16px;">
+      <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
+        <div>
+          <h3 style="font-size:1.1rem; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
+            <i class="bi bi-clock-history text-info"></i> Trazabilidad &bull; Bitácora Histórica del Pedido
+          </h3>
+          <div style="font-size:0.78rem; color:#94A3B8;" id="auditModalSubtitle">
+            Pedido # -
+          </div>
+        </div>
+        <button type="button" onclick="closeModalDirectly('orderAuditTimelineModal')" style="background:none; border:none; font-size:1.4rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body-custom" style="padding:1.25rem; max-height:70vh; overflow-y:auto;">
+        
+        <!-- Ficha de Trazabilidad Actual -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px; margin-bottom:18px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:0.8rem;">
+            <div><strong>Estado Actual:</strong> <span id="auditCurrentStatusBadge" class="badge-status badge-confirmed">-</span></div>
+            <div><strong>Descuento en Kardex:</strong> <span id="auditStockDeductedBadge" style="font-weight:700; color:#10B981;">No</span></div>
+            <div><strong>Bodeguero Alistador:</strong> <span id="auditPreparedBySpan">-</span></div>
+            <div><strong>Chofer / Repartidor:</strong> <span id="auditDriverSpan">-</span></div>
+          </div>
+        </div>
+
+        <!-- Línea de Tiempo (Timeline Visual) -->
+        <div class="audit-timeline" id="auditTimelineContainer">
+          <!-- Inyectado dinámicamente vía JS -->
+        </div>
+
+      </div>
+
+      <div class="modal-footer-custom" style="padding:1rem;">
+        <button type="button" class="btn-fragama btn-primary-fragama" onclick="closeModalDirectly('orderAuditTimelineModal')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .audit-timeline {
+      position: relative;
+      padding-left: 28px;
+    }
+    .audit-timeline::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 5px;
+      bottom: 5px;
+      width: 2px;
+      background: #E2E8F0;
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -28px;
+      top: 3px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #0284C7;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.68rem;
+      box-shadow: 0 0 0 3px #F8FAFC;
+    }
+    .timeline-item.success .timeline-dot { background: #10B981; }
+    .timeline-item.warning .timeline-dot { background: #F59E0B; }
+    .timeline-item.danger .timeline-dot { background: #EF4444; }
+    .timeline-item.purple .timeline-dot { background: #8B5CF6; }
+
+    .timeline-content {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .timeline-time {
+      font-size: 0.72rem;
+      color: #64748B;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .timeline-title {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: #0B192C;
+      margin: 2px 0 4px 0;
+    }
+    .timeline-body {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+    .timeline-justification {
+      margin-top: 6px;
+      background: #FEF2F2;
+      border-left: 3px solid #EF4444;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      color: #991B1B;
+      border-radius: 4px;
+    }
+  </style>
+
   <!-- MODAL: ETIQUETA Y CÓDIGO DE BARRAS EAN-13 / CODE 128 -->
   <div class="modal-overlay" id="barcodeModal">
     <div class="modal-box" style="max-width:460px; border-radius:16px;">

@@ -31,7 +31,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable / Compostable",
     "description": "Bandeja cuadrada de bagazo de caña resistente para almuerzos y comidas calientes.",
     "imageIcon": "bi-box2",
-    "image": "img/catalog/prod_102.jpg"
+    "image": "img/catalog/prod_102.jpg",
+    "stock": 150
   },
   {
     "id": 103,
@@ -47,7 +48,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable / Compostable",
     "description": "Bandeja tipo almeja perfecta para hamburguesas, repostería y porciones individuales.",
     "imageIcon": "bi-archive",
-    "image": "img/catalog/prod_103.jpg"
+    "image": "img/catalog/prod_103.jpg",
+    "stock": 150
   },
   {
     "id": 104,
@@ -64,7 +66,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable",
     "description": "Plato pastelero/postre biodegradable y resistente a cortes y salsas.",
     "imageIcon": "bi-disc",
-    "image": "img/catalog/prod_104.jpg"
+    "image": "img/catalog/prod_104.jpg",
+    "stock": 150
   },
   {
     "id": 105,
@@ -81,7 +84,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable",
     "description": "Plato grande para almuerzos ejecutivos y eventos, 100% compostable.",
     "imageIcon": "bi-record-circle",
-    "image": "img/catalog/prod_105.jpg"
+    "image": "img/catalog/prod_105.jpg",
+    "stock": 150
   },
   {
     "id": 106,
@@ -97,7 +101,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable",
     "description": "Bandeja rectangular almeja ecológica para comidas completas con acompañamientos.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_106.jpg"
+    "image": "img/catalog/prod_106.jpg",
+    "stock": 150
   },
   {
     "id": 107,
@@ -113,7 +118,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Reciclable / Eco",
     "description": "Bowl kraft redondo térmico para ensaladas, sopas, poke bowls y pastas.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_107.jpg"
+    "image": "img/catalog/prod_107.jpg",
+    "stock": 150
   },
   {
     "id": 108,
@@ -129,7 +135,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Reciclable / Eco",
     "description": "Bowl kraft extra grande para porciones familiares, sopas y comidas completas.",
     "imageIcon": "bi-cup-hot",
-    "image": "img/catalog/prod_108.jpg"
+    "image": "img/catalog/prod_108.jpg",
+    "stock": 150
   },
   {
     "id": 109,
@@ -145,7 +152,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Microondable MFPP",
     "description": "Bandeja térmica con polipropileno reforzado con minerales, apta para microondas.",
     "imageIcon": "bi-box-seam-fill",
-    "image": "img/catalog/prod_109.jpg"
+    "image": "img/catalog/prod_109.jpg",
+    "stock": 150
   },
   {
     "id": 110,
@@ -161,7 +169,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Microondable MFPP",
     "description": "Bandeja almeja para hamburguesas y bocadillos, bisagra resistente.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_110.jpg"
+    "image": "img/catalog/prod_110.jpg",
+    "stock": 150
   },
   {
     "id": 111,
@@ -177,7 +186,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Microondable MFPP",
     "description": "Bandeja cuadrada térmica de alta rigidez para servicio express.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_111.jpg"
+    "image": "img/catalog/prod_111.jpg",
+    "stock": 150
   },
   {
     "id": 112,
@@ -193,7 +203,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Microondable / Premium",
     "description": "Bandeja MFPP color negro mate para presentación ejecutiva y gourmet.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_112.jpg"
+    "image": "img/catalog/prod_112.jpg",
+    "stock": 150
   },
   {
     "id": 113,
@@ -209,7 +220,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Microondable MFPP",
     "description": "Bandeja formato intermedio de excelente calidad estructural para comidas calientes.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_113.jpg"
+    "image": "img/catalog/prod_113.jpg",
+    "stock": 150
   },
   {
     "id": 114,
@@ -225,7 +237,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Microondable MFPP",
     "description": "Bandeja grande multi-compartimento para casados y banquetes.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_114.jpg"
+    "image": "img/catalog/prod_114.jpg",
+    "stock": 150
   },
   {
     "id": 115,
@@ -241,7 +254,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Biodegradable",
     "description": "Bandeja abierta diseño rojo/blanco para papas, nuggets y tacos.",
     "imageIcon": "bi-basket2",
-    "image": "img/catalog/prod_115.jpg"
+    "image": "img/catalog/prod_115.jpg",
+    "stock": 150
   },
   {
     "id": 116,
@@ -257,7 +271,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Biodegradable",
     "description": "Bandeja de cartón rígida para hot dogs y raciones intermedias.",
     "imageIcon": "bi-basket2",
-    "image": "img/catalog/prod_116.jpg"
+    "image": "img/catalog/prod_116.jpg",
+    "stock": 150
   },
   {
     "id": 117,
@@ -273,7 +288,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Biodegradable",
     "description": "Bandeja resistente a la grasa para combos de comida rápida.",
     "imageIcon": "bi-basket2",
-    "image": "img/catalog/prod_117.jpg"
+    "image": "img/catalog/prod_117.jpg",
+    "stock": 150
   },
   {
     "id": 118,
@@ -289,7 +305,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Biodegradable",
     "description": "Bandeja tamaño grande de 2 lb para porciones familiares y parrilladas.",
     "imageIcon": "bi-basket2",
-    "image": "img/catalog/prod_118.jpg"
+    "image": "img/catalog/prod_118.jpg",
+    "stock": 150
   },
   {
     "id": 119,
@@ -305,7 +322,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Transparente",
     "description": "Envase burbuja transparente con cierre seguro para postres y pastelería.",
     "imageIcon": "bi-box-arrow-in-up-right",
-    "image": "img/catalog/prod_119.jpg"
+    "image": "img/catalog/prod_119.jpg",
+    "stock": 150
   },
   {
     "id": 120,
@@ -321,7 +339,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Transparente",
     "description": "Envase burbuja mediano transparente para porciones individuales.",
     "imageIcon": "bi-box-arrow-in-up-right",
-    "image": "img/catalog/prod_120.jpg"
+    "image": "img/catalog/prod_120.jpg",
+    "stock": 150
   },
   {
     "id": 121,
@@ -337,7 +356,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Transparente",
     "description": "Envase burbuja grande para queques, ensaladas frías y bocadillos.",
     "imageIcon": "bi-box-arrow-in-up-right",
-    "image": "img/catalog/prod_121.jpg"
+    "image": "img/catalog/prod_121.jpg",
+    "stock": 150
   },
   {
     "id": 122,
@@ -353,7 +373,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Transparente",
     "description": "Envase burbuja extra grande de alta visibilidad y sellado hermético.",
     "imageIcon": "bi-box-arrow-in-up-right",
-    "image": "img/catalog/prod_122.jpg"
+    "image": "img/catalog/prod_122.jpg",
+    "stock": 150
   },
   {
     "id": 123,
@@ -369,7 +390,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Especial Repostería",
     "description": "Envase triangular de perfil alto diseñado para porciones de pie, cheesecake y tartas.",
     "imageIcon": "bi-triangle",
-    "image": "img/catalog/prod_123.jpg"
+    "image": "img/catalog/prod_123.jpg",
+    "stock": 150
   },
   {
     "id": 124,
@@ -386,7 +408,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable / Compostable",
     "description": "Base negra de almidón de maíz con tapa antifog antivaho. Resistente al calor y frío.",
     "imageIcon": "bi-egg-fried",
-    "image": "img/catalog/prod_124.jpg"
+    "image": "img/catalog/prod_124.jpg",
+    "stock": 150
   },
   {
     "id": 201,
@@ -403,7 +426,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Hermético",
     "description": "Envase translúcido deli redondo con tapa a presión, ideal para ensaladas frías, postres y dips.",
     "imageIcon": "bi-circle",
-    "image": "img/catalog/prod_201.jpg"
+    "image": "img/catalog/prod_201.jpg",
+    "stock": 150
   },
   {
     "id": 202,
@@ -420,7 +444,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Hermético",
     "description": "Envase deli de 12oz con tapa de sellado hermético antiderrame.",
     "imageIcon": "bi-circle",
-    "image": "img/catalog/prod_202.jpg"
+    "image": "img/catalog/prod_202.jpg",
+    "stock": 150
   },
   {
     "id": 203,
@@ -437,7 +462,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Hermético",
     "description": "Envase de alta capacidad 24oz con tapa para comidas completas y ensaladas.",
     "imageIcon": "bi-circle",
-    "image": "img/catalog/prod_203.jpg"
+    "image": "img/catalog/prod_203.jpg",
+    "stock": 150
   },
   {
     "id": 204,
@@ -454,7 +480,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico",
     "description": "Taza china color verde capacidad entera con tapa para sopas y arroz.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_204.jpg"
+    "image": "img/catalog/prod_204.jpg",
+    "stock": 150
   },
   {
     "id": 205,
@@ -471,7 +498,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico",
     "description": "Taza china media porción color verde con tapa incluida.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_205.jpg"
+    "image": "img/catalog/prod_205.jpg",
+    "stock": 150
   },
   {
     "id": 206,
@@ -488,7 +516,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Hermético",
     "description": "Envase verde resistente al ácido cítrico y frío, especial ceviches.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_206.jpg"
+    "image": "img/catalog/prod_206.jpg",
+    "stock": 150
   },
   {
     "id": 207,
@@ -505,7 +534,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico",
     "description": "Taza china tradicional blanca tamaño entero con tapa ajustada.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_207.jpg"
+    "image": "img/catalog/prod_207.jpg",
+    "stock": 150
   },
   {
     "id": 208,
@@ -522,7 +552,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico",
     "description": "Taza china blanca medio tamaño para entradas y acompañamientos.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_208.jpg"
+    "image": "img/catalog/prod_208.jpg",
+    "stock": 150
   },
   {
     "id": 209,
@@ -539,7 +570,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Transparente",
     "description": "Taza china cristalina para lucir el producto preparado con tapa.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_209.jpg"
+    "image": "img/catalog/prod_209.jpg",
+    "stock": 150
   },
   {
     "id": 210,
@@ -556,7 +588,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Transparente",
     "description": "Taza china entera cristalina reforzada con tapa hermética.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_210.jpg"
+    "image": "img/catalog/prod_210.jpg",
+    "stock": 150
   },
   {
     "id": 211,
@@ -573,7 +606,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Salsas y Dips",
     "description": "Copa soufflé pequeña para salsas, chiles, aderezos y degustaciones.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_211.jpg"
+    "image": "img/catalog/prod_211.jpg",
+    "stock": 150
   },
   {
     "id": 212,
@@ -590,7 +624,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Salsas y Dips",
     "description": "Copa soufflé estándar para chimichurri, mayonesa y queso rallado.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_212.jpg"
+    "image": "img/catalog/prod_212.jpg",
+    "stock": 150
   },
   {
     "id": 213,
@@ -607,7 +642,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Salsas y Dips",
     "description": "Copa soufflé mediana para porciones de guacamole y frijoles molidos.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_213.jpg"
+    "image": "img/catalog/prod_213.jpg",
+    "stock": 150
   },
   {
     "id": 214,
@@ -624,7 +660,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Salsas y Dips",
     "description": "Copa soufflé de 4oz con tapa ajustada para ensaladitas y aderezos.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_214.jpg"
+    "image": "img/catalog/prod_214.jpg",
+    "stock": 150
   },
   {
     "id": 215,
@@ -641,7 +678,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Salsas y Dips",
     "description": "Copa soufflé capacidad amplia para postres y ensaladas pequeñas.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_215.jpg"
+    "image": "img/catalog/prod_215.jpg",
+    "stock": 150
   },
   {
     "id": 216,
@@ -658,7 +696,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Tapa Domo",
     "description": "Envase soufflé 5oz con tapa abombada para cupcakes y postres decorados.",
     "imageIcon": "bi-stars",
-    "image": "img/catalog/prod_216.jpg"
+    "image": "img/catalog/prod_216.jpg",
+    "stock": 150
   },
   {
     "id": 217,
@@ -675,7 +714,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Higiene Total",
     "description": "Cubiertos individuales sellados herméticamente con servilleta incluida. Máxima inocuidad.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_217.jpg"
+    "image": "img/catalog/prod_217.jpg",
+    "stock": 150
   },
   {
     "id": 218,
@@ -691,7 +731,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Resistente",
     "description": "Cuchara plástica resistente blanca #7 para postres y helados.",
     "imageIcon": "bi-slash-circle",
-    "image": "img/catalog/prod_218.jpg"
+    "image": "img/catalog/prod_218.jpg",
+    "stock": 150
   },
   {
     "id": 219,
@@ -707,7 +748,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Resistente",
     "description": "Tenedor blanco estándar con dientes reforzados.",
     "imageIcon": "bi-slash-circle",
-    "image": "img/catalog/prod_219.jpg"
+    "image": "img/catalog/prod_219.jpg",
+    "stock": 150
   },
   {
     "id": 220,
@@ -723,7 +765,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Resistente",
     "description": "Cuchillo blanco con filo dentado para carnes y comida express.",
     "imageIcon": "bi-slash-circle",
-    "image": "img/catalog/prod_220.jpg"
+    "image": "img/catalog/prod_220.jpg",
+    "stock": 150
   },
   {
     "id": 221,
@@ -739,7 +782,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Resistente",
     "description": "Cuchara honda especial para caldos, ollas de carne y sopas.",
     "imageIcon": "bi-slash-circle",
-    "image": "img/catalog/prod_221.jpg"
+    "image": "img/catalog/prod_221.jpg",
+    "stock": 150
   },
   {
     "id": 222,
@@ -755,7 +799,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Resistente",
     "description": "Spork híbrido versátil para ensaladas y postres.",
     "imageIcon": "bi-slash-circle",
-    "image": "img/catalog/prod_222.jpg"
+    "image": "img/catalog/prod_222.jpg",
+    "stock": 150
   },
   {
     "id": 223,
@@ -771,7 +816,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Resistente",
     "description": "Cuchara pequeña económica para café y nieves.",
     "imageIcon": "bi-slash-circle",
-    "image": "img/catalog/prod_223.jpg"
+    "image": "img/catalog/prod_223.jpg",
+    "stock": 150
   },
   {
     "id": 224,
@@ -787,7 +833,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Bebidas Calientes",
     "description": "Removedor plástico corto blanco para tazas de café.",
     "imageIcon": "bi-dash-lg",
-    "image": "img/catalog/prod_224.jpg"
+    "image": "img/catalog/prod_224.jpg",
+    "stock": 150
   },
   {
     "id": 225,
@@ -803,7 +850,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Bebidas Calientes",
     "description": "Removedor largo para vasos térmicos de 12oz a 16oz.",
     "imageIcon": "bi-dash-lg",
-    "image": "img/catalog/prod_225.jpg"
+    "image": "img/catalog/prod_225.jpg",
+    "stock": 150
   },
   {
     "id": 226,
@@ -819,7 +867,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Madera Biodegradable",
     "description": "Paletas de madera pulida natural sin químicos para cafetería.",
     "imageIcon": "bi-tree",
-    "image": "img/catalog/prod_226.jpg"
+    "image": "img/catalog/prod_226.jpg",
+    "stock": 150
   },
   {
     "id": 301,
@@ -835,7 +884,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico Café",
     "description": "Vaso de cartón decorado coffee con tapa tipo beberito para espresso y cappuccino.",
     "imageIcon": "bi-cup-hot-fill",
-    "image": "img/catalog/prod_301.jpg"
+    "image": "img/catalog/prod_301.jpg",
+    "stock": 150
   },
   {
     "id": 302,
@@ -851,7 +901,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico Café",
     "description": "Vaso térmico para café mediano con tapa hermética beberito.",
     "imageIcon": "bi-cup-hot-fill",
-    "image": "img/catalog/prod_302.jpg"
+    "image": "img/catalog/prod_302.jpg",
+    "stock": 150
   },
   {
     "id": 303,
@@ -867,7 +918,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Térmico Café",
     "description": "Vaso grande para café americano y latte caliente.",
     "imageIcon": "bi-cup-hot-fill",
-    "image": "img/catalog/prod_303.jpg"
+    "image": "img/catalog/prod_303.jpg",
+    "stock": 150
   },
   {
     "id": 304,
@@ -883,7 +935,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Refrescos",
     "description": "Vaso blanco encerado para gaseosas y refrescos naturales.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_304.jpg"
+    "image": "img/catalog/prod_304.jpg",
+    "stock": 150
   },
   {
     "id": 305,
@@ -899,7 +952,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Refrescos",
     "description": "Vaso encerado 16oz para bebidas frías con ranura para pajilla.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_305.jpg"
+    "image": "img/catalog/prod_305.jpg",
+    "stock": 150
   },
   {
     "id": 306,
@@ -916,7 +970,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Dispensador Oficina",
     "description": "Vaso cónico de papel blanco para dispensadores de agua en oficinas y clínicas.",
     "imageIcon": "bi-cone-striped",
-    "image": "img/catalog/prod_306.jpg"
+    "image": "img/catalog/prod_306.jpg",
+    "stock": 150
   },
   {
     "id": 307,
@@ -932,7 +987,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cristalino PET",
     "description": "Vaso cristalino para batidos, smoothies y frappés con tapa domo.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_307.jpg"
+    "image": "img/catalog/prod_307.jpg",
+    "stock": 150
   },
   {
     "id": 308,
@@ -948,7 +1004,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cristalino PET",
     "description": "El vaso más popular para batidos y malteadas con crema chantilly.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_308.jpg"
+    "image": "img/catalog/prod_308.jpg",
+    "stock": 150
   },
   {
     "id": 309,
@@ -964,7 +1021,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cristalino PET",
     "description": "Vaso jumbo para bebidas heladas y especialidades con tapa domo.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_309.jpg"
+    "image": "img/catalog/prod_309.jpg",
+    "stock": 150
   },
   {
     "id": 310,
@@ -980,7 +1038,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cristalino PET",
     "description": "Vaso cristalino con tapa plana sellada y ranura para pajilla.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_310.jpg"
+    "image": "img/catalog/prod_310.jpg",
+    "stock": 150
   },
   {
     "id": 311,
@@ -996,7 +1055,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cristalino PET",
     "description": "Vaso cristalino de 16oz con tapa plana para servicio express.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_311.jpg"
+    "image": "img/catalog/prod_311.jpg",
+    "stock": 150
   },
   {
     "id": 312,
@@ -1012,7 +1072,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cristalino PET",
     "description": "Vaso extra grande de 22oz con tapa plana antiderrame.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_312.jpg"
+    "image": "img/catalog/prod_312.jpg",
+    "stock": 150
   },
   {
     "id": 313,
@@ -1028,7 +1089,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Sellado Hermético",
     "description": "Película impresa para selladoras térmicas de vasos de bubble tea y batidos.",
     "imageIcon": "bi-film",
-    "image": "img/catalog/prod_313.jpg"
+    "image": "img/catalog/prod_313.jpg",
+    "stock": 150
   },
   {
     "id": 314,
@@ -1044,7 +1106,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Shot / Tragos",
     "description": "Copita cristalina rígida para licores, shots y muestras gastronómicas.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_314.jpg"
+    "image": "img/catalog/prod_314.jpg",
+    "stock": 150
   },
   {
     "id": 315,
@@ -1060,7 +1123,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económico",
     "description": "Vaso pequeño para bebidas infantiles, jugos y degustación.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_315.jpg"
+    "image": "img/catalog/prod_315.jpg",
+    "stock": 150
   },
   {
     "id": 316,
@@ -1076,7 +1140,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económico",
     "description": "Vaso plástico ranurado para eventos, fiestas y sodas.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_316.jpg"
+    "image": "img/catalog/prod_316.jpg",
+    "stock": 150
   },
   {
     "id": 317,
@@ -1092,7 +1157,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Con Tapa",
     "description": "Vaso 7oz rígido con tapa hermética para gelatinas y jugos.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_317.jpg"
+    "image": "img/catalog/prod_317.jpg",
+    "stock": 150
   },
   {
     "id": 318,
@@ -1108,7 +1174,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económico PP",
     "description": "Vaso de polipropileno ligero para agua y refrescos.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_318.jpg"
+    "image": "img/catalog/prod_318.jpg",
+    "stock": 150
   },
   {
     "id": 319,
@@ -1124,7 +1191,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económico PP",
     "description": "Vaso tradicional de 8oz multiuso para soda y comedor.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_319.jpg"
+    "image": "img/catalog/prod_319.jpg",
+    "stock": 150
   },
   {
     "id": 320,
@@ -1140,7 +1208,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económico PP",
     "description": "Vaso de tamaño mediano resistente a bebidas frías.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_320.jpg"
+    "image": "img/catalog/prod_320.jpg",
+    "stock": 150
   },
   {
     "id": 321,
@@ -1156,7 +1225,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Con Tapa",
     "description": "Vaso 14oz con tapa a presión ideal para té frío y jugos naturales.",
     "imageIcon": "bi-cup",
-    "image": "img/catalog/prod_321.jpg"
+    "image": "img/catalog/prod_321.jpg",
+    "stock": 150
   },
   {
     "id": 322,
@@ -1172,7 +1242,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable",
     "description": "Bandeja portavasos biodegradable con 4 cavidades para servicio para llevar express.",
     "imageIcon": "bi-grid-2x2",
-    "image": "img/catalog/prod_322.jpg"
+    "image": "img/catalog/prod_322.jpg",
+    "stock": 150
   },
   {
     "id": 323,
@@ -1188,7 +1259,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable Forrada",
     "description": "Pajilla envuelta individualmente en papel para garantizar la higiene en restaurantes.",
     "imageIcon": "bi-slash-lg",
-    "image": "img/catalog/prod_323.jpg"
+    "image": "img/catalog/prod_323.jpg",
+    "stock": 150
   },
   {
     "id": 324,
@@ -1204,7 +1276,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Madera",
     "description": "Palillos de madera resistentes en caja dispensadora.",
     "imageIcon": "bi-pin",
-    "image": "img/catalog/prod_324.jpg"
+    "image": "img/catalog/prod_324.jpg",
+    "stock": 150
   },
   {
     "id": 325,
@@ -1220,7 +1293,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Decoración Bar",
     "description": "Sombrillas coloridas tradicionales de papel para coctelería y bebidas tropicales.",
     "imageIcon": "bi-umbrella",
-    "image": "img/catalog/prod_325.jpg"
+    "image": "img/catalog/prod_325.jpg",
+    "stock": 150
   },
   {
     "id": 326,
@@ -1236,7 +1310,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Kraft Ecológico",
     "description": "Fundas de papel kraft para cubiertos con diseño impreso para mesa de restaurante.",
     "imageIcon": "bi-envelope",
-    "image": "img/catalog/prod_326.jpg"
+    "image": "img/catalog/prod_326.jpg",
+    "stock": 150
   },
   {
     "id": 327,
@@ -1252,7 +1327,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Institucional",
     "description": "Sobres de azúcar individual para cafeterías, restaurantes y hoteles.",
     "imageIcon": "bi-envelope-paper",
-    "image": "img/catalog/prod_327.jpg"
+    "image": "img/catalog/prod_327.jpg",
+    "stock": 150
   },
   {
     "id": 401,
@@ -1269,7 +1345,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa de papel kraft resistente sin asas para panaderías y golosinas.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_401.jpg"
+    "image": "img/catalog/prod_401.jpg",
+    "stock": 150
   },
   {
     "id": 402,
@@ -1286,7 +1363,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft para 1 libra de granos, café y panes pequeños.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_402.jpg"
+    "image": "img/catalog/prod_402.jpg",
+    "stock": 150
   },
   {
     "id": 403,
@@ -1303,7 +1381,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft resistente para abarrotes y repostería.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_403.jpg"
+    "image": "img/catalog/prod_403.jpg",
+    "stock": 150
   },
   {
     "id": 404,
@@ -1320,7 +1399,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa de papel de 3 libras para compras y comidas para llevar.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_404.jpg"
+    "image": "img/catalog/prod_404.jpg",
+    "stock": 150
   },
   {
     "id": 405,
@@ -1337,7 +1417,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa de alta resistencia para pedidos de restaurantes y cafeterías.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_405.jpg"
+    "image": "img/catalog/prod_405.jpg",
+    "stock": 150
   },
   {
     "id": 406,
@@ -1354,7 +1435,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft para 5 libras de capacidad con fondo plano.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_406.jpg"
+    "image": "img/catalog/prod_406.jpg",
+    "stock": 150
   },
   {
     "id": 407,
@@ -1370,7 +1452,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa de papel marrón resistente para verduras y despacho.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_407.jpg"
+    "image": "img/catalog/prod_407.jpg",
+    "stock": 150
   },
   {
     "id": 408,
@@ -1386,7 +1469,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft de 8 libras excelente para envíos de comida.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_408.jpg"
+    "image": "img/catalog/prod_408.jpg",
+    "stock": 150
   },
   {
     "id": 409,
@@ -1402,7 +1486,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft reforzada para 10 libras de peso.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_409.jpg"
+    "image": "img/catalog/prod_409.jpg",
+    "stock": 150
   },
   {
     "id": 410,
@@ -1418,7 +1503,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft de gran capacidad y gramaje grueso.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_410.jpg"
+    "image": "img/catalog/prod_410.jpg",
+    "stock": 150
   },
   {
     "id": 411,
@@ -1434,7 +1520,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa de papel para 16 libras para mercaderías pesadas.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_411.jpg"
+    "image": "img/catalog/prod_411.jpg",
+    "stock": 150
   },
   {
     "id": 412,
@@ -1450,7 +1537,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft extra pesada 20 libras para entrega de combos múltiples.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_412.jpg"
+    "image": "img/catalog/prod_412.jpg",
+    "stock": 150
   },
   {
     "id": 413,
@@ -1466,7 +1554,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "100% Reciclable",
     "description": "Bolsa kraft de 25 libras para cargas voluminosas.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_413.jpg"
+    "image": "img/catalog/prod_413.jpg",
+    "stock": 150
   },
   {
     "id": 414,
@@ -1482,7 +1571,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsita de papel blanco puro para farmacias, panaderías y golosinas.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_414.jpg"
+    "image": "img/catalog/prod_414.jpg",
+    "stock": 150
   },
   {
     "id": 415,
@@ -1498,7 +1588,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa blanca nacional de 1 lb limpia y elegante para venta al mostrador.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_415.jpg"
+    "image": "img/catalog/prod_415.jpg",
+    "stock": 150
   },
   {
     "id": 416,
@@ -1514,7 +1605,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa blanca de 2 libras para repostería fina y pan blanco.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_416.jpg"
+    "image": "img/catalog/prod_416.jpg",
+    "stock": 150
   },
   {
     "id": 417,
@@ -1530,7 +1622,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa de papel blanco grado alimentario para 3 libras.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_417.jpg"
+    "image": "img/catalog/prod_417.jpg",
+    "stock": 150
   },
   {
     "id": 418,
@@ -1546,7 +1639,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa blanca mediana de excelente presentación y blancura.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_418.jpg"
+    "image": "img/catalog/prod_418.jpg",
+    "stock": 150
   },
   {
     "id": 419,
@@ -1562,7 +1656,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa de papel blanco 5 lb con fuelle lateral.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_419.jpg"
+    "image": "img/catalog/prod_419.jpg",
+    "stock": 150
   },
   {
     "id": 420,
@@ -1578,7 +1673,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa blanca de 6 libras para tiendas y supermercados.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_420.jpg"
+    "image": "img/catalog/prod_420.jpg",
+    "stock": 150
   },
   {
     "id": 421,
@@ -1594,7 +1690,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa de papel blanco de 8 libras resistente.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_421.jpg"
+    "image": "img/catalog/prod_421.jpg",
+    "stock": 150
   },
   {
     "id": 422,
@@ -1610,7 +1707,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Papel Blanco",
     "description": "Bolsa de papel blanco grande con fondo resistente.",
     "imageIcon": "bi-bag-dash",
-    "image": "img/catalog/prod_422.jpg"
+    "image": "img/catalog/prod_422.jpg",
+    "stock": 150
   },
   {
     "id": 423,
@@ -1626,7 +1724,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Especial Pan Baguette",
     "description": "Bolsa larga de papel kraft con diseño impreso para barra de pan baguette.",
     "imageIcon": "bi-card-text",
-    "image": "img/catalog/prod_423.jpg"
+    "image": "img/catalog/prod_423.jpg",
+    "stock": 150
   },
   {
     "id": 424,
@@ -1642,7 +1741,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Especial Pan Baguette",
     "description": "Bolsa kraft ancha para transportar 2 barras de baguette.",
     "imageIcon": "bi-card-text",
-    "image": "img/catalog/prod_424.jpg"
+    "image": "img/catalog/prod_424.jpg",
+    "stock": 150
   },
   {
     "id": 425,
@@ -1658,7 +1758,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Ventana Cristalina",
     "description": "Bolsa para pan baguette con franja de ventana transparente para exhibición.",
     "imageIcon": "bi-eye",
-    "image": "img/catalog/prod_425.jpg"
+    "image": "img/catalog/prod_425.jpg",
+    "stock": 150
   },
   {
     "id": 501,
@@ -1675,7 +1776,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Kraft Térmico",
     "description": "Caja de pizza microcorrugado #8 con impresión tradicional a color.",
     "imageIcon": "bi-pie-chart",
-    "image": "img/catalog/prod_501.jpg"
+    "image": "img/catalog/prod_501.jpg",
+    "stock": 150
   },
   {
     "id": 502,
@@ -1692,7 +1794,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Kraft Térmico",
     "description": "Caja de pizza tamaño mediano con ventilación antigoteo.",
     "imageIcon": "bi-pie-chart",
-    "image": "img/catalog/prod_502.jpg"
+    "image": "img/catalog/prod_502.jpg",
+    "stock": 150
   },
   {
     "id": 503,
@@ -1709,7 +1812,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Kraft Térmico",
     "description": "Caja de pizza tradicional de 12 pulgadas para servicio a domicilio express.",
     "imageIcon": "bi-pie-chart",
-    "image": "img/catalog/prod_503.jpg"
+    "image": "img/catalog/prod_503.jpg",
+    "stock": 150
   },
   {
     "id": 504,
@@ -1726,7 +1830,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Kraft Térmico",
     "description": "Caja de pizza para 14 pulgadas resistente al peso y vapores calientes.",
     "imageIcon": "bi-pie-chart",
-    "image": "img/catalog/prod_504.jpg"
+    "image": "img/catalog/prod_504.jpg",
+    "stock": 150
   },
   {
     "id": 505,
@@ -1743,7 +1848,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Kraft Térmico",
     "description": "Caja de pizza extra grande para pizzerías y servicios familiares.",
     "imageIcon": "bi-pie-chart",
-    "image": "img/catalog/prod_505.jpg"
+    "image": "img/catalog/prod_505.jpg",
+    "stock": 150
   },
   {
     "id": 506,
@@ -1760,7 +1866,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cartón Kraft Térmico",
     "description": "Caja gigante de 18 pulgadas, máxima resistencia estructural.",
     "imageIcon": "bi-pie-chart",
-    "image": "img/catalog/prod_506.jpg"
+    "image": "img/catalog/prod_506.jpg",
+    "stock": 150
   },
   {
     "id": 507,
@@ -1776,7 +1883,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Gastronómico",
     "description": "Salsa de tomate italiana sazonada para pizza, elaborada con tomates 100% selectos.",
     "imageIcon": "bi-basket3",
-    "image": "img/catalog/prod_507.jpg"
+    "image": "img/catalog/prod_507.jpg",
+    "stock": 150
   },
   {
     "id": 508,
@@ -1792,7 +1900,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Monodosis",
     "description": "Sobres de queso seco para acompañar pedidos de pizza y pastas express.",
     "imageIcon": "bi-envelope",
-    "image": "img/catalog/prod_508.jpg"
+    "image": "img/catalog/prod_508.jpg",
+    "stock": 150
   },
   {
     "id": 509,
@@ -1808,7 +1917,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Monodosis",
     "description": "Sobres de chile picante en hojuelas deshidratadas para pizzerías.",
     "imageIcon": "bi-fire",
-    "image": "img/catalog/prod_509.jpg"
+    "image": "img/catalog/prod_509.jpg",
+    "stock": 150
   },
   {
     "id": 510,
@@ -1824,7 +1934,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Gastronómico",
     "description": "Salsa de tomate para pizza nacional de gran rendimiento y sabor concentrado.",
     "imageIcon": "bi-droplet-half",
-    "image": "img/catalog/prod_510.jpg"
+    "image": "img/catalog/prod_510.jpg",
+    "stock": 150
   },
   {
     "id": 511,
@@ -1840,7 +1951,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Ventana Cristalina",
     "description": "Caja quequera de cartón kraft natural con ventana para queques medianos.",
     "imageIcon": "bi-box2-heart",
-    "image": "img/catalog/prod_511.jpg"
+    "image": "img/catalog/prod_511.jpg",
+    "stock": 150
   },
   {
     "id": 512,
@@ -1856,7 +1968,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Ventana Cristalina",
     "description": "Quequera grande kraft con ventana superior transparente para pasteles decorados.",
     "imageIcon": "bi-box2-heart",
-    "image": "img/catalog/prod_512.jpg"
+    "image": "img/catalog/prod_512.jpg",
+    "stock": 150
   },
   {
     "id": 513,
@@ -1872,7 +1985,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Ventana Cristalina",
     "description": "Quequera extra alta con ventana para tortas de pisos y repostería alta.",
     "imageIcon": "bi-box2-heart",
-    "image": "img/catalog/prod_513.jpg"
+    "image": "img/catalog/prod_513.jpg",
+    "stock": 150
   },
   {
     "id": 514,
@@ -1888,7 +2002,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Biodegradable",
     "description": "Cajita kraft automontable para papas fritas y dedos de queso.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_514.jpg"
+    "image": "img/catalog/prod_514.jpg",
+    "stock": 150
   },
   {
     "id": 515,
@@ -1904,7 +2019,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Repostería y Comidas",
     "description": "Caja blanca multiuso de cartón encerado para pastelería y almuerzos.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_515.jpg"
+    "image": "img/catalog/prod_515.jpg",
+    "stock": 150
   },
   {
     "id": 516,
@@ -1920,7 +2036,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Repostería y Comidas",
     "description": "Caja de cartón blanca resistente para bandejas y postres.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_516.jpg"
+    "image": "img/catalog/prod_516.jpg",
+    "stock": 150
   },
   {
     "id": 517,
@@ -1936,7 +2053,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Repostería y Comidas",
     "description": "Caja cuadrada blanca #12 de excelente presentación.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_517.jpg"
+    "image": "img/catalog/prod_517.jpg",
+    "stock": 150
   },
   {
     "id": 518,
@@ -1952,7 +2070,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Repostería y Comidas",
     "description": "Caja grande blanca para catering, donas y bocadillos.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_518.jpg"
+    "image": "img/catalog/prod_518.jpg",
+    "stock": 150
   },
   {
     "id": 519,
@@ -1968,7 +2087,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Gastronómico",
     "description": "Salsa de queso cheddar cremosa especial para nachos, hamburguesas y papas.",
     "imageIcon": "bi-egg",
-    "image": "img/catalog/prod_519.jpg"
+    "image": "img/catalog/prod_519.jpg",
+    "stock": 150
   },
   {
     "id": 520,
@@ -1984,7 +2104,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Gastronómico",
     "description": "Champiñones selectos rebanados en salmuera para pizzas, pastas y salsas.",
     "imageIcon": "bi-tree-fill",
-    "image": "img/catalog/prod_520.jpg"
+    "image": "img/catalog/prod_520.jpg",
+    "stock": 150
   },
   {
     "id": 521,
@@ -2000,7 +2121,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Gastronómico",
     "description": "Aderezo cremoso con queso cheddar Hellmann\\'s para restaurantes y cafeterías.",
     "imageIcon": "bi-droplet-half",
-    "image": "img/catalog/prod_521.jpg"
+    "image": "img/catalog/prod_521.jpg",
+    "stock": 150
   },
   {
     "id": 601,
@@ -2016,7 +2138,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Por Kilo",
     "description": "Bolsas plásticas transparentes en variedad de medidas: 4x8, 6x10, 8x12, 10x16, 12x18, 14x20, 20x30 y más.",
     "imageIcon": "bi-layers",
-    "image": "img/catalog/prod_601.jpg"
+    "image": "img/catalog/prod_601.jpg",
+    "stock": 150
   },
   {
     "id": 602,
@@ -2032,7 +2155,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Antiderrame Refresco",
     "description": "Bolsas termo-sellables ideales para bebidas frías y refrescos sin goteo. Taco 12x18 y lámina 12x18.",
     "imageIcon": "bi-water",
-    "image": "img/catalog/prod_602.jpg"
+    "image": "img/catalog/prod_602.jpg",
+    "stock": 150
   },
   {
     "id": 603,
@@ -2048,7 +2172,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Alta Densidad",
     "description": "Bolsas resistentes al calor de comidas recién preparadas. Medidas: 6x12, 7x10, 8x12, 10x16, 12x18, 14x20.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_603.jpg"
+    "image": "img/catalog/prod_603.jpg",
+    "stock": 150
   },
   {
     "id": 604,
@@ -2064,7 +2189,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Con Asas",
     "description": "Bolsas tipo camiseta color blanco virgen para pulperías, carnicerías y tiendas.",
     "imageIcon": "bi-bag",
-    "image": "img/catalog/prod_604.jpg"
+    "image": "img/catalog/prod_604.jpg",
+    "stock": 150
   },
   {
     "id": 605,
@@ -2080,7 +2206,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Material Reciclado",
     "description": "Bolsas con asas fabricadas en material recuperado ecológico. Medidas surtidas.",
     "imageIcon": "bi-recycle",
-    "image": "img/catalog/prod_605.jpg"
+    "image": "img/catalog/prod_605.jpg",
+    "stock": 150
   },
   {
     "id": 606,
@@ -2096,7 +2223,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Ultra Transparente PP",
     "description": "Bolsas cristalinas de alta claridad que conservan frescos los productos de panadería y dulces.",
     "imageIcon": "bi-stars",
-    "image": "img/catalog/prod_606.jpg"
+    "image": "img/catalog/prod_606.jpg",
+    "stock": 150
   },
   {
     "id": 607,
@@ -2112,7 +2240,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Empaque Continuo",
     "description": "Bobina plástica continua para sellado y envasado de productos. Medidas 6x25, 8x12, 10x16, 12x18.",
     "imageIcon": "bi-record",
-    "image": "img/catalog/prod_607.jpg"
+    "image": "img/catalog/prod_607.jpg",
+    "stock": 150
   },
   {
     "id": 608,
@@ -2128,7 +2257,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Empaque al Vacío",
     "description": "Bolsas para selladora al vacío de 3 capas para carnes, embutidos y quesos.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_608.jpg"
+    "image": "img/catalog/prod_608.jpg",
+    "stock": 150
   },
   {
     "id": 609,
@@ -2144,7 +2274,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Empaque al Vacío",
     "description": "Bolsas de conservación al vacío para porciones medianas de alimentos.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_609.jpg"
+    "image": "img/catalog/prod_609.jpg",
+    "stock": 150
   },
   {
     "id": 610,
@@ -2160,7 +2291,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Empaque al Vacío",
     "description": "Bolsas al vacío para cortes de carne y pescado.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_610.jpg"
+    "image": "img/catalog/prod_610.jpg",
+    "stock": 150
   },
   {
     "id": 611,
@@ -2176,7 +2308,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Empaque al Vacío",
     "description": "Bolsas alargadas al vacío para lomitos, jamones y embutidos.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_611.jpg"
+    "image": "img/catalog/prod_611.jpg",
+    "stock": 150
   },
   {
     "id": 612,
@@ -2192,7 +2325,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Empaque al Vacío",
     "description": "Bolsas jumbo de empaque al vacío para piezas enteras.",
     "imageIcon": "bi-box",
-    "image": "img/catalog/prod_612.jpg"
+    "image": "img/catalog/prod_612.jpg",
+    "stock": 150
   },
   {
     "id": 613,
@@ -2208,7 +2342,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Material Reciclado",
     "description": "Bolsas negras calibre pesado para basura institucional y municipal.",
     "imageIcon": "bi-trash",
-    "image": "img/catalog/prod_613.jpg"
+    "image": "img/catalog/prod_613.jpg",
+    "stock": 150
   },
   {
     "id": 614,
@@ -2224,7 +2359,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Uso Rudo 51 Gals",
     "description": "Bolsas de jardín extra grandes para estañones y poda de áreas verdes.",
     "imageIcon": "bi-trash-fill",
-    "image": "img/catalog/prod_614.jpg"
+    "image": "img/catalog/prod_614.jpg",
+    "stock": 150
   },
   {
     "id": 615,
@@ -2240,7 +2376,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Institucional",
     "description": "Bolsas para basureros grandes de pasillos y oficinas.",
     "imageIcon": "bi-trash-fill",
-    "image": "img/catalog/prod_615.jpg"
+    "image": "img/catalog/prod_615.jpg",
+    "stock": 150
   },
   {
     "id": 616,
@@ -2256,7 +2393,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Institucional",
     "description": "Bolsa mediana para cestos de basura de baño y cocina.",
     "imageIcon": "bi-trash",
-    "image": "img/catalog/prod_616.jpg"
+    "image": "img/catalog/prod_616.jpg",
+    "stock": 150
   },
   {
     "id": 617,
@@ -2272,7 +2410,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Institucional",
     "description": "Bolsas para papeleras de escritorio y cubículos.",
     "imageIcon": "bi-trash",
-    "image": "img/catalog/prod_617.jpg"
+    "image": "img/catalog/prod_617.jpg",
+    "stock": 150
   },
   {
     "id": 618,
@@ -2288,7 +2427,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Extra Resistente",
     "description": "Bolsas de marca Vikingo con fondo reforzado antigoteo.",
     "imageIcon": "bi-trash",
-    "image": "img/catalog/prod_618.jpg"
+    "image": "img/catalog/prod_618.jpg",
+    "stock": 150
   },
   {
     "id": 619,
@@ -2304,7 +2444,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Extra Resistente",
     "description": "Bolsas grandes Vikingo para residuos pesados.",
     "imageIcon": "bi-trash",
-    "image": "img/catalog/prod_619.jpg"
+    "image": "img/catalog/prod_619.jpg",
+    "stock": 150
   },
   {
     "id": 620,
@@ -2320,7 +2461,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Extra Resistente",
     "description": "Bolsas tamaño jardín calibre grueso Vikingo.",
     "imageIcon": "bi-trash-fill",
-    "image": "img/catalog/prod_620.jpg"
+    "image": "img/catalog/prod_620.jpg",
+    "stock": 150
   },
   {
     "id": 621,
@@ -2336,7 +2478,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Rollo Pre-cortado",
     "description": "Bolsas negras en rollo precortado para fácil extracción en bodegas.",
     "imageIcon": "bi-record-circle",
-    "image": "img/catalog/prod_621.jpg"
+    "image": "img/catalog/prod_621.jpg",
+    "stock": 150
   },
   {
     "id": 622,
@@ -2352,7 +2495,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Rollo Pre-cortado",
     "description": "Rollo de 50 bolsas grandes para limpieza de condominios y restaurantes.",
     "imageIcon": "bi-record-circle",
-    "image": "img/catalog/prod_622.jpg"
+    "image": "img/catalog/prod_622.jpg",
+    "stock": 150
   },
   {
     "id": 623,
@@ -2368,7 +2512,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aluminio Doméstico",
     "description": "Rollo de papel aluminio para hornear y envolver alimentos.",
     "imageIcon": "bi-shield",
-    "image": "img/catalog/prod_623.jpg"
+    "image": "img/catalog/prod_623.jpg",
+    "stock": 150
   },
   {
     "id": 624,
@@ -2384,7 +2529,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aluminio Doméstico",
     "description": "Rollo de papel aluminio Pal 25 pies para cocina.",
     "imageIcon": "bi-shield",
-    "image": "img/catalog/prod_624.jpg"
+    "image": "img/catalog/prod_624.jpg",
+    "stock": 150
   },
   {
     "id": 625,
@@ -2400,7 +2546,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aluminio Rendidor",
     "description": "Papel aluminio rendidor para restaurantes y repostería.",
     "imageIcon": "bi-shield",
-    "image": "img/catalog/prod_625.jpg"
+    "image": "img/catalog/prod_625.jpg",
+    "stock": 150
   },
   {
     "id": 626,
@@ -2416,7 +2563,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Uso Profesional",
     "description": "Papel aluminio calibre institucional en caja despachadora con sierra metálica.",
     "imageIcon": "bi-shield",
-    "image": "img/catalog/prod_626.jpg"
+    "image": "img/catalog/prod_626.jpg",
+    "stock": 150
   },
   {
     "id": 627,
@@ -2432,7 +2580,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Uso Profesional",
     "description": "Rollo de 500 pies de aluminio para hoteles, cocinas industriales y caterings.",
     "imageIcon": "bi-shield",
-    "image": "img/catalog/prod_627.jpg"
+    "image": "img/catalog/prod_627.jpg",
+    "stock": 150
   },
   {
     "id": 628,
@@ -2448,7 +2597,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Máximo Rendimiento",
     "description": "El rollo de mayor rendimiento de aluminio para gastronomía industrial.",
     "imageIcon": "bi-shield",
-    "image": "img/catalog/prod_628.jpg"
+    "image": "img/catalog/prod_628.jpg",
+    "stock": 150
   },
   {
     "id": 629,
@@ -2464,7 +2614,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Antigrasa",
     "description": "Hojas de papel encerado grado alimenticio para hamburguesas y sándwiches.",
     "imageIcon": "bi-card-text",
-    "image": "img/catalog/prod_629.jpg"
+    "image": "img/catalog/prod_629.jpg",
+    "stock": 150
   },
   {
     "id": 630,
@@ -2480,7 +2631,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Antigrasa",
     "description": "Papel encerado tamaño 8x10 para envolver carnes frías y quesos.",
     "imageIcon": "bi-card-text",
-    "image": "img/catalog/prod_630.jpg"
+    "image": "img/catalog/prod_630.jpg",
+    "stock": 150
   },
   {
     "id": 631,
@@ -2496,7 +2648,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Antigrasa",
     "description": "Papel encerado cuadrado 10x10 para cestas de comida rápida.",
     "imageIcon": "bi-card-text",
-    "image": "img/catalog/prod_631.jpg"
+    "image": "img/catalog/prod_631.jpg",
+    "stock": 150
   },
   {
     "id": 632,
@@ -2512,7 +2665,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Antigrasa",
     "description": "Papel encerado 12x10 para envolver burritos, combos y repostería.",
     "imageIcon": "bi-card-text",
-    "image": "img/catalog/prod_632.jpg"
+    "image": "img/catalog/prod_632.jpg",
+    "stock": 150
   },
   {
     "id": 633,
@@ -2528,7 +2682,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Film Adherente",
     "description": "Película extensible transparente con cortador deslizante para frescura de alimentos.",
     "imageIcon": "bi-film",
-    "image": "img/catalog/prod_633.jpg"
+    "image": "img/catalog/prod_633.jpg",
+    "stock": 150
   },
   {
     "id": 634,
@@ -2544,7 +2699,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Film Adherente",
     "description": "Film adherente ancho de 18 pulgadas para bandejas grandes de carnicería.",
     "imageIcon": "bi-film",
-    "image": "img/catalog/prod_634.jpg"
+    "image": "img/catalog/prod_634.jpg",
+    "stock": 150
   },
   {
     "id": 635,
@@ -2560,7 +2716,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Logística Bodega",
     "description": "Rollo de película estirable para fijación y embalaje de tarimas en bodegas.",
     "imageIcon": "bi-boxes",
-    "image": "img/catalog/prod_635.jpg"
+    "image": "img/catalog/prod_635.jpg",
+    "stock": 150
   },
   {
     "id": 701,
@@ -2576,7 +2733,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Dispensador",
     "description": "Servilletas interdobladas que dispensan una a una ahorrando hasta un 30%.",
     "imageIcon": "bi-file-earmark-text",
-    "image": "img/catalog/prod_701.jpg"
+    "image": "img/catalog/prod_701.jpg",
+    "stock": 150
   },
   {
     "id": 702,
@@ -2592,7 +2750,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Alta Absorción",
     "description": "Toalla de manos en rollo continuo blanco de alto metraje para baños públicos y cocinas.",
     "imageIcon": "bi-circle-square",
-    "image": "img/catalog/prod_702.jpg"
+    "image": "img/catalog/prod_702.jpg",
+    "stock": 150
   },
   {
     "id": 703,
@@ -2608,7 +2767,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Institucional",
     "description": "Papel higiénico institucional de gran metraje para dispensadores circulares.",
     "imageIcon": "bi-circle",
-    "image": "img/catalog/prod_703.jpg"
+    "image": "img/catalog/prod_703.jpg",
+    "stock": 150
   },
   {
     "id": 704,
@@ -2624,7 +2784,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Calidad Premium TORK",
     "description": "Papel higiénico de doble hoja de máxima suavidad y absorción marca líder TORK.",
     "imageIcon": "bi-circle",
-    "image": "img/catalog/prod_704.jpg"
+    "image": "img/catalog/prod_704.jpg",
+    "stock": 150
   },
   {
     "id": 705,
@@ -2640,7 +2801,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Uso Cocina",
     "description": "Toalla de cocina absorbente multisuperficies marca Fiesta.",
     "imageIcon": "bi-circle-square",
-    "image": "img/catalog/prod_705.jpg"
+    "image": "img/catalog/prod_705.jpg",
+    "stock": 150
   },
   {
     "id": 706,
@@ -2656,7 +2818,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Dispensador Z-Fold",
     "description": "Toallas dobladas en Z para dispensadores de pared en baños ejecutivos.",
     "imageIcon": "bi-file-earmark-text",
-    "image": "img/catalog/prod_706.jpg"
+    "image": "img/catalog/prod_706.jpg",
+    "stock": 150
   },
   {
     "id": 707,
@@ -2672,7 +2835,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económica",
     "description": "Servilletas de mesa blancas familiares de excelente suavidad.",
     "imageIcon": "bi-file-earmark-text",
-    "image": "img/catalog/prod_707.jpg"
+    "image": "img/catalog/prod_707.jpg",
+    "stock": 150
   },
   {
     "id": 708,
@@ -2688,7 +2852,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Inocuidad Alimentaria",
     "description": "Guantes de polietileno ligeros ideales para manipulación rápida de alimentos en sodas.",
     "imageIcon": "bi-hand-index-thumb",
-    "image": "img/catalog/prod_708.jpg"
+    "image": "img/catalog/prod_708.jpg",
+    "stock": 150
   },
   {
     "id": 709,
@@ -2704,7 +2869,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Grado Médico / Limpieza",
     "description": "Guantes ambidiestros de látex blanco elástico con polvo ligero para ajuste anatómico.",
     "imageIcon": "bi-hand-index",
-    "image": "img/catalog/prod_709.jpg"
+    "image": "img/catalog/prod_709.jpg",
+    "stock": 150
   },
   {
     "id": 710,
@@ -2720,7 +2886,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Libre de Látex / Rudo",
     "description": "Guantes de nitrilo color negro resistente a químicos y grasas. Favorito de chefs y tatuadores.",
     "imageIcon": "bi-hand-index-thumb-fill",
-    "image": "img/catalog/prod_710.jpg"
+    "image": "img/catalog/prod_710.jpg",
+    "stock": 150
   },
   {
     "id": 711,
@@ -2736,7 +2903,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Libre de Látex",
     "description": "Guantes de protección de nitrilo azul para desinfección y laboratorios.",
     "imageIcon": "bi-hand-index-thumb-fill",
-    "image": "img/catalog/prod_711.jpg"
+    "image": "img/catalog/prod_711.jpg",
+    "stock": 150
   },
   {
     "id": 712,
@@ -2752,7 +2920,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cerdas Rígidas",
     "description": "Cepillo hisopo sanitario con cerdas resistentes para limpieza de inodoros.",
     "imageIcon": "bi-brush",
-    "image": "img/catalog/prod_712.jpg"
+    "image": "img/catalog/prod_712.jpg",
+    "stock": 150
   },
   {
     "id": 713,
@@ -2768,7 +2937,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Higiénico",
     "description": "Set completo de hisopo con base higiénica para guardar de forma limpia en el baño.",
     "imageIcon": "bi-brush-fill",
-    "image": "img/catalog/prod_713.jpg"
+    "image": "img/catalog/prod_713.jpg",
+    "stock": 150
   },
   {
     "id": 714,
@@ -2784,7 +2954,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aroma Fresco",
     "description": "Pastilla con canastilla para inodoros que limpia y aromatiza en cada descarga.",
     "imageIcon": "bi-droplet-fill",
-    "image": "img/catalog/prod_714.jpg"
+    "image": "img/catalog/prod_714.jpg",
+    "stock": 150
   },
   {
     "id": 715,
@@ -2800,7 +2971,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Ergonómico",
     "description": "Cepillo ergonómico con mango para fregar ropa, zapatillas y juntas de azulejos.",
     "imageIcon": "bi-brush",
-    "image": "img/catalog/prod_715.jpg"
+    "image": "img/catalog/prod_715.jpg",
+    "stock": 150
   },
   {
     "id": 801,
@@ -2817,7 +2989,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Envase Retornable",
     "description": "Presentación mayorista de cloro concentrado al 4% en pichinga resistente.",
     "imageIcon": "bi-bucket",
-    "image": "img/catalog/prod_801.jpg"
+    "image": "img/catalog/prod_801.jpg",
+    "stock": 150
   },
   {
     "id": 802,
@@ -2834,7 +3007,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Envase Retornable",
     "description": "Pichinga de desinfectante concentrado multiaroma para pisos y superficies.",
     "imageIcon": "bi-bucket-fill",
-    "image": "img/catalog/prod_802.jpg"
+    "image": "img/catalog/prod_802.jpg",
+    "stock": 150
   },
   {
     "id": 803,
@@ -2850,7 +3024,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Desinfección",
     "description": "Cloro doméstico e institucional para desinfección de pisos y blanqueo de ropa.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_803.jpg"
+    "image": "img/catalog/prod_803.jpg",
+    "stock": 150
   },
   {
     "id": 804,
@@ -2866,7 +3041,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Grado Hospitalario",
     "description": "Cloro reforzado al 6% de alta acción bactericida y fungicida.",
     "imageIcon": "bi-shield-fill",
-    "image": "img/catalog/prod_804.jpg"
+    "image": "img/catalog/prod_804.jpg",
+    "stock": 150
   },
   {
     "id": 805,
@@ -2882,7 +3058,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Uso Industrial Corrosivo",
     "description": "Cloro hipoclorito al 12% para plantas procesadoras, piscinas y tratamiento de aguas.",
     "imageIcon": "bi-exclamation-triangle-fill",
-    "image": "img/catalog/prod_805.jpg"
+    "image": "img/catalog/prod_805.jpg",
+    "stock": 150
   },
   {
     "id": 806,
@@ -2898,7 +3075,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Económico",
     "description": "Cloro al mejor precio para mantenimiento diario en comercio y hogares.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_806.jpg"
+    "image": "img/catalog/prod_806.jpg",
+    "stock": 150
   },
   {
     "id": 807,
@@ -2914,7 +3092,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aroma Intenso",
     "description": "Desinfectante para pisos con fragancias duraderas a limón, lavanda o bouquet floral.",
     "imageIcon": "bi-flower1",
-    "image": "img/catalog/prod_807.jpg"
+    "image": "img/catalog/prod_807.jpg",
+    "stock": 150
   },
   {
     "id": 808,
@@ -2931,7 +3110,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "10 Aromas Disponibles",
     "description": "Aromas: Floral, Naranja, Violeta, Limón, Lavanda, Baby, Pino, Maracuyá, Bouquet, Pinetron y Tutti Frutti.",
     "imageIcon": "bi-flower2",
-    "image": "img/catalog/prod_808.jpg"
+    "image": "img/catalog/prod_808.jpg",
+    "stock": 150
   },
   {
     "id": 809,
@@ -2947,7 +3127,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Neutralizador",
     "description": "Fórmula química que descompone las moléculas del mal olor en trampas de grasa, baños y basureros.",
     "imageIcon": "bi-wind",
-    "image": "img/catalog/prod_809.jpg"
+    "image": "img/catalog/prod_809.jpg",
+    "stock": 150
   },
   {
     "id": 810,
@@ -2963,7 +3144,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Arranca-grasa",
     "description": "Crema lavaplatos concentrada que corta la grasa y deja vajilla brillante.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_810.jpg"
+    "image": "img/catalog/prod_810.jpg",
+    "stock": 150
   },
   {
     "id": 811,
@@ -2979,7 +3161,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Fórmula Superior",
     "description": "Jabón en pasta con glicerina para cuidar las manos y alto poder desengrasante.",
     "imageIcon": "bi-cup-straw",
-    "image": "img/catalog/prod_811.jpg"
+    "image": "img/catalog/prod_811.jpg",
+    "stock": 150
   },
   {
     "id": 812,
@@ -2995,7 +3178,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Limpieza Ollas",
     "description": "Lana de acero con jabón limpiador para ollas y sartenes tiznados.",
     "imageIcon": "bi-stars",
-    "image": "img/catalog/prod_812.jpg"
+    "image": "img/catalog/prod_812.jpg",
+    "stock": 150
   },
   {
     "id": 813,
@@ -3011,7 +3195,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Calidad 3M",
     "description": "Esponja con fibra verde abrasiva por un lado y espuma suave por el otro.",
     "imageIcon": "bi-square-fill",
-    "image": "img/catalog/prod_813.jpg"
+    "image": "img/catalog/prod_813.jpg",
+    "stock": 150
   },
   {
     "id": 814,
@@ -3027,7 +3212,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "No Raya Teflón",
     "description": "Fibra suave azul especial para superficies antiadherentes, copas y acero inoxidable.",
     "imageIcon": "bi-square-fill",
-    "image": "img/catalog/prod_814.jpg"
+    "image": "img/catalog/prod_814.jpg",
+    "stock": 150
   },
   {
     "id": 815,
@@ -3043,7 +3229,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Abrasivo Fuerte",
     "description": "Fibra verde tradicional para fregar parrilas, pisos y utensilios rústicos.",
     "imageIcon": "bi-square",
-    "image": "img/catalog/prod_815.jpg"
+    "image": "img/catalog/prod_815.jpg",
+    "stock": 150
   },
   {
     "id": 816,
@@ -3059,7 +3246,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Acero Inox",
     "description": "Espiral de alambre de acero inoxidable que no se oxida para remover grasa quemada.",
     "imageIcon": "bi-circle",
-    "image": "img/catalog/prod_816.jpg"
+    "image": "img/catalog/prod_816.jpg",
+    "stock": 150
   },
   {
     "id": 817,
@@ -3076,7 +3264,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Brillo Espejo",
     "description": "Emulsión acrílica blanca para pisos de mosaico, terrazo y vinil sin necesidad de pulidora.",
     "imageIcon": "bi-gem",
-    "image": "img/catalog/prod_817.jpg"
+    "image": "img/catalog/prod_817.jpg",
+    "stock": 150
   },
   {
     "id": 818,
@@ -3093,7 +3282,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Pisos Rojos",
     "description": "Cera autobrillante con pigmento rojo para restaurar y proteger pisos de barro y concreto.",
     "imageIcon": "bi-gem",
-    "image": "img/catalog/prod_818.jpg"
+    "image": "img/catalog/prod_818.jpg",
+    "stock": 150
   },
   {
     "id": 819,
@@ -3110,7 +3300,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Porcelanato y Azulejo",
     "description": "Líquido abrillantador para azulejos y cerámicas sin dejar residuos resbalosos.",
     "imageIcon": "bi-sparkles",
-    "image": "img/catalog/prod_819.jpg"
+    "image": "img/catalog/prod_819.jpg",
+    "stock": 150
   },
   {
     "id": 820,
@@ -3128,7 +3319,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Brillo Alta Duración",
     "description": "Tratamiento sellador y abrillantador premium de pisos para alto tráfico.",
     "imageIcon": "bi-stars",
-    "image": "img/catalog/prod_820.jpg"
+    "image": "img/catalog/prod_820.jpg",
+    "stock": 150
   },
   {
     "id": 821,
@@ -3144,7 +3336,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Pulidor",
     "description": "Polvo limpiador con cloro para fregar pilas, lozas de baño y sartenes.",
     "imageIcon": "bi-capsule",
-    "image": "img/catalog/prod_821.jpg"
+    "image": "img/catalog/prod_821.jpg",
+    "stock": 150
   },
   {
     "id": 822,
@@ -3160,7 +3353,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Lavandería",
     "description": "Barra de jabón azul tradicional para lavado a mano de ropa blanca y de color.",
     "imageIcon": "bi-square-fill",
-    "image": "img/catalog/prod_822.jpg"
+    "image": "img/catalog/prod_822.jpg",
+    "stock": 150
   },
   {
     "id": 823,
@@ -3176,7 +3370,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Telas Suaves",
     "description": "Suavizante concentrado que facilita el planchado y deja aroma fresco prolongado.",
     "imageIcon": "bi-heart",
-    "image": "img/catalog/prod_823.jpg"
+    "image": "img/catalog/prod_823.jpg",
+    "stock": 150
   },
   {
     "id": 824,
@@ -3192,7 +3387,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Lavado Activo",
     "description": "Detergente en polvo enzimático moteado para lavadoras automáticas y lavado a mano.",
     "imageIcon": "bi-box-seam",
-    "image": "img/catalog/prod_824.jpg"
+    "image": "img/catalog/prod_824.jpg",
+    "stock": 150
   },
   {
     "id": 825,
@@ -3209,7 +3405,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Lavadora y Telas",
     "description": "Detergente líquido biodegradable sin fosfatos para ropa blanca y oscura.",
     "imageIcon": "bi-droplet-half",
-    "image": "img/catalog/prod_825.jpg"
+    "image": "img/catalog/prod_825.jpg",
+    "stock": 150
   },
   {
     "id": 826,
@@ -3226,7 +3423,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Hipoalergénico",
     "description": "Jabón líquido humectante con pH neutro para dispensadores de lavamanos.",
     "imageIcon": "bi-heart-pulse",
-    "image": "img/catalog/prod_826.jpg"
+    "image": "img/catalog/prod_826.jpg",
+    "stock": 150
   },
   {
     "id": 827,
@@ -3242,7 +3440,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Desinfección Manos",
     "description": "Gel antibacterial al 70% de alcohol con agentes hidratantes para manos.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_827.jpg"
+    "image": "img/catalog/prod_827.jpg",
+    "stock": 150
   },
   {
     "id": 828,
@@ -3258,7 +3457,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Desinfección Superficies",
     "description": "Alcohol desinfectante líquido al 80% para nebulización y esterilización de objetos.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_828.jpg"
+    "image": "img/catalog/prod_828.jpg",
+    "stock": 150
   },
   {
     "id": 829,
@@ -3275,7 +3475,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Sin Manchas",
     "description": "Fórmula que disuelve polvo y huellas en cristales, espejos y parabrisas sin dejar marcas.",
     "imageIcon": "bi-aspect-ratio",
-    "image": "img/catalog/prod_829.jpg"
+    "image": "img/catalog/prod_829.jpg",
+    "stock": 150
   },
   {
     "id": 830,
@@ -3291,7 +3492,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Corta-Grasa Pesada",
     "description": "Potente removedor alcalino de aceites, hollín y grasa vegetal en campanas y pisos de cocina.",
     "imageIcon": "bi-lightning-charge",
-    "image": "img/catalog/prod_830.jpg"
+    "image": "img/catalog/prod_830.jpg",
+    "stock": 150
   },
   {
     "id": 831,
@@ -3308,7 +3510,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cuidado Automotriz",
     "description": "Espuma activa de pH neutro con carnauba para lavado de vehículos sin dañar la pintura.",
     "imageIcon": "bi-car-front",
-    "image": "img/catalog/prod_831.jpg"
+    "image": "img/catalog/prod_831.jpg",
+    "stock": 150
   },
   {
     "id": 832,
@@ -3324,7 +3527,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Uso Rudo",
     "description": "Guantes de goma látex amarillo con palma antideslizante para fregado y químicos.",
     "imageIcon": "bi-hand-index-thumb",
-    "image": "img/catalog/prod_832.jpg"
+    "image": "img/catalog/prod_832.jpg",
+    "stock": 150
   },
   {
     "id": 833,
@@ -3340,7 +3544,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Línea Doña Mechita",
     "description": "Set estelar: Cubo con escurridor 12L + Cabo de aluminio 140cm + Mecha trenzeta 100% microfibra máxima absorción.",
     "imageIcon": "bi-bucket",
-    "image": "img/catalog/prod_833.jpg"
+    "image": "img/catalog/prod_833.jpg",
+    "stock": 150
   },
   {
     "id": 834,
@@ -3356,7 +3561,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Máxima Absorción",
     "description": "Mecha de trenzas de microfibra que no suelta pelusas y dura 3 veces más que el algodón.",
     "imageIcon": "bi-tools",
-    "image": "img/catalog/prod_834.jpg"
+    "image": "img/catalog/prod_834.jpg",
+    "stock": 150
   },
   {
     "id": 835,
@@ -3372,7 +3578,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Escurridor Ergonómico",
     "description": "Balde plástico resistente de 12 litros con escurridor a presión y asa metálica.",
     "imageIcon": "bi-bucket",
-    "image": "img/catalog/prod_835.jpg"
+    "image": "img/catalog/prod_835.jpg",
+    "stock": 150
   },
   {
     "id": 836,
@@ -3388,7 +3595,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aluminio Liviano",
     "description": "Palo de aluminio liviano e inoxidable con rosca universal para mopas y escobas.",
     "imageIcon": "bi-slash",
-    "image": "img/catalog/prod_836.jpg"
+    "image": "img/catalog/prod_836.jpg",
+    "stock": 150
   },
   {
     "id": 837,
@@ -3404,7 +3612,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cerdas Plásticas",
     "description": "Escoba de cerdas con memoria para barrido suave en interiores.",
     "imageIcon": "bi-brush",
-    "image": "img/catalog/prod_837.jpg"
+    "image": "img/catalog/prod_837.jpg",
+    "stock": 150
   },
   {
     "id": 838,
@@ -3420,7 +3629,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Barrido Amplio",
     "description": "Escoba con cabezal extra ancho para pasillos, aceras y bodegas.",
     "imageIcon": "bi-brush-fill",
-    "image": "img/catalog/prod_838.jpg"
+    "image": "img/catalog/prod_838.jpg",
+    "stock": 150
   },
   {
     "id": 839,
@@ -3436,7 +3646,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Sin Agacharse",
     "description": "Pala plástica con filo de hule y mango alto de 80cm para recolección cómoda.",
     "imageIcon": "bi-box-arrow-in-down",
-    "image": "img/catalog/prod_839.jpg"
+    "image": "img/catalog/prod_839.jpg",
+    "stock": 150
   },
   {
     "id": 840,
@@ -3452,7 +3663,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Agua Azul Limpia",
     "description": "Bloque higiénico para tanque que tiñe el agua de azul y combate el sarro.",
     "imageIcon": "bi-droplet",
-    "image": "img/catalog/prod_840.jpg"
+    "image": "img/catalog/prod_840.jpg",
+    "stock": 150
   },
   {
     "id": 841,
@@ -3468,7 +3680,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Auto-Adherible",
     "description": "Tiras adhesivas que se aplican directo en la taza del inodoro para fragancia continua.",
     "imageIcon": "bi-flower3",
-    "image": "img/catalog/prod_841.jpg"
+    "image": "img/catalog/prod_841.jpg",
+    "stock": 150
   },
   {
     "id": 842,
@@ -3484,7 +3697,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Cuello Direccional",
     "description": "Gel viscoso con cuello especial para alcanzar debajo del borde del inodoro.",
     "imageIcon": "bi-shield-check",
-    "image": "img/catalog/prod_842.jpg"
+    "image": "img/catalog/prod_842.jpg",
+    "stock": 150
   },
   {
     "id": 843,
@@ -3500,7 +3714,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Insecticida",
     "description": "Insecticida fulminante contra moscas, zancudos, cucarachas y hormigas con suave aroma.",
     "imageIcon": "bi-bug",
-    "image": "img/catalog/prod_843.jpg"
+    "image": "img/catalog/prod_843.jpg",
+    "stock": 150
   },
   {
     "id": 844,
@@ -3516,7 +3731,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Aromatizante",
     "description": "Aromatizante ambiental en aerosol que elimina olores al instante.",
     "imageIcon": "bi-soundwave",
-    "image": "img/catalog/prod_844.jpg"
+    "image": "img/catalog/prod_844.jpg",
+    "stock": 150
   },
   {
     "id": 845,
@@ -3532,7 +3748,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Hasta 60 Días",
     "description": "Repuesto para dispensador automático de aromatizante de baterías.",
     "imageIcon": "bi-clock-history",
-    "image": "img/catalog/prod_845.jpg"
+    "image": "img/catalog/prod_845.jpg",
+    "stock": 150
   },
   {
     "id": 846,
@@ -3548,7 +3765,8 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Brillo y Protección",
     "description": "Lustrador en aerosol para nutrir madera, repeler polvo y dar brillo natural.",
     "imageIcon": "bi-tree",
-    "image": "img/catalog/prod_846.jpg"
+    "image": "img/catalog/prod_846.jpg",
+    "stock": 150
   },
   {
     "id": 847,
@@ -3564,6 +3782,7 @@ window.FRAGAMA_CATALOG = [
     "ecoBadge": "Brillo y Protección",
     "description": "Presentación económica grande de 378ml para mantenimiento de oficinas.",
     "imageIcon": "bi-tree",
-    "image": "img/catalog/prod_847.jpg"
+    "image": "img/catalog/prod_847.jpg",
+    "stock": 150
   }
 ];
