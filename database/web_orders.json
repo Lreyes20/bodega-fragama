@@ -1,5 +1,43 @@
 [
   {
+    "orderCode": "PED-WEB-12345",
+    "docType": "PEDIDO_WEB",
+    "source": "TIENDA_WEB",
+    "customerId": 9999,
+    "customerName": "Prueba Cliente Tienda",
+    "customerTaxId": "1-1111-2222",
+    "customerAddress": "Cartago, 100m norte de la iglesia",
+    "customerPhone": "8765-4321",
+    "assignedUserId": 6,
+    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserRole": "Vendedor",
+    "assignedUserHandle": "cpiedra",
+    "date": "2026-10-02",
+    "deliveryDate": "Cartago Centro",
+    "deliveryRoute": "Cartago Centro",
+    "terms": "Contado / Contra Entrega",
+    "status": "ALISTADO",
+    "notes": "Ruta: Cartago Centro. Dejar en recepción",
+    "items": [
+      {
+        "productId": 101,
+        "sku": "BAN-BAG-099",
+        "name": "Bandeja 9x9",
+        "qty": 3,
+        "unitPrice": 120.0,
+        "subtotal": 360.0
+      }
+    ],
+    "subtotalBruto": 360.0,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 360.0,
+    "iva": 46.8,
+    "total": 406.8,
+    "id": 106,
+    "preparedByName": "Colaborador Fragama",
+    "stockDeducted": 0
+  },
+  {
     "orderCode": "PED-WEB-84283",
     "docType": "PEDIDO_WEB",
     "source": "TIENDA_WEB",
@@ -22,7 +60,7 @@
       {
         "productId": 101,
         "sku": "BAN-BAG-099",
-        "name": "Bandeja 9x9 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
+        "name": "Bandeja 9x9 con o sin división Bagazo de Caña",
         "qty": 50,
         "unitPrice": 107.0,
         "subtotal": 5350.0
@@ -30,7 +68,7 @@
       {
         "productId": 102,
         "sku": "BAN-BAG-088",
-        "name": "Bandeja 8x8 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
+        "name": "Bandeja 8x8 con o sin división Bagazo de Caña",
         "qty": 50,
         "unitPrice": 79.0,
         "subtotal": 3950.0
@@ -79,7 +117,9 @@
     "subtotalNeto": 1070.0,
     "iva": 139.1,
     "total": 1209.1,
-    "id": 102
+    "id": 102,
+    "preparedByName": "Colaborador Fragama",
+    "stockDeducted": 0
   },
   {
     "orderCode": "PED-WEB-88412",
@@ -104,7 +144,7 @@
       {
         "productId": 101,
         "sku": "BAN-BAG-099",
-        "name": "Bandeja 9x9 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
+        "name": "Bandeja 9x9 con o sin división Bagazo de Caña",
         "qty": 50,
         "unitPrice": 107.0,
         "subtotal": 5350.0
@@ -116,10 +156,10 @@
     "iva": 695.5,
     "total": 6045.5,
     "id": 101,
-    "preparedByName": "Leonardo Reyes Hern\u00e1ndez",
+    "preparedByName": "Leonardo Reyes Hernández",
     "driverName": "Mauricio Brenes (Chofer)",
     "stockDeducted": 0,
-    "undeliveredReason": "Cliente se encontraba de viaje y no hubo quien recibiera. Mercader\u00eda devuelta a bodega intacta."
+    "undeliveredReason": "Cliente se encontraba de viaje y no hubo quien recibiera. Mercadería devuelta a bodega intacta."
   },
   {
     "id": 1790876838,
@@ -144,7 +184,7 @@
       {
         "productId": 103,
         "sku": "BAN-BAG-066",
-        "name": "Bandeja Hamburguesa 6x6 Bagazo de Ca\u00f1a",
+        "name": "Bandeja Hamburguesa 6x6 Bagazo de Caña",
         "qty": 50,
         "unitPrice": 48.0,
         "subtotal": 2400.0
@@ -164,7 +204,7 @@
     "customerId": 9999,
     "customerName": "Soda El Manantial (Test)",
     "customerTaxId": "1-1234-0567",
-    "customerAddress": "100m Este del Parque Central de Para\u00edso, Cartago",
+    "customerAddress": "100m Este del Parque Central de Paraíso, Cartago",
     "customerPhone": "8899-7766",
     "assignedUserId": 6,
     "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
@@ -174,12 +214,12 @@
     "deliveryDate": "Cartago (Lunes y Jueves)",
     "terms": "Contado / Contra Entrega",
     "status": "PENDIENTE",
-    "notes": "Entregar en horario de la ma\u00f1ana",
+    "notes": "Entregar en horario de la mañana",
     "items": [
       {
         "productId": 101,
         "sku": "BAN-BAG-099",
-        "name": "Bandeja 9x9 con o sin divisi\u00f3n Bagazo de Ca\u00f1a",
+        "name": "Bandeja 9x9 con o sin división Bagazo de Caña",
         "qty": 50,
         "unitPrice": 107.0,
         "subtotal": 5350.0
@@ -187,7 +227,7 @@
       {
         "productId": 803,
         "sku": "CLO-GOY-004",
-        "name": "Cloro al 4% Goyca (Gal\u00f3n 3.8L)",
+        "name": "Cloro al 4% Goyca (Galón 3.8L)",
         "qty": 4,
         "unitPrice": 1150.0,
         "subtotal": 4600.0

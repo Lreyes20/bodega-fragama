@@ -774,17 +774,43 @@ function initRealtimeOrderSync() {
   
   _orderSyncInterval = setInterval(async () => {
     try {
+      // Actualizar estampa de tiempo de sincronización en vivo en la UI
+      const tsEl = document.getElementById('liveSyncTimestamp');
+      if (tsEl) tsEl.textContent = new Date().toLocaleTimeString('es-CR');
+
       const res = await fetch('/api/orders');
       if (!res.ok) return;
       const serverOrders = await res.json();
       if (!Array.isArray(serverOrders)) return;
 
-      const currentCodes = new Set(AppState.salesOrders.map(o => o.orderCode));
+      // Sincronización con pedidos web locales (localStorage) creados en el navegador
+      try {
+        const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+        if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
+          const srvCodes = new Set(serverOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
+          for (const lwo of localWebOrders) {
+            const cleanLwoCode = (lwo.orderCode || '').trim().toUpperCase();
+            if (cleanLwoCode && !srvCodes.has(cleanLwoCode)) {
+              serverOrders.unshift(lwo);
+              srvCodes.add(cleanLwoCode);
+              // Asentar silenciosamente en el servidor
+              fetch('/api/public/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(lwo)
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {}
+
+      const currentCodes = new Set(AppState.salesOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
       let hasNewOrders = false;
       let newestOrder = null;
 
       serverOrders.forEach(so => {
-        if (!currentCodes.has(so.orderCode)) {
+        const soCode = (so.orderCode || '').trim().toUpperCase();
+        if (soCode && !currentCodes.has(soCode)) {
           hasNewOrders = true;
           if (!newestOrder) newestOrder = so;
         }
@@ -793,7 +819,10 @@ function initRealtimeOrderSync() {
       let hasStatusChange = false;
       if (!hasNewOrders && serverOrders.length === AppState.salesOrders.length) {
         for (const so of serverOrders) {
-          const ex = AppState.salesOrders.find(o => String(o.id) === String(so.id) || o.orderCode === so.orderCode);
+          const ex = AppState.salesOrders.find(o => 
+            String(o.id) === String(so.id) || 
+            (o.orderCode && o.orderCode.trim().toUpperCase() === (so.orderCode || '').trim().toUpperCase())
+          );
           if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
             hasStatusChange = true;
             break;
@@ -816,7 +845,7 @@ function initRealtimeOrderSync() {
     } catch (err) {
       // Ignorar fallas momentáneas de red
     }
-  }, 4000);
+  }, 3000);
 }
 
 function playOrderChime() {
@@ -5689,15 +5718,21 @@ window.handleConfirmOrderPicking = async function(event) {
   const driverSelect = document.getElementById('pickingDriverSelect');
   const packingNotes = document.getElementById('pickingPackingNotes').value.trim();
 
-  const respId = respSelect ? Number(respSelect.value) : 1;
-  const respName = respSelect ? respSelect.options[respSelect.selectedIndex].text.split(' (')[0] : 'Colaborador';
+  const respId = (respSelect && respSelect.value) ? Number(respSelect.value) : 1;
+  const respName = (respSelect && respSelect.selectedIndex >= 0 && respSelect.options[respSelect.selectedIndex]) 
+    ? respSelect.options[respSelect.selectedIndex].text.split(' (')[0] 
+    : 'Colaborador Fragama';
   
-  const driverId = driverSelect ? Number(driverSelect.value) : 1;
-  const driverName = driverSelect ? driverSelect.options[driverSelect.selectedIndex].text.split(' (')[0] : 'Chofer';
+  const driverId = (driverSelect && driverSelect.value) ? Number(driverSelect.value) : 1;
+  const driverName = (driverSelect && driverSelect.selectedIndex >= 0 && driverSelect.options[driverSelect.selectedIndex]) 
+    ? driverSelect.options[driverSelect.selectedIndex].text.split(' (')[0] 
+    : 'Chofer de Ruta';
 
   const submitBtn = document.getElementById('btnConfirmPickingSubmit');
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Guardando Trazabilidad...`;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Guardando Trazabilidad...`;
+  }
 
   try {
     const payload = {
@@ -5867,8 +5902,10 @@ window.handleConfirmUndeliveredOrder = async function(event) {
   errDiv.style.display = 'none';
 
   const repSelect = document.getElementById('undeliveredReporterSelect');
-  const repId = repSelect ? Number(repSelect.value) : 1;
-  const repName = repSelect ? repSelect.options[repSelect.selectedIndex].text.split(' (')[0] : 'Chofer';
+  const repId = (repSelect && repSelect.value) ? Number(repSelect.value) : 1;
+  const repName = (repSelect && repSelect.selectedIndex >= 0 && repSelect.options[repSelect.selectedIndex]) 
+    ? repSelect.options[repSelect.selectedIndex].text.split(' (')[0] 
+    : 'Chofer de Ruta';
 
   try {
     const res = await fetch(`/api/orders/${encodeURIComponent(orderCode || orderId)}/status`, {
@@ -7818,8 +7855,18 @@ window.renderWebOrdersFullTable = function() {
     const targetCode = o.orderCode || o.id;
 
     const itemsSummary = items.length > 0 
-      ? items.slice(0, 3).map(it => `• <strong>${it.qty}x</strong> ${escapeHtml(it.name || it.sku)}`).join('<br>') + (items.length > 3 ? `<br><small style="color:#64748B;">(+${items.length - 3} artículos más...)</small>` : '')
-      : '<span style="color:#94A3B8;">Sin artículos detallados</span>';
+      ? `<div style="max-height:160px; overflow-y:auto; padding-right:4px;">` + items.map(it => `
+          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:4px; font-size:0.78rem;">
+            <span style="background:#E0F2FE; color:#0284C7; font-weight:800; padding:1px 6px; border-radius:4px; font-size:0.72rem; white-space:nowrap; border:1px solid #BAE6FD; flex-shrink:0;">
+              ${it.qty || 1}x
+            </span>
+            <div style="line-height:1.25;">
+              <span style="font-weight:700; color:#0F172A;">${escapeHtml(it.name || it.sku || 'Artículo')}</span>
+              ${it.sku ? `<span style="font-size:0.68rem; color:#64748B; font-family:'JetBrains Mono',monospace; margin-left:4px;">[${escapeHtml(it.sku)}]</span>` : ''}
+            </div>
+          </div>
+        `).join('') + `</div>`
+      : '<span style="color:#94A3B8; font-style:italic;">Sin artículos detallados</span>';
 
     return `
       <tr style="border-bottom:1px solid #E2E8F0; ${isPending ? 'background:#F0FDF4;' : ''}">

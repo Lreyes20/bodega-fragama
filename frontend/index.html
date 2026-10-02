@@ -1345,6 +1345,11 @@
               </p>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div style="display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; background:#ECFDF5; border:1px solid #10B981; color:#065F46; padding:5px 12px; border-radius:20px; font-weight:700;">
+                <span style="display:inline-block; width:8px; height:8px; background:#10B981; border-radius:50%; box-shadow:0 0 8px #10B981; animation:pulse 2s infinite;"></span>
+                <span>En Vivo (Sync 3s)</span>
+                <span id="liveSyncTimestamp" style="color:#047857; font-family:'JetBrains Mono',monospace;"></span>
+              </div>
               <button class="btn-fragama btn-outline-fragama" onclick="triggerManualOrderSync()" style="padding:6px 12px; font-size:0.8rem; background:#FFF; border-color:#10B981; color:#065F46; font-weight:700;" title="Sincronizar pedidos con la nube">
                 <i class="bi bi-arrow-clockwise"></i> Refrescar Bandeja
               </button>

@@ -859,6 +859,75 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
     order_row = cur.fetchone()
 
     if not order_row:
+        # Fallback de auto-recuperación: Si el pedido vino de web_orders.json o contingencia
+        web_orders = load_local_web_orders()
+        found_wo = None
+        for wo in web_orders:
+            if str(wo.get("id")) == str(order_id) or str(wo.get("orderCode")) == str(order_id):
+                found_wo = wo
+                break
+        
+        if found_wo:
+            try:
+                c_name = found_wo.get("customerName", "Cliente Web")
+                c_phone = found_wo.get("customerPhone", "")
+                c_tax = found_wo.get("customerTaxId") or f"WEB-{c_phone or int(time.time())}"
+                c_addr = found_wo.get("customerAddress", "")
+                c_route = found_wo.get("deliveryRoute", "Cartago")
+
+                cur.execute("""
+                    INSERT INTO Customers (TaxId, BusinessName, Email, Phone, Address, Canton, Province)
+                    VALUES (?, ?, '', ?, ?, ?, 'Cartago')
+                    ON CONFLICT(TaxId) DO UPDATE SET 
+                        BusinessName = excluded.BusinessName,
+                        Phone = excluded.Phone,
+                        Address = excluded.Address
+                """, (c_tax, c_name, c_phone, c_addr, c_route))
+                
+                cur.execute("SELECT CustomerId FROM Customers WHERE TaxId = ?", (c_tax,))
+                crow = cur.fetchone()
+                cid = crow["CustomerId"] if crow else 1
+
+                cur.execute("""
+                    INSERT INTO SalesOrders 
+                    (OrderNumber, CustomerId, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
+                    VALUES (?, ?, 1, 6, ?, ?, ?, ?, ?, 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
+                """, (
+                    found_wo.get("orderCode", order_id), cid,
+                    found_wo.get("subtotalBruto", found_wo.get("total", 0)),
+                    found_wo.get("descuentoTotal", 0),
+                    found_wo.get("iva", 0),
+                    found_wo.get("total", 0),
+                    found_wo.get("status", "PENDIENTE"),
+                    c_route,
+                    found_wo.get("notes", ""),
+                    found_wo.get("date", now_date)
+                ))
+                new_so_id = cur.lastrowid
+
+                # Insertar detalles
+                for it in found_wo.get("items", []):
+                    cur.execute("""
+                        INSERT INTO SalesOrderDetails (SalesOrderId, ProductId, Sku, ProductName, Quantity, UnitPrice, Subtotal)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        new_so_id, it.get("productId", 101), it.get("sku", ""),
+                        it.get("name", "Producto"), it.get("qty", 1),
+                        it.get("unitPrice", 0), it.get("subtotal", 0)
+                    ))
+                conn.commit()
+
+                cur.execute("""
+                    SELECT SalesOrderId, OrderNumber, Status, StockDeducted, PreparedByName, DriverName, DeliveryNotes, TotalAmount
+                    FROM SalesOrders
+                    WHERE SalesOrderId = ?
+                """, (new_so_id,))
+                order_row = cur.fetchone()
+                logger.info(f"🔄 Pedido web {order_id} auto-recuperado y registrado en SQLite (ID: {new_so_id}).")
+            except Exception as e:
+                logger.error(f"Error auto-recuperando pedido web a SQLite: {e}")
+
+    if not order_row:
         conn.close()
         raise HTTPException(status_code=404, detail=f"No se encontró el pedido '{order_id}'.")
 
