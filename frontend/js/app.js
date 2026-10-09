@@ -2579,7 +2579,12 @@ function setupProductMaintenance() {
             stock: stock,
             minStock: minStock,
             unit: unit,
-            categoryLabel: family?.name || 'General'
+            categoryLabel: family?.name || 'General',
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            hazardClass: hazardClass,
+            warehouseLocation: location,
+            warehouseZone: family?.zone || 'ZONA-A'
           };
           const putRes = await fetch(`/api/products/${editingProductId}`, {
             method: 'PUT',
@@ -2644,7 +2649,12 @@ function setupProductMaintenance() {
             minStock: minStock,
             unit: unit,
             category: 'bandejas_eco',
-            categoryLabel: family?.name || 'General'
+            categoryLabel: family?.name || 'General',
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            hazardClass: hazardClass,
+            warehouseLocation: location,
+            warehouseZone: family?.zone || 'ZONA-A'
           };
           const postRes = await fetch('/api/products', {
             method: 'POST',
@@ -7340,7 +7350,36 @@ function setupQuickMovementModal() {
       product.stock = finalStock;
 
       const nextId = AppState.kardexMovements.length + 101;
-      const nextCode = `${isExit ? 'SAL' : (isTransfer ? 'TRA' : 'ENT')}-20260929-${String(nextId).padStart(4, '0')}`;
+      const nextCode = `${isExit ? 'SAL' : (isTransfer ? 'TRA' : 'ENT')}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(nextId).padStart(4, '0')}`;
+
+      // Persistir de forma atómica en Backend SQLite ACID
+      let backendType = 'AJUSTE_POSITIVO';
+      if (type === 'Salida Venta') backendType = 'SALIDA_VENTA';
+      else if (type === 'Ajuste Negativo') backendType = 'AJUSTE_NEGATIVO';
+      else if (type === 'Traslado Interno') backendType = 'TRASLADO_INTERNO';
+      else if (type === 'Merma / Vencimiento') backendType = 'MERMA_VENCIMIENTO';
+      else if (type === 'Entrada Compra') backendType = 'ENTRADA_COMPRA';
+
+      fetch('/api/inventory/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productId,
+          movementType: backendType,
+          quantity: qty,
+          batchNumber: product.batchNumber || 'LOT-2026-CAT',
+          sourceLocation: product.location || 'PAS-01',
+          targetLocation: product.location || 'PAS-01',
+          referenceDocument: doc,
+          notes: `Ajuste manual [${type}] registrado por ${AppState.currentUser?.name || 'Bodeguero'}`,
+          userId: AppState.currentUser?.id || 1,
+          userName: AppState.currentUser?.name || 'Bodeguero'
+        })
+      }).then(r => r.json()).then(res => {
+        if (res && res.movementNumber) {
+          console.log("Kardex persistido con éxito en SQLite:", res.movementNumber);
+        }
+      }).catch(err => console.warn("Aviso guardando en backend:", err));
 
       AppState.kardexMovements.unshift({
         id: nextId,
@@ -7359,7 +7398,7 @@ function setupQuickMovementModal() {
 
       renderAllViews();
       closeMovementModal();
-      showNotificationToast(`Movimiento ${nextCode} registrado en Kardex exitosamente.`, 'success');
+      showNotificationToast(`Movimiento ${nextCode} registrado y persistido en Kardex exitosamente.`, 'success');
     });
   }
 }

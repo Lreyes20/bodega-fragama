@@ -109,12 +109,12 @@ def get_sqlite_conn():
     return conn
 
 def init_database_schema():
-    """Inicializa tablas de Trazabilidad, Kardex y columnas de alistado en SQLite."""
+    """Inicializa tablas de Trazabilidad, Kardex, Proveedores, Ubicaciones y WMS en SQLite (ACID)."""
     try:
         conn = get_sqlite_conn()
         cur = conn.cursor()
         
-        # 1. Tabla de Movimientos de Kardex
+        # 1. Tabla de Movimientos de Kardex (InvenTree/OpenBoxes style)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS InventoryMovements (
                 MovementId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,6 +129,10 @@ def init_database_schema():
                 FinalStock INTEGER NOT NULL,
                 UnitCost REAL DEFAULT 0.0,
                 TotalAmount REAL DEFAULT 0.0,
+                BatchNumber TEXT,
+                ExpiryDate TEXT,
+                SourceLocation TEXT,
+                TargetLocation TEXT,
                 ReferenceDocument TEXT,
                 UserId INTEGER,
                 UserName TEXT,
@@ -136,6 +140,19 @@ def init_database_schema():
                 CreatedAt TEXT NOT NULL
             );
         """)
+
+        # Verificar y agregar columnas nuevas a InventoryMovements si no existen
+        cur.execute("PRAGMA table_info(InventoryMovements)")
+        im_cols = set(r[1] for r in cur.fetchall())
+        im_to_add = [
+            ("BatchNumber", "TEXT"),
+            ("ExpiryDate", "TEXT"),
+            ("SourceLocation", "TEXT"),
+            ("TargetLocation", "TEXT")
+        ]
+        for cname, ctype in im_to_add:
+            if cname not in im_cols:
+                cur.execute(f"ALTER TABLE InventoryMovements ADD COLUMN {cname} {ctype};")
         
         # 2. Tabla de Bitácora / Auditoría de Pedidos (Audit Trail)
         cur.execute("""
@@ -156,8 +173,7 @@ def init_database_schema():
         
         # 3. Columnas de trazabilidad en SalesOrders
         cur.execute("PRAGMA table_info(SalesOrders)")
-        existing_cols = set(r[1] for r in cur.fetchall())
-        
+        so_cols = set(r[1] for r in cur.fetchall())
         cols_to_add = [
             ("PreparedByUserId", "INTEGER"),
             ("PreparedByName", "TEXT"),
@@ -169,11 +185,159 @@ def init_database_schema():
             ("UndeliveredReason", "TEXT"),
             ("StockDeducted", "INTEGER DEFAULT 0")
         ]
-        
         for col_name, col_type in cols_to_add:
-            if col_name not in existing_cols:
+            if col_name not in so_cols:
                 cur.execute(f"ALTER TABLE SalesOrders ADD COLUMN {col_name} {col_type};")
-                
+
+        # 4. Columnas WMS Avanzadas en Products (Lote, Vencimiento, Zonas, Peligrosidad)
+        cur.execute("PRAGMA table_info(Products)")
+        prod_cols = set(r[1] for r in cur.fetchall())
+        prod_add = [
+            ("BatchNumber", "TEXT DEFAULT 'LOT-2026-CAT'"),
+            ("ExpiryDate", "TEXT DEFAULT '2028-12-31'"),
+            ("HazardClass", "TEXT DEFAULT 'NO_PELIGROSO'"),
+            ("WarehouseZone", "TEXT DEFAULT 'ZONA-A'"),
+            ("WarehouseLocation", "TEXT DEFAULT 'PAS-01-EST-01-N1'"),
+            ("WeightKg", "REAL DEFAULT 1.0"),
+            ("VolumeM3", "REAL DEFAULT 0.01"),
+            ("IsActive", "INTEGER DEFAULT 1")
+        ]
+        for cname, ctype in prod_add:
+            if cname not in prod_cols:
+                cur.execute(f"ALTER TABLE Products ADD COLUMN {cname} {ctype};")
+
+        # 5. Tabla de Proveedores Homologados (Suppliers)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS Suppliers (
+                SupplierId INTEGER PRIMARY KEY AUTOINCREMENT,
+                TaxId TEXT UNIQUE,
+                BusinessName TEXT NOT NULL,
+                Category TEXT,
+                ContactPerson TEXT,
+                Phone TEXT,
+                MobileWhatsApp TEXT,
+                Email TEXT,
+                Address TEXT,
+                City TEXT DEFAULT 'Cartago',
+                PaymentTerms TEXT DEFAULT 'Crédito 30 días',
+                IsActive INTEGER DEFAULT 1,
+                CreatedAt TEXT NOT NULL
+            );
+        """)
+
+        # 6. Tabla de Ubicaciones Físicas de Bodega (WarehouseLocations)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS WarehouseLocations (
+                LocationId INTEGER PRIMARY KEY AUTOINCREMENT,
+                Code TEXT UNIQUE NOT NULL,
+                Zone TEXT NOT NULL,
+                Aisle TEXT,
+                Rack TEXT,
+                ShelfLevel TEXT,
+                Position TEXT,
+                Description TEXT,
+                HazardClassAllowed TEXT DEFAULT 'ALL',
+                MaxWeightKg REAL DEFAULT 1500.0,
+                IsOccupied INTEGER DEFAULT 0,
+                CreatedAt TEXT NOT NULL
+            );
+        """)
+
+        # 7. Tabla de Auditorías y Conteos Físicos de Inventario (CycleCountAudits)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS CycleCountAudits (
+                AuditId INTEGER PRIMARY KEY AUTOINCREMENT,
+                AuditCode TEXT UNIQUE NOT NULL,
+                AuditDate TEXT NOT NULL,
+                AuditorName TEXT NOT NULL,
+                TotalItemsCounted INTEGER NOT NULL,
+                TotalDiscrepancyQty INTEGER NOT NULL,
+                TotalDiscrepancyAmount REAL NOT NULL,
+                Status TEXT DEFAULT 'COMPLETADO',
+                Notes TEXT,
+                CreatedAt TEXT NOT NULL
+            );
+        """)
+
+        # 8. Índices de Alto Rendimiento para Producción
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_products_sku ON Products(Sku);",
+            "CREATE INDEX IF NOT EXISTS idx_products_barcode ON Products(Barcode);",
+            "CREATE INDEX IF NOT EXISTS idx_products_category ON Products(Category);",
+            "CREATE INDEX IF NOT EXISTS idx_movements_prod ON InventoryMovements(ProductId);",
+            "CREATE INDEX IF NOT EXISTS idx_movements_date ON InventoryMovements(MovementDate);",
+            "CREATE INDEX IF NOT EXISTS idx_salesorders_num ON SalesOrders(OrderNumber);",
+            "CREATE INDEX IF NOT EXISTS idx_customers_tax ON Customers(TaxId);",
+            "CREATE INDEX IF NOT EXISTS idx_suppliers_tax ON Suppliers(TaxId);"
+        ]
+        for idx in indexes:
+            try:
+                cur.execute(idx)
+            except Exception:
+                pass
+
+        # Sembrar Proveedores Iniciales si la tabla está vacía
+        cur.execute("SELECT COUNT(*) FROM Suppliers")
+        if cur.fetchone()[0] == 0:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            init_suppliers = [
+                ("3-101-098234", "Químicos Industriales Goyca S.A.", "Químicos y Desinfectantes", "Ing. Fernando Mora", "2244-8800", "8844-8800", "ventas@goyca.cr", "La Uruca, San José", "Cartago", "Crédito 30 días", 1, now_str),
+                ("3-102-887711", "Empaques Ecológicos del Valle", "Papelería y Desechables", "Lic. Karen Zúñiga", "2573-1200", "8573-1200", "pedidos@empaquesdelvalle.cr", "Zona Franca Cartago", "Cartago", "Crédito 15 días", 1, now_str),
+                ("3-101-776655", "Plásticos y Termoformados de C.R.", "Bolsas y Plásticos", "Don Jorge Solano", "2272-3344", "8272-3344", "distribucion@plasticoscr.com", "Curridabat, San José", "Cartago", "Crédito 30 días", 1, now_str)
+            ]
+            cur.executemany("""
+                INSERT INTO Suppliers (TaxId, BusinessName, Category, ContactPerson, Phone, MobileWhatsApp, Email, Address, City, PaymentTerms, IsActive, CreatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, init_suppliers)
+
+        # Sembrar Ubicaciones de Bodega Cartago si la tabla está vacía
+        cur.execute("SELECT COUNT(*) FROM WarehouseLocations")
+        if cur.fetchone()[0] == 0:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            init_locs = [
+                ("PAS-QUIM-01/EST-01/N-1/P-01", "ZONA-QUIMICOS (Pabellón A)", "PAS-QUIM-01", "EST-01", "N-1", "P-01", "Químicos pesados, desengrasantes y cloros", "CORROSIVO", 2000.0, 1, now_str),
+                ("PAS-QUIM-02/EST-02/N-2/P-02", "ZONA-QUIMICOS (Pabellón A)", "PAS-QUIM-02", "EST-02", "N-2", "P-02", "Jabones y aromatizantes", "NO_PELIGROSO", 1500.0, 1, now_str),
+                ("PAS-PAP-01/EST-01/N-1/P-01", "ZONA-SECA-PAPEL (Pabellón B)", "PAS-PAP-01", "EST-01", "N-1", "P-01", "Papel higiénico institucional y jumbo rolls", "NO_PELIGROSO", 800.0, 1, now_str),
+                ("PAS-PAP-02/EST-02/N-1/P-02", "ZONA-SECA-PAPEL (Pabellón B)", "PAS-PAP-02", "EST-02", "N-1", "P-02", "Bandejas eco y cajas térmicas", "NO_PELIGROSO", 600.0, 1, now_str),
+                ("PAS-PLAS-01/EST-01/N-1/P-01", "ZONA-PLASTICOS (Pabellón C)", "PAS-PLAS-01", "EST-01", "N-1", "P-01", "Bolsas para basura y rollos de empaque", "NO_PELIGROSO", 1200.0, 1, now_str),
+                ("PAS-ACC-01/EST-01/N-1/P-01", "ZONA-ACCESORIOS (Pabellón D)", "PAS-ACC-01", "EST-01", "N-1", "P-01", "Mopas, escobas y guantes de nitrilo", "NO_PELIGROSO", 500.0, 1, now_str)
+            ]
+            cur.executemany("""
+                INSERT INTO WarehouseLocations (Code, Zone, Aisle, Rack, ShelfLevel, Position, Description, HazardClassAllowed, MaxWeightKg, IsOccupied, CreatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, init_locs)
+
+        # Asignar zonas y lotes realistas a los productos existentes según categoría
+        cur.execute("SELECT COUNT(*) FROM Products WHERE WarehouseZone = 'ZONA-A' OR WarehouseZone IS NULL")
+        if cur.fetchone()[0] > 0:
+            cur.execute("""
+                UPDATE Products SET 
+                    WarehouseZone = 'ZONA-QUIMICOS (Pabellón A)',
+                    WarehouseLocation = 'PAS-QUIM-01/EST-01/N-1/P-01',
+                    HazardClass = 'CORROSIVO',
+                    ExpiryDate = '2027-06-30',
+                    BatchNumber = 'LOT-QUI-2026-09'
+                WHERE Category = 'quimicos_limpieza';
+            """)
+            cur.execute("""
+                UPDATE Products SET 
+                    WarehouseZone = 'ZONA-PLASTICOS (Pabellón C)',
+                    WarehouseLocation = 'PAS-PLAS-01/EST-01/N-1/P-01',
+                    HazardClass = 'NO_PELIGROSO',
+                    ExpiryDate = '2029-12-31',
+                    BatchNumber = 'LOT-PLA-2026-04'
+                WHERE Category = 'bolsas_plasticas';
+            """)
+            cur.execute("""
+                UPDATE Products SET 
+                    WarehouseZone = 'ZONA-SECA-PAPEL (Pabellón B)',
+                    WarehouseLocation = 'PAS-PAP-01/EST-01/N-1/P-01',
+                    HazardClass = 'NO_PELIGROSO',
+                    ExpiryDate = '2028-12-31',
+                    BatchNumber = 'LOT-PAP-2026-11'
+                WHERE Category IN ('bandejas_eco', 'cajas_pizza', 'bolsas_papel', 'papeleria_higiene', 'vasos_bebidas', 'envases_deli');
+            """)
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -356,6 +520,14 @@ class ProductUpdateRequest(BaseModel):
     unit: Optional[str] = None
     image: Optional[str] = None
     ecoBadge: Optional[str] = None
+    batchNumber: Optional[str] = None
+    expiryDate: Optional[str] = None
+    hazardClass: Optional[str] = None
+    warehouseZone: Optional[str] = None
+    warehouseLocation: Optional[str] = None
+    weightKg: Optional[float] = None
+    volumeM3: Optional[float] = None
+    isActive: Optional[bool] = None
 
 class ProductCreateRequest(BaseModel):
     sku: str = Field(..., min_length=2, max_length=50)
@@ -370,6 +542,90 @@ class ProductCreateRequest(BaseModel):
     minStock: Optional[int] = 10
     unit: Optional[str] = "UNIDAD"
     image: Optional[str] = None
+    batchNumber: Optional[str] = "LOT-2026-CAT"
+    expiryDate: Optional[str] = "2028-12-31"
+    hazardClass: Optional[str] = "NO_PELIGROSO"
+    warehouseZone: Optional[str] = "ZONA-A"
+    warehouseLocation: Optional[str] = "PAS-01-EST-01-N1"
+    weightKg: Optional[float] = 1.0
+    volumeM3: Optional[float] = 0.01
+
+class CustomerUpdateRequest(BaseModel):
+    taxId: Optional[str] = None
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    terms: Optional[str] = None
+    route: Optional[str] = None
+    address: Optional[str] = None
+    isActive: Optional[bool] = None
+
+class SupplierCreateRequest(BaseModel):
+    taxId: Optional[str] = None
+    name: str = Field(..., min_length=2)
+    category: Optional[str] = "General"
+    contact: Optional[str] = None
+    phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    terms: Optional[str] = "Crédito 30 días"
+    city: Optional[str] = "Cartago"
+    address: Optional[str] = None
+
+class SupplierUpdateRequest(BaseModel):
+    taxId: Optional[str] = None
+    name: Optional[str] = None
+    category: Optional[str] = None
+    contact: Optional[str] = None
+    phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    terms: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    isActive: Optional[bool] = None
+
+class InventoryAdjustmentRequest(BaseModel):
+    productId: int
+    movementType: str = Field("AJUSTE_POSITIVO", pattern="^(AJUSTE_POSITIVO|AJUSTE_NEGATIVO|MERMA_VENCIMIENTO|CONTEO_FISICO|TRASLADO_INTERNO|ENTRADA_COMPRA|SALIDA_VENTA|DEVOLUCION_CLIENTE)$")
+    quantity: int = Field(..., gt=0)
+    batchNumber: Optional[str] = None
+    sourceLocation: Optional[str] = None
+    targetLocation: Optional[str] = None
+    referenceDocument: Optional[str] = "AJUSTE-MANUAL"
+    notes: Optional[str] = None
+    userId: Optional[int] = 1
+    userName: Optional[str] = "Bodeguero Fragama"
+
+class ReceiptItemRequest(BaseModel):
+    productId: int
+    quantity: int = Field(..., gt=0)
+    unitCost: Optional[float] = None
+    batchNumber: Optional[str] = None
+    expiryDate: Optional[str] = None
+    warehouseLocation: Optional[str] = None
+
+class InwardReceiptRequest(BaseModel):
+    supplierId: Optional[int] = None
+    supplierName: Optional[str] = None
+    documentNumber: str = Field(..., min_length=2)
+    items: List[ReceiptItemRequest]
+    notes: Optional[str] = None
+    userId: Optional[int] = 1
+    userName: Optional[str] = "Bodeguero Fragama"
+
+class CycleCountItem(BaseModel):
+    productId: int
+    physicalStock: int = Field(..., ge=0)
+    batchNumber: Optional[str] = None
+    notes: Optional[str] = None
+
+class CycleCountRequest(BaseModel):
+    counts: List[CycleCountItem]
+    auditorName: str = "Auditor de Bodega"
+    auditorUserId: Optional[int] = 1
+    notes: Optional[str] = None
 
 class LoginRequest(BaseModel):
     username: str
@@ -402,27 +658,11 @@ class UserStatusRequest(BaseModel):
 class UserRoleRequest(BaseModel):
     role: str
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
 class UserPasswordRequest(BaseModel):
     password: str
     mustChangePassword: Optional[bool] = None
     userId: Optional[int] = None
     username: Optional[str] = None
-
-class SupplierCreateRequest(BaseModel):
-    taxId: Optional[str] = None
-    name: str
-    category: Optional[str] = "General"
-    contact: Optional[str] = None
-    phone: Optional[str] = None
-    whatsapp: Optional[str] = None
-    email: Optional[str] = None
-    terms: Optional[str] = "Contado"
-    city: Optional[str] = "Cartago"
-    address: Optional[str] = None
 
 # ==============================================================================
 # ENDPOINTS PÚBLICOS DE TIENDA Y CATÁLOGO
@@ -1211,19 +1451,49 @@ def create_internal_order(req: OrderCreateRequest):
 
 @app.get("/api/products")
 def get_products():
-    """Consulta productos del catálogo oficial e inventario."""
-    # Intentar desde SQLite
+    """Consulta productos del catálogo oficial e inventario con atributos WMS completos."""
     if os.path.exists(SQLITE_DB_PATH):
         try:
             conn = get_sqlite_conn()
             cur = conn.cursor()
-            cur.execute("SELECT ProductId as id, Sku as sku, Barcode as barcode, Name as name, Description as description, Category as category, CategoryLabel as categoryLabel, Price as price, CostPrice as costPrice, Stock as stock, MinStock as minStock, Unit as unit, Image as image FROM Products")
+            cur.execute("""
+                SELECT ProductId as id, Sku as sku, Barcode as barcode, Name as name, Description as description,
+                       Category as category, CategoryLabel as categoryLabel, Price as price, CostPrice as costPrice,
+                       Stock as stock, MinStock as minStock, Unit as unit, Image as image,
+                       COALESCE(BatchNumber, 'LOT-2026-CAT') as batchNumber,
+                       COALESCE(ExpiryDate, '2028-12-31') as expiryDate,
+                       COALESCE(HazardClass, 'NO_PELIGROSO') as hazardClass,
+                       COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
+                       COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation,
+                       COALESCE(WeightKg, 1.0) as weightKg,
+                       COALESCE(VolumeM3, 0.01) as volumeM3,
+                       COALESCE(IsActive, 1) as isActive
+                FROM Products
+                ORDER BY ProductId ASC
+            """)
             prods = [dict(r) for r in cur.fetchall()]
             conn.close()
             if prods:
+                today = date.today()
+                for p in prods:
+                    p["hasLowStockAlert"] = (p.get("stock", 0) <= p.get("minStock", 10))
+                    exp_str = p.get("expiryDate")
+                    if exp_str:
+                        try:
+                            exp_d = datetime.strptime(exp_str[:10], "%Y-%m-%d").date()
+                            days_to_exp = (exp_d - today).days
+                            p["isExpiringSoon"] = (days_to_exp <= 30)
+                            p["isExpired"] = (days_to_exp < 0)
+                            p["daysToExpiry"] = days_to_exp
+                        except Exception:
+                            p["isExpiringSoon"] = False
+                            p["isExpired"] = False
+                    else:
+                        p["isExpiringSoon"] = False
+                        p["isExpired"] = False
                 return prods
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Aviso leyendo productos de SQLite: {e}")
             
     # Fallback JSON
     if os.path.exists(CATALOG_JSON_FILE):
@@ -1234,6 +1504,69 @@ def get_products():
             pass
             
     return []
+
+@app.get("/api/products/{product_id}")
+def get_product_detail(product_id: int):
+    """Obtiene el detalle individual de un producto con sus últimos movimientos de Kardex."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ProductId as id, Sku as sku, Barcode as barcode, Name as name, Description as description,
+               Category as category, CategoryLabel as categoryLabel, Price as price, CostPrice as costPrice,
+               Stock as stock, MinStock as minStock, Unit as unit, Image as image,
+               COALESCE(BatchNumber, 'LOT-2026-CAT') as batchNumber,
+               COALESCE(ExpiryDate, '2028-12-31') as expiryDate,
+               COALESCE(HazardClass, 'NO_PELIGROSO') as hazardClass,
+               COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
+               COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation,
+               COALESCE(WeightKg, 1.0) as weightKg,
+               COALESCE(VolumeM3, 0.01) as volumeM3
+        FROM Products
+        WHERE ProductId = ?
+    """, (product_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        
+    p = dict(row)
+    cur.execute("""
+        SELECT MovementId as id, MovementNumber as code, MovementDate as date,
+               MovementType as type, Quantity as qty, PreviousStock as prev,
+               FinalStock as final, ReferenceDocument as doc, UserName as user, Notes as notes
+        FROM InventoryMovements
+        WHERE ProductId = ?
+        ORDER BY MovementId DESC
+        LIMIT 20
+    """, (product_id,))
+    p["movements"] = [dict(m) for m in cur.fetchall()]
+    conn.close()
+    return p
+
+@app.get("/api/products/barcode/{barcode}")
+def lookup_product_by_barcode(barcode: str):
+    """Búsqueda ultra rápida para escáneres de código de barras y pistolas láser WMS."""
+    clean_code = barcode.strip()
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ProductId as id, Sku as sku, Barcode as barcode, Name as name, Description as description,
+               Category as category, CategoryLabel as categoryLabel, Price as price, CostPrice as costPrice,
+               Stock as stock, MinStock as minStock, Unit as unit, Image as image,
+               COALESCE(BatchNumber, 'LOT-2026-CAT') as batchNumber,
+               COALESCE(ExpiryDate, '2028-12-31') as expiryDate,
+               COALESCE(HazardClass, 'NO_PELIGROSO') as hazardClass,
+               COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
+               COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation
+        FROM Products
+        WHERE Barcode = ? OR Sku = ?
+        LIMIT 1
+    """, (clean_code, clean_code))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"No se encontró producto con código '{clean_code}'.")
+    return dict(row)
 
 def sync_catalog_files(catalog_items: List[Dict[str, Any]]):
     """Sincroniza los archivos JSON y JS del catálogo tras cambios de mantenimiento."""
@@ -1256,7 +1589,7 @@ def sync_catalog_files(catalog_items: List[Dict[str, Any]]):
 @app.put("/api/products/{product_id}")
 @app.post("/api/products/{product_id}")
 def update_product(product_id: int, req: ProductUpdateRequest):
-    """Actualiza precios, datos o imagen de un producto en base de datos y catálogo web."""
+    """Actualiza precios, datos, stock, lote o ubicación de un producto en base de datos y Kardex."""
     conn = get_sqlite_conn()
     cur = conn.cursor()
     
@@ -1268,6 +1601,7 @@ def update_product(product_id: int, req: ProductUpdateRequest):
         
     curr_dict = dict(curr)
     new_sku = req.sku if req.sku is not None else curr_dict['Sku']
+    new_bar = req.barcode if req.barcode is not None else curr_dict.get('Barcode', '')
     new_name = req.name if req.name is not None else curr_dict['Name']
     new_desc = req.description if req.description is not None else curr_dict['Description']
     new_price = req.price if req.price is not None else curr_dict['Price']
@@ -1278,12 +1612,39 @@ def update_product(product_id: int, req: ProductUpdateRequest):
     new_cat = req.category if req.category is not None else curr_dict['Category']
     new_cat_lbl = req.categoryLabel if req.categoryLabel is not None else curr_dict['CategoryLabel']
     new_img = req.image if req.image is not None else curr_dict['Image']
+    new_batch = req.batchNumber if req.batchNumber is not None else curr_dict.get('BatchNumber', 'LOT-2026-CAT')
+    new_exp = req.expiryDate if req.expiryDate is not None else curr_dict.get('ExpiryDate', '2028-12-31')
+    new_haz = req.hazardClass if req.hazardClass is not None else curr_dict.get('HazardClass', 'NO_PELIGROSO')
+    new_zone = req.warehouseZone if req.warehouseZone is not None else curr_dict.get('WarehouseZone', 'ZONA-A')
+    new_loc = req.warehouseLocation if req.warehouseLocation is not None else curr_dict.get('WarehouseLocation', 'PAS-01-EST-01-N1')
+    new_weight = req.weightKg if req.weightKg is not None else curr_dict.get('WeightKg', 1.0)
+    new_vol = req.volumeM3 if req.volumeM3 is not None else curr_dict.get('VolumeM3', 0.01)
+
+    old_stock = curr_dict['Stock'] or 0
 
     cur.execute("""
         UPDATE Products 
-        SET Sku=?, Name=?, Description=?, Price=?, CostPrice=?, Stock=?, MinStock=?, Unit=?, Category=?, CategoryLabel=?, Image=?
+        SET Sku=?, Barcode=?, Name=?, Description=?, Price=?, CostPrice=?, Stock=?, MinStock=?, Unit=?, Category=?, CategoryLabel=?, Image=?,
+            BatchNumber=?, ExpiryDate=?, HazardClass=?, WarehouseZone=?, WarehouseLocation=?, WeightKg=?, VolumeM3=?
         WHERE ProductId=?
-    """, (new_sku, new_name, new_desc, new_price, new_cost, new_stock, new_min, new_unit, new_cat, new_cat_lbl, new_img, product_id))
+    """, (new_sku, new_bar, new_name, new_desc, new_price, new_cost, new_stock, new_min, new_unit, new_cat, new_cat_lbl, new_img,
+          new_batch, new_exp, new_haz, new_zone, new_loc, new_weight, new_vol, product_id))
+
+    # Si cambió el stock manualmente, registrar en Kardex para trazabilidad 100%
+    if req.stock is not None and new_stock != old_stock:
+        diff_qty = new_stock - old_stock
+        mov_type = "AJUSTE_POSITIVO" if diff_qty > 0 else "AJUSTE_NEGATIVO"
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        mov_num = f"MOV-AJU-{int(time.time()) % 1000000:06d}"
+        cur.execute("""
+            INSERT INTO InventoryMovements
+            (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock, UnitCost, TotalAmount, BatchNumber, ExpiryDate, SourceLocation, TargetLocation, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANTENIMIENTO_CATALOGO', 1, 'Administrador WMS', 'Ajuste manual de stock desde catálogo', ?)
+        """, (
+            mov_num, now_str[:10], product_id, new_sku, new_name, mov_type, diff_qty, old_stock, new_stock, new_cost, abs(diff_qty * new_cost),
+            new_batch, new_exp, new_loc, new_loc, now_str
+        ))
+
     conn.commit()
     conn.close()
 
@@ -1295,6 +1656,7 @@ def update_product(product_id: int, req: ProductUpdateRequest):
             for p in catalog:
                 if p.get("id") == product_id:
                     p["sku"] = new_sku
+                    p["barcode"] = new_bar
                     p["name"] = new_name
                     p["description"] = new_desc
                     p["price"] = new_price
@@ -1305,6 +1667,10 @@ def update_product(product_id: int, req: ProductUpdateRequest):
                     p["category"] = new_cat
                     p["categoryLabel"] = new_cat_lbl
                     p["image"] = new_img
+                    p["batchNumber"] = new_batch
+                    p["expiryDate"] = new_exp
+                    p["hazardClass"] = new_haz
+                    p["warehouseLocation"] = new_loc
                     break
             sync_catalog_files(catalog)
         except Exception as e:
@@ -1312,15 +1678,16 @@ def update_product(product_id: int, req: ProductUpdateRequest):
 
     return {
         "success": True, 
-        "message": f"Producto {new_sku} actualizado correctamente. Nuevo precio: ₡{new_price}",
+        "message": f"Producto {new_sku} actualizado correctamente. Stock: {new_stock}, Precio: ₡{new_price}",
         "product": {
-            "id": product_id, "sku": new_sku, "name": new_name, "price": new_price, "stock": new_stock, "image": new_img
+            "id": product_id, "sku": new_sku, "name": new_name, "price": new_price, "stock": new_stock, "image": new_img,
+            "batchNumber": new_batch, "expiryDate": new_exp, "warehouseLocation": new_loc
         }
     }
 
 @app.post("/api/products")
 def create_product(req: ProductCreateRequest):
-    """Crea un nuevo producto y lo asienta en base de datos y catálogo oficial."""
+    """Crea un nuevo producto con atributos WMS y lo asienta en base de datos y catálogo oficial."""
     conn = get_sqlite_conn()
     cur = conn.cursor()
     
@@ -1331,9 +1698,27 @@ def create_product(req: ProductCreateRequest):
     img_path = req.image or f"img/catalog/prod_{new_id}.jpg"
     
     cur.execute("""
-        INSERT INTO Products (ProductId, Sku, Barcode, Name, Description, Category, CategoryLabel, Price, CostPrice, Stock, MinStock, Unit, Image)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (new_id, req.sku, req.barcode or f"744100{new_id}", req.name, req.description or "", req.category, req.categoryLabel, req.price, req.costPrice or 0.0, req.stock or 100, req.minStock or 10, req.unit or "UNIDAD", img_path))
+        INSERT INTO Products (ProductId, Sku, Barcode, Name, Description, Category, CategoryLabel, Price, CostPrice, Stock, MinStock, Unit, Image,
+                              BatchNumber, ExpiryDate, HazardClass, WarehouseZone, WarehouseLocation, WeightKg, VolumeM3)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (new_id, req.sku, req.barcode or f"744100{new_id}", req.name, req.description or "", req.category, req.categoryLabel, req.price, req.costPrice or 0.0,
+          req.stock or 100, req.minStock or 10, req.unit or "UNIDAD", img_path,
+          req.batchNumber or "LOT-2026-CAT", req.expiryDate or "2028-12-31", req.hazardClass or "NO_PELIGROSO",
+          req.warehouseZone or "ZONA-A", req.warehouseLocation or "PAS-01-EST-01-N1", req.weightKg or 1.0, req.volumeM3 or 0.01))
+    
+    # Registrar entrada inicial en Kardex
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    mov_num = f"MOV-INI-{int(time.time()) % 1000000:06d}"
+    init_stock = req.stock or 100
+    cur.execute("""
+        INSERT INTO InventoryMovements
+        (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock, UnitCost, TotalAmount, BatchNumber, ExpiryDate, SourceLocation, TargetLocation, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+        VALUES (?, ?, ?, ?, ?, 'ENTRADA_COMPRA', ?, 0, ?, ?, ?, ?, ?, 'BODEGA_RECEPCION', ?, 'ALTA_PRODUCTO', 1, 'Administrador WMS', 'Ingreso inicial por alta de SKU', ?)
+    """, (
+        mov_num, now_str[:10], new_id, req.sku, req.name, init_stock, init_stock, req.costPrice or 0.0, (init_stock * (req.costPrice or 0.0)),
+        req.batchNumber or "LOT-2026-CAT", req.expiryDate or "2028-12-31", req.warehouseLocation or "PAS-01-EST-01-N1", now_str
+    ))
+
     conn.commit()
     conn.close()
 
@@ -1355,13 +1740,17 @@ def create_product(req: ProductCreateRequest):
                 "stock": req.stock or 100,
                 "minOrder": req.minStock or 10,
                 "unit": req.unit or "UNIDAD",
-                "image": img_path
+                "image": img_path,
+                "batchNumber": req.batchNumber or "LOT-2026-CAT",
+                "expiryDate": req.expiryDate or "2028-12-31",
+                "hazardClass": req.hazardClass or "NO_PELIGROSO",
+                "warehouseLocation": req.warehouseLocation or "PAS-01-EST-01-N1"
             })
             sync_catalog_files(catalog)
         except Exception as e:
             logger.error(f"Error agregando a JSON: {e}")
 
-    return {"success": True, "productId": new_id, "message": f"Producto {req.sku} registrado exitosamente."}
+    return {"success": True, "productId": new_id, "message": f"Producto {req.sku} registrado exitosamente con Kardex inicial."}
 
 @app.delete("/api/products/{product_id}")
 def delete_product(product_id: int):
@@ -1418,26 +1807,36 @@ async def upload_product_image(product_id: int, file: UploadFile = File(...)):
             logger.error(f"Error actualizando imagen en catálogo: {e}")
 
     return {"success": True, "message": "Imagen de producto actualizada correctamente.", "image": img_rel_path}
-def get_customers():
-    """Consulta clientes registrados."""
+
+@app.get("/api/customers")
+def get_customers(search: Optional[str] = None):
+    """Consulta clientes registrados desde la base de datos relacional SQLite."""
     if os.path.exists(SQLITE_DB_PATH):
         try:
             conn = get_sqlite_conn()
             cur = conn.cursor()
-            cur.execute("SELECT CustomerId as id, TaxId as taxId, BusinessName as name, Email as email, Phone as phone, Address as address, Canton as canton, Province as province, PaymentTerms as terms FROM Customers ORDER BY CustomerId DESC")
+            query = "SELECT CustomerId as id, TaxId as taxId, BusinessName as name, Email as email, Phone as phone, Address as address, Canton as canton, Province as province, PaymentTerms as terms, IsActive as isActive FROM Customers"
+            params = []
+            if search:
+                query += " WHERE BusinessName LIKE ? OR TaxId LIKE ? OR Phone LIKE ?"
+                term = f"%{search.strip()}%"
+                params.extend([term, term, term])
+            query += " ORDER BY CustomerId DESC"
+            cur.execute(query, params)
             custs = [dict(r) for r in cur.fetchall()]
             conn.close()
             if custs:
                 return custs
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Aviso leyendo clientes de SQLite: {e}")
 
-    return [
+    fallback = [
         { "id": 1, "taxId": "3-101-582910", "name": "Restaurante El Fogón Tico S.A.", "contact": "Don Esteban Brenes", "phone": "2551-3344", "email": "compras@fogontico.cr", "terms": "Crédito 30 días", "route": "Cartago Centro", "address": "200m Sur de la Basílica de Los Ángeles" },
         { "id": 2, "taxId": "3-102-449102", "name": "Panadería & Repostería La Espiga de Oro", "contact": "Doña Marta Chinchilla", "phone": "2552-1920", "email": "gerencia@laespiga.com", "terms": "Contado", "route": "Paraíso - Cervantes", "address": "Costado Norte del Parque Central de Paraíso" },
         { "id": 3, "taxId": "3-002-045921", "name": "Municipalidad de Cartago (Depto. Suministros)", "contact": "Lic. Rodrigo Navarro", "phone": "2550-4400", "email": "proveeduria@muni-cartago.go.cr", "terms": "Crédito 60 días", "route": "Cartago Centro", "address": "Edificio Municipal, 2do piso, Cartago" },
         { "id": 4, "taxId": "3014042047", "name": "Municipalidad de Curridabat", "contact": "Recepción de Pedidos", "phone": "88378662", "email": "suministros@curridabat.go.cr", "terms": "Contado / Contra Entrega", "route": "Cartago (Lunes y Jueves)", "address": "Costado norte del estadio lito monge de Curridabat" }
     ]
+    return fallback
 
 @app.post("/api/customers")
 def create_customer(req: CustomerCreateRequest):
@@ -1462,6 +1861,46 @@ def create_customer(req: CustomerCreateRequest):
     except Exception as e:
         logger.error(f"Error registrando cliente: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/customers/{customer_id}")
+def update_customer(customer_id: int, req: CustomerUpdateRequest):
+    """Actualiza los datos de un cliente comercial en base de datos."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM Customers WHERE CustomerId = ?", (customer_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+    curr = dict(row)
+    new_tax = req.taxId if req.taxId is not None else curr['TaxId']
+    new_name = req.name if req.name is not None else curr['BusinessName']
+    new_phone = req.phone if req.phone is not None else curr.get('Phone', '')
+    new_email = req.email if req.email is not None else curr.get('Email', '')
+    new_addr = req.address if req.address is not None else curr.get('Address', '')
+    new_terms = req.terms if req.terms is not None else curr.get('PaymentTerms', 'Contado')
+    new_route = req.route if req.route is not None else curr.get('Canton', 'Cartago')
+    new_active = 1 if (req.isActive is None or req.isActive) else 0
+
+    cur.execute("""
+        UPDATE Customers
+        SET TaxId = ?, BusinessName = ?, Phone = ?, Email = ?, Address = ?, Canton = ?, PaymentTerms = ?, IsActive = ?
+        WHERE CustomerId = ?
+    """, (new_tax, new_name, new_phone, new_email, new_addr, new_route, new_terms, new_active, customer_id))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": f"Cliente '{new_name}' actualizado correctamente."}
+
+@app.delete("/api/customers/{customer_id}")
+def delete_customer(customer_id: int):
+    """Desactiva o da de baja un cliente."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE Customers SET IsActive = 0 WHERE CustomerId = ?", (customer_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": f"Cliente ID {customer_id} desactivado correctamente."}
 
 ROLE_MAP = {
     "Administrador": 1,
@@ -1768,30 +2207,146 @@ def auth_change_password(req: UserPasswordRequest):
     return {"success": True, "message": "Contraseña personal actualizada exitosamente."}
 
 
+# ==============================================================================
+# GESTIÓN DE PROVEEDORES (SUPPLIERS) - PERSISTENCIA SQLITE ACID
+# ==============================================================================
 @app.get("/api/suppliers")
-def get_suppliers():
-    """Proveedores institucionales de Fragama."""
+def get_suppliers(search: Optional[str] = None, category: Optional[str] = None):
+    """Directorio oficial de proveedores homologados de Fragama con persistencia relacional."""
+    if os.path.exists(SQLITE_DB_PATH):
+        try:
+            conn = get_sqlite_conn()
+            cur = conn.cursor()
+            query = """
+                SELECT SupplierId as id, TaxId as taxId, BusinessName as name, Category as category,
+                       ContactPerson as contact, Phone as phone, MobileWhatsApp as whatsapp,
+                       Email as email, Address as address, City as city, PaymentTerms as terms,
+                       IsActive as isActive, CreatedAt as createdAt
+                FROM Suppliers
+                WHERE IsActive = 1
+            """
+            params = []
+            if search:
+                query += " AND (BusinessName LIKE ? OR TaxId LIKE ? OR ContactPerson LIKE ? OR City LIKE ?)"
+                term = f"%{search.strip()}%"
+                params.extend([term, term, term, term])
+            if category and category != "ALL":
+                query += " AND Category = ?"
+                params.append(category)
+                
+            query += " ORDER BY SupplierId DESC"
+            cur.execute(query, params)
+            suppliers = [dict(r) for r in cur.fetchall()]
+            conn.close()
+            if suppliers:
+                return suppliers
+        except Exception as e:
+            logger.warning(f"Aviso leyendo proveedores de SQLite: {e}")
+
     return [
-        { "id": 1, "taxId": "3-101-098234", "name": "Químicos Industriales Goyca S.A.", "category": "Químicos y Desinfectantes", "contact": "Ing. Fernando Mora", "phone": "2244-8800", "email": "ventas@goyca.cr", "address": "La Uruca, San José", "terms": "Crédito 30 días" },
-        { "id": 2, "taxId": "3-102-887711", "name": "Empaques Ecológicos del Valle", "category": "Papelería y Desechables", "contact": "Lic. Karen Zúñiga", "phone": "2573-1200", "email": "pedidos@empaquesdelvalle.cr", "address": "Zona Franca Cartago", "terms": "Crédito 15 días" },
-        { "id": 3, "taxId": "3-101-776655", "name": "Plásticos y Termoformados de C.R.", "category": "Bolsas y Plásticos", "contact": "Don Jorge Solano", "phone": "2272-3344", "email": "distribucion@plasticoscr.com", "address": "Curridabat, San José", "terms": "Crédito 30 días" }
+        { "id": 1, "taxId": "3-101-098234", "name": "Químicos Industriales Goyca S.A.", "category": "Químicos y Desinfectantes", "contact": "Ing. Fernando Mora", "phone": "2244-8800", "whatsapp": "8844-8800", "email": "ventas@goyca.cr", "address": "La Uruca, San José", "city": "Cartago", "terms": "Crédito 30 días", "isActive": 1 },
+        { "id": 2, "taxId": "3-102-887711", "name": "Empaques Ecológicos del Valle", "category": "Papelería y Desechables", "contact": "Lic. Karen Zúñiga", "phone": "2573-1200", "whatsapp": "8573-1200", "email": "pedidos@empaquesdelvalle.cr", "address": "Zona Franca Cartago", "city": "Cartago", "terms": "Crédito 15 días", "isActive": 1 },
+        { "id": 3, "taxId": "3-101-776655", "name": "Plásticos y Termoformados de C.R.", "category": "Bolsas y Plásticos", "contact": "Don Jorge Solano", "phone": "2272-3344", "whatsapp": "8272-3344", "email": "distribucion@plasticoscr.com", "address": "Curridabat, San José", "city": "Cartago", "terms": "Crédito 30 días", "isActive": 1 }
     ]
 
 @app.post("/api/suppliers")
 def create_supplier(req: SupplierCreateRequest):
-    """Registra un nuevo proveedor en base de datos."""
-    return {
-        "success": True,
-        "message": f"Proveedor '{req.name}' registrado exitosamente.",
-        "supplier": req.dict()
-    }
+    """Registra un nuevo proveedor homologado en la base de datos relacional."""
+    name = sanitize_text(req.name)
+    tax_id = sanitize_text(req.taxId or f"PROV-{int(time.time())}")
+    cat = sanitize_text(req.category or "General")
+    contact = sanitize_text(req.contact or "")
+    phone = sanitize_text(req.phone or "")
+    wa = sanitize_text(req.whatsapp or "")
+    email = sanitize_text(req.email or "")
+    terms = sanitize_text(req.terms or "Crédito 30 días")
+    city = sanitize_text(req.city or "Cartago")
+    addr = sanitize_text(req.address or "")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-@app.get("/api/inventory/movements")
-def get_inventory_movements():
-    """Retorna los movimientos reales de Kardex registrados en la base de datos."""
+    try:
+        conn = get_sqlite_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO Suppliers (TaxId, BusinessName, Category, ContactPerson, Phone, MobileWhatsApp, Email, Address, City, PaymentTerms, IsActive, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (tax_id, name, cat, contact, phone, wa, email, addr, city, terms, now_str))
+        supp_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+        return {
+            "success": True,
+            "supplierId": supp_id,
+            "message": f"Proveedor '{name}' registrado exitosamente en base de datos.",
+            "supplier": {
+                "id": supp_id, "taxId": tax_id, "name": name, "category": cat,
+                "contact": contact, "phone": phone, "whatsapp": wa, "email": email,
+                "terms": terms, "city": city, "address": addr, "isActive": 1
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error creando proveedor: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/suppliers/{supplier_id}")
+def update_supplier(supplier_id: int, req: SupplierUpdateRequest):
+    """Actualiza la información de un proveedor homologado."""
     conn = get_sqlite_conn()
     cur = conn.cursor()
+    cur.execute("SELECT * FROM Suppliers WHERE SupplierId = ?", (supplier_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+
+    curr = dict(row)
+    new_name = sanitize_text(req.name) if req.name is not None else curr['BusinessName']
+    new_tax = sanitize_text(req.taxId) if req.taxId is not None else curr['TaxId']
+    new_cat = sanitize_text(req.category) if req.category is not None else curr['Category']
+    new_contact = sanitize_text(req.contact) if req.contact is not None else curr.get('ContactPerson', '')
+    new_phone = sanitize_text(req.phone) if req.phone is not None else curr.get('Phone', '')
+    new_wa = sanitize_text(req.whatsapp) if req.whatsapp is not None else curr.get('MobileWhatsApp', '')
+    new_email = sanitize_text(req.email) if req.email is not None else curr.get('Email', '')
+    new_terms = sanitize_text(req.terms) if req.terms is not None else curr.get('PaymentTerms', 'Crédito 30 días')
+    new_city = sanitize_text(req.city) if req.city is not None else curr.get('City', 'Cartago')
+    new_addr = sanitize_text(req.address) if req.address is not None else curr.get('Address', '')
+    new_active = 1 if (req.isActive is None or req.isActive) else 0
+
     cur.execute("""
+        UPDATE Suppliers
+        SET TaxId = ?, BusinessName = ?, Category = ?, ContactPerson = ?, Phone = ?, MobileWhatsApp = ?,
+            Email = ?, Address = ?, City = ?, PaymentTerms = ?, IsActive = ?
+        WHERE SupplierId = ?
+    """, (new_tax, new_name, new_cat, new_contact, new_phone, new_wa, new_email, new_addr, new_city, new_terms, new_active, supplier_id))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": f"Proveedor '{new_name}' actualizado exitosamente."}
+
+@app.delete("/api/suppliers/{supplier_id}")
+def delete_supplier(supplier_id: int):
+    """Desactiva un proveedor del catálogo oficial."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE Suppliers SET IsActive = 0 WHERE SupplierId = ?", (supplier_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": f"Proveedor ID {supplier_id} desactivado del catálogo."}
+
+# ==============================================================================
+# OPERACIONES WMS KARDEX & CONTROL DE BODEGA (INVENTREE / OPENBOXES STYLE)
+# ==============================================================================
+@app.get("/api/inventory/movements")
+def get_inventory_movements(
+    productId: Optional[int] = None,
+    movementType: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 200
+):
+    """Consulta movimientos reales e inmutables del Kardex de bodega con filtros avanzados."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    
+    query = """
         SELECT m.MovementId as id,
                m.MovementNumber as code,
                m.MovementDate as date,
@@ -1800,27 +2355,611 @@ def get_inventory_movements():
                m.ProductName as product,
                m.MovementType as type,
                ABS(m.Quantity) as qty,
+               m.Quantity as rawQty,
                m.PreviousStock as prevStock,
                m.FinalStock as postStock,
+               COALESCE(m.BatchNumber, p.BatchNumber, 'LOT-2026') as batch,
+               COALESCE(m.ExpiryDate, p.ExpiryDate) as expiryDate,
+               COALESCE(m.TargetLocation, p.WarehouseLocation, 'PAS-01') as location,
+               m.UnitCost as cost,
+               m.TotalAmount as totalAmount,
                m.ReferenceDocument as doc,
                m.UserName as user,
                m.Notes as notes,
                m.CreatedAt as createdAt
         FROM InventoryMovements m
-        ORDER BY m.MovementId DESC
-        LIMIT 200
-    """)
+        LEFT JOIN Products p ON m.ProductId = p.ProductId
+        WHERE 1=1
+    """
+    params = []
+    if productId:
+        query += " AND m.ProductId = ?"
+        params.append(productId)
+    if movementType and movementType != "ALL":
+        query += " AND m.MovementType = ?"
+        params.append(movementType)
+    if search:
+        query += " AND (m.ProductName LIKE ? OR m.Sku LIKE ? OR m.MovementNumber LIKE ? OR m.ReferenceDocument LIKE ?)"
+        term = f"%{search.strip()}%"
+        params.extend([term, term, term, term])
+        
+    query += " ORDER BY m.MovementId DESC LIMIT ?"
+    params.append(limit)
+    
+    cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
     
     movements = [dict(r) for r in rows]
-    if not movements:
-        # Valores de ejemplo inicial si la tabla acaba de crearse
-        return [
-            { "id": 101, "code": "ENT-20261001-001", "product": "Bandeja 9x9 con o sin división Bagazo de Caña", "type": "ENTRADA", "qty": 500, "prevStock": 100, "postStock": 600, "doc": "FAC-GOY-9912", "user": "Esteban Quirós (Bodega)", "date": "2026-10-01 08:30" },
-            { "id": 102, "code": "SAL-20261001-002", "product": "Bandeja Hamburguesa 6x6 Bagazo de Caña", "type": "SALIDA_VENTA", "qty": 50, "prevStock": 200, "postStock": 150, "doc": "PED-WEB-29914", "user": "Sistema Tienda Web", "date": "2026-10-01 11:47" }
-        ]
+    # Determinar signo para vista
+    for m in movements:
+        mtype = m.get("type", "")
+        if "ENTRADA" in mtype or "REINGRESO" in mtype or "AJUSTE_POSITIVO" in mtype:
+            m["sign"] = 1
+        elif "SALIDA" in mtype or "MERMA" in mtype or "AJUSTE_NEGATIVO" in mtype:
+            m["sign"] = -1
+        else:
+            m["sign"] = 0
+            
     return movements
+
+@app.post("/api/inventory/adjust")
+def adjust_inventory_stock(req: InventoryAdjustmentRequest):
+    """
+    Ajuste de inventario con garantía ACID:
+    - Previene saldos negativos.
+    - Genera número correlativo único de movimiento.
+    - Asienta traza inmutable en Kardex.
+    - Actualiza el stock oficial de catálogo.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT ProductId, Sku, Name, Stock, CostPrice, BatchNumber, ExpiryDate, WarehouseLocation FROM Products WHERE ProductId = ?", (req.productId,))
+    prod = cur.fetchone()
+    if not prod:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    p = dict(prod)
+    curr_stock = p['Stock'] or 0
+    cost = p['CostPrice'] or 0.0
+    qty = req.quantity
+
+    is_exit = req.movementType in ("AJUSTE_NEGATIVO", "MERMA_VENCIMIENTO", "SALIDA_VENTA")
+    is_transfer = req.movementType == "TRASLADO_INTERNO"
+    sign = 0 if is_transfer else (-1 if is_exit else 1)
+
+    if is_exit and curr_stock - qty < 0:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Stock insuficiente para '{p['Sku']}'. Stock actual: {curr_stock}, requerido: {qty}. No se permiten saldos negativos."
+        )
+
+    new_stock = curr_stock + (sign * qty)
+    batch = req.batchNumber or p.get('BatchNumber') or 'LOT-2026-CAT'
+    src_loc = req.sourceLocation or p.get('WarehouseLocation') or 'PAS-01'
+    tgt_loc = req.targetLocation or (req.sourceLocation if is_transfer else p.get('WarehouseLocation')) or 'PAS-01'
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    prefix = "TRA" if is_transfer else ("SAL" if is_exit else "ENT")
+    mov_num = f"{prefix}-{datetime.now().strftime('%Y%m%d')}-{int(time.time()) % 10000:04d}"
+
+    # 1. Actualizar Producto
+    update_fields = ["Stock = ?"]
+    update_params = [new_stock]
+    if req.batchNumber:
+        update_fields.append("BatchNumber = ?")
+        update_params.append(req.batchNumber)
+    if is_transfer and req.targetLocation:
+        update_fields.append("WarehouseLocation = ?")
+        update_params.append(req.targetLocation)
+    update_params.append(req.productId)
+
+    cur.execute(f"UPDATE Products SET {', '.join(update_fields)} WHERE ProductId = ?", update_params)
+
+    # 2. Asentar en Kardex (InventoryMovements)
+    cur.execute("""
+        INSERT INTO InventoryMovements
+        (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock,
+         UnitCost, TotalAmount, BatchNumber, ExpiryDate, SourceLocation, TargetLocation, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        mov_num, now_str[:10], req.productId, p['Sku'], p['Name'], req.movementType, (sign * qty),
+        curr_stock, new_stock, cost, (qty * cost), batch, p.get('ExpiryDate'), src_loc, tgt_loc,
+        req.referenceDocument or "AJUSTE-MANUAL", req.userId or 1, req.userName or "Bodeguero",
+        req.notes or f"Ajuste {req.movementType} registrado por {req.userName}", now_str
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "movementNumber": mov_num,
+        "productId": req.productId,
+        "sku": p['Sku'],
+        "previousStock": curr_stock,
+        "finalStock": new_stock,
+        "difference": (sign * qty),
+        "message": f"Movimiento {mov_num} registrado con éxito. Nuevo stock de [{p['Sku']}]: {new_stock} unidades."
+    }
+
+@app.post("/api/inventory/receive")
+def receive_inbound_goods(req: InwardReceiptRequest):
+    """
+    Recepción oficial de compras / Inbound Receipt (OpenBoxes / InvenTree standard).
+    Registra lote, fecha de vencimiento, ubicación y entrada al Kardex para múltiples artículos.
+    """
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+
+    received_items = []
+    try:
+        for it in req.items:
+            cur.execute("SELECT ProductId, Sku, Name, Stock, CostPrice, BatchNumber, ExpiryDate, WarehouseLocation FROM Products WHERE ProductId = ?", (it.productId,))
+            row = cur.fetchone()
+            if not row:
+                continue
+
+            p = dict(row)
+            prev_stock = p['Stock'] or 0
+            new_stock = prev_stock + it.quantity
+            cost = it.unitCost if it.unitCost is not None else (p['CostPrice'] or 0.0)
+            batch = it.batchNumber or p.get('BatchNumber') or f"LOT-{datetime.now().strftime('%Y%m')}-REC"
+            expiry = it.expiryDate or p.get('ExpiryDate') or "2028-12-31"
+            loc = it.warehouseLocation or p.get('WarehouseLocation') or "PAS-01-EST-01-N1"
+
+            # Actualizar producto
+            cur.execute("""
+                UPDATE Products
+                SET Stock = ?, CostPrice = ?, BatchNumber = ?, ExpiryDate = ?, WarehouseLocation = ?
+                WHERE ProductId = ?
+            """, (new_stock, cost, batch, expiry, loc, it.productId))
+
+            # Kardex
+            mov_num = f"ENT-COMP-{int(time.time()) % 1000000:06d}-{len(received_items)+1}"
+            cur.execute("""
+                INSERT INTO InventoryMovements
+                (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock,
+                 UnitCost, TotalAmount, BatchNumber, ExpiryDate, SourceLocation, TargetLocation, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+                VALUES (?, ?, ?, ?, ?, 'ENTRADA_COMPRA', ?, ?, ?, ?, ?, ?, ?, 'RECEPCION-MUELLE', ?, ?, ?, ?, ?, ?)
+            """, (
+                mov_num, now_str[:10], it.productId, p['Sku'], p['Name'], it.quantity,
+                prev_stock, new_stock, cost, (it.quantity * cost), batch, expiry, loc,
+                req.documentNumber, req.userId or 1, req.userName or "Bodeguero Fragama",
+                f"Recepción de mercancía por compra Factura/PO #{req.documentNumber}. Proveedor: {req.supplierName or 'N/A'}",
+                now_str
+            ))
+
+            received_items.append({
+                "productId": it.productId,
+                "sku": p['Sku'],
+                "receivedQty": it.quantity,
+                "newStock": new_stock,
+                "batch": batch,
+                "expiry": expiry
+            })
+
+        conn.commit()
+        conn.close()
+        return {
+            "success": True,
+            "documentNumber": req.documentNumber,
+            "itemsReceivedCount": len(received_items),
+            "details": received_items,
+            "message": f"Recepción de compra #{req.documentNumber} procesada con éxito ({len(received_items)} productos ingresados al Kardex)."
+        }
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        logger.error(f"Error procesando recepción de mercancía: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/inventory/cycle-count")
+def submit_cycle_count_audit(req: CycleCountRequest):
+    """
+    Auditoría y Conteo Físico de Inventario (Physical Inventory Reconciliation):
+    - Compara Stock del Sistema vs Conteo Físico.
+    - Cuadra las diferencias automáticamente mediante movimientos 'CONTEO_FISICO'.
+    - Genera acta oficial de auditoría en CycleCountAudits.
+    """
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+
+    audit_code = f"AUD-{datetime.now().strftime('%Y%m%d')}-{int(time.time()) % 10000:04d}"
+    total_counted = len(req.counts)
+    total_diff_qty = 0
+    total_diff_amt = 0.0
+    adjusted_items = []
+
+    try:
+        for it in req.counts:
+            cur.execute("SELECT ProductId, Sku, Name, Stock, CostPrice, BatchNumber, WarehouseLocation FROM Products WHERE ProductId = ?", (it.productId,))
+            row = cur.fetchone()
+            if not row:
+                continue
+
+            p = dict(row)
+            sys_stock = p['Stock'] or 0
+            phys_stock = it.physicalStock
+            diff = phys_stock - sys_stock
+            cost = p['CostPrice'] or 0.0
+
+            if diff != 0:
+                total_diff_qty += abs(diff)
+                total_diff_amt += abs(diff * cost)
+
+                # Ajustar producto
+                cur.execute("UPDATE Products SET Stock = ? WHERE ProductId = ?", (phys_stock, it.productId))
+
+                # Kardex
+                mov_num = f"AUD-{audit_code[-8:]}-{p['Sku'][:6]}"
+                mov_type = "AJUSTE_POSITIVO" if diff > 0 else "AJUSTE_NEGATIVO"
+                cur.execute("""
+                    INSERT INTO InventoryMovements
+                    (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock,
+                     UnitCost, TotalAmount, BatchNumber, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
+                    VALUES (?, ?, ?, ?, ?, 'CONTEO_FISICO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    mov_num, now_str[:10], it.productId, p['Sku'], p['Name'], diff, sys_stock, phys_stock,
+                    cost, abs(diff * cost), it.batchNumber or p.get('BatchNumber', 'LOT-2026'), audit_code,
+                    req.auditorUserId or 1, req.auditorName,
+                    f"Ajuste por conteo físico en auditoría {audit_code}. Dif: {diff:+d} unidades. {it.notes or ''}", now_str
+                ))
+
+                adjusted_items.append({
+                    "sku": p['Sku'],
+                    "name": p['Name'],
+                    "systemStock": sys_stock,
+                    "physicalStock": phys_stock,
+                    "difference": diff,
+                    "amount": round(abs(diff * cost), 2)
+                })
+
+        # Registrar acta en CycleCountAudits
+        cur.execute("""
+            INSERT INTO CycleCountAudits
+            (AuditCode, AuditDate, AuditorName, TotalItemsCounted, TotalDiscrepancyQty, TotalDiscrepancyAmount, Status, Notes, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, 'COMPLETADO', ?, ?)
+        """, (
+            audit_code, now_str[:10], req.auditorName, total_counted, total_diff_qty, total_diff_amt,
+            req.notes or f"Conteo físico completado con {len(adjusted_items)} ajustes automáticos.", now_str
+        ))
+
+        conn.commit()
+        conn.close()
+        return {
+            "success": True,
+            "auditCode": audit_code,
+            "totalItemsAudited": total_counted,
+            "discrepanciesCount": len(adjusted_items),
+            "totalDiscrepancyQty": total_diff_qty,
+            "totalDiscrepancyAmount": round(total_diff_amt, 2),
+            "discrepancies": adjusted_items,
+            "message": f"Acta oficial {audit_code} generada exitosamente. Se cuadraron {len(adjusted_items)} productos en Kardex."
+        }
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        logger.error(f"Error procesando conteo físico: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/inventory/alerts")
+def get_inventory_alerts():
+    """
+    Monitor WMS proactivo de Alertas en Tiempo Real:
+    1. Lotes próximos a expirar / vencidos (Política FEFO - First Expired First Out).
+    2. Productos bajo Stock Mínimo (Punto de Reorden).
+    3. Resumen de salud del almacén.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ProductId as id, Sku as sku, Name as name, Category as category,
+               CategoryLabel as categoryLabel, Stock as stock, MinStock as minStock,
+               Price as price, CostPrice as costPrice,
+               COALESCE(BatchNumber, 'LOT-2026') as batchNumber,
+               COALESCE(ExpiryDate, '2028-12-31') as expiryDate,
+               COALESCE(HazardClass, 'NO_PELIGROSO') as hazardClass,
+               COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
+               COALESCE(WarehouseLocation, 'PAS-01') as location
+        FROM Products
+        WHERE IsActive = 1
+    """)
+    prods = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    today = date.today()
+    low_stock = []
+    expiring_soon = []
+    expired = []
+
+    for p in prods:
+        # 1. Alerta de Stock Mínimo
+        if p['stock'] <= p['minStock']:
+            suggested_reorder = max(p['minStock'] * 3, 50) - p['stock']
+            p['suggestedReorder'] = suggested_reorder
+            low_stock.append(p)
+
+        # 2. Alerta FEFO de Vencimiento
+        exp_str = p.get('expiryDate')
+        if exp_str:
+            try:
+                exp_d = datetime.strptime(exp_str[:10], "%Y-%m-%d").date()
+                days_left = (exp_d - today).days
+                p['daysLeft'] = days_left
+                if days_left < 0:
+                    expired.append(p)
+                elif days_left <= 30:
+                    expiring_soon.append(p)
+            except Exception:
+                pass
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "summary": {
+            "totalSkus": len(prods),
+            "lowStockCount": len(low_stock),
+            "expiringSoonCount": len(expiring_soon),
+            "expiredCount": len(expired),
+            "warehouseStatus": "OPTIMAL" if (len(low_stock) + len(expired)) == 0 else "ATTENTION_REQUIRED"
+        },
+        "lowStockAlerts": low_stock[:50],
+        "expiringSoonAlerts": expiring_soon,
+        "expiredAlerts": expired
+    }
+
+@app.get("/api/inventory/locations")
+def get_warehouse_locations():
+    """Consulta la estructura física de ubicaciones, racks, pasillos y zonas del almacén en Cartago."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT LocationId as id, Code as code, Zone as zone, Aisle as aisle,
+               Rack as rack, ShelfLevel as shelfLevel, Position as position,
+               Description as description, HazardClassAllowed as hazardClassAllowed,
+               MaxWeightKg as maxWeightKg, IsOccupied as isOccupied
+        FROM WarehouseLocations
+        ORDER BY Zone ASC, Code ASC
+    """)
+    locs = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return locs
+
+@app.get("/api/inventory/lookup/{code}")
+def lookup_inventory_code(code: str):
+    """Alias para escaneo de códigos de barra o SKUs con información WMS completa."""
+    return lookup_product_by_barcode(code)
+
+@app.get("/api/inventory/valuation")
+def get_inventory_financial_valuation():
+    """
+    Valorización Financiera y Contable de Inventario (ERPNext >31k Stars Standard).
+    Calcula valor en libros a costo (₡), valor a precio de venta y margen bruto proyectado,
+    desglosado por Zonas de Almacén y Familias de Productos.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ProductId as id, Sku as sku, Name as name, Category as category,
+               CategoryLabel as categoryLabel, Stock as stock, CostPrice as costPrice,
+               Price as salePrice,
+               COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
+               COALESCE(WarehouseLocation, 'PAS-01') as warehouseLocation
+        FROM Products
+        WHERE IsActive = 1
+    """)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    total_skus = len(rows)
+    total_units = 0
+    total_cost_valuation = 0.0
+    total_sale_valuation = 0.0
+
+    by_zone = {}
+
+    for p in rows:
+        stk = max(0, p['stock'] or 0)
+        cost = max(0.0, p['costPrice'] or 0.0)
+        sale = max(0.0, p['salePrice'] or 0.0)
+
+        line_cost = stk * cost
+        line_sale = stk * sale
+
+        total_units += stk
+        total_cost_valuation += line_cost
+        total_sale_valuation += line_sale
+
+        z = p['warehouseZone']
+        if z not in by_zone:
+            by_zone[z] = {
+                "zone": z,
+                "skusCount": 0,
+                "units": 0,
+                "costValuation": 0.0,
+                "saleValuation": 0.0
+            }
+        by_zone[z]["skusCount"] += 1
+        by_zone[z]["units"] += stk
+        by_zone[z]["costValuation"] += line_cost
+        by_zone[z]["saleValuation"] += line_sale
+
+    gross_margin_amt = total_sale_valuation - total_cost_valuation
+    gross_margin_pct = round((gross_margin_amt / total_sale_valuation * 100), 2) if total_sale_valuation > 0 else 0.0
+
+    zones_list = []
+    for z, data in by_zone.items():
+        data["costValuation"] = round(data["costValuation"], 2)
+        data["saleValuation"] = round(data["saleValuation"], 2)
+        m = data["saleValuation"] - data["costValuation"]
+        data["marginPct"] = round((m / data["saleValuation"] * 100), 2) if data["saleValuation"] > 0 else 0.0
+        zones_list.append(data)
+
+    zones_list.sort(key=lambda x: x["costValuation"], reverse=True)
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "currency": "CRC (₡)",
+        "summary": {
+            "totalSkus": total_skus,
+            "totalPhysicalUnits": total_units,
+            "totalCostValuation": round(total_cost_valuation, 2),
+            "totalSaleValuation": round(total_sale_valuation, 2),
+            "projectedGrossMarginAmount": round(gross_margin_amt, 2),
+            "projectedGrossMarginPercent": gross_margin_pct
+        },
+        "breakdownByWarehouseZone": zones_list
+    }
+
+@app.get("/api/inventory/reorder-suggestions")
+def get_reorder_suggestions():
+    """
+    Motor Automatizado de Reorden y Compras (ERPNext & InvenTree Standard).
+    Identifica SKUs bajo punto de reorden (Stock <= MinStock), calcula cantidad
+    sugerida a comprar y sugiere el proveedor homologado con presupuesto estimado.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT p.ProductId as id, p.Sku as sku, p.Name as name, p.Category as category,
+               p.CategoryLabel as categoryLabel, p.Stock as stock, p.MinStock as minStock,
+               p.CostPrice as costPrice, p.WarehouseLocation as location,
+               s.SupplierId as supplierId, s.BusinessName as supplierName, s.Phone as supplierPhone,
+               s.MobileWhatsApp as supplierWhatsApp, s.PaymentTerms as supplierTerms
+        FROM Products p
+        LEFT JOIN Suppliers s ON s.IsActive = 1 AND (
+            (p.Category = 'quimicos_limpieza' AND s.Category LIKE '%Químic%') OR
+            (p.Category IN ('bandejas_eco', 'cajas_pizza', 'bolsas_papel', 'papeleria_higiene', 'vasos_bebidas', 'envases_deli') AND s.Category LIKE '%Papel%') OR
+            (p.Category = 'bolsas_plasticas' AND s.Category LIKE '%Bolsas%')
+        )
+        WHERE p.IsActive = 1 AND p.Stock <= p.MinStock
+        ORDER BY (p.MinStock - p.Stock) DESC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+
+    suggestions = []
+    total_budget_needed = 0.0
+
+    seen_skus = set()
+    for r in rows:
+        d = dict(r)
+        if d['sku'] in seen_skus:
+            continue
+        seen_skus.add(d['sku'])
+
+        target_stock = max(d['minStock'] * 3, 50)
+        qty_to_order = max(target_stock - d['stock'], 10)
+        cost = d['costPrice'] or 0.0
+        est_amount = qty_to_order * cost
+        total_budget_needed += est_amount
+
+        suggestions.append({
+            "productId": d['id'],
+            "sku": d['sku'],
+            "name": d['name'],
+            "category": d['categoryLabel'] or d['category'],
+            "currentStock": d['stock'],
+            "minStock": d['minStock'],
+            "suggestedOrderQty": qty_to_order,
+            "unitCost": cost,
+            "estimatedOrderAmount": round(est_amount, 2),
+            "location": d['location'],
+            "suggestedSupplier": {
+                "id": d['supplierId'] or 1,
+                "name": d['supplierName'] or "Químicos Industriales Goyca S.A.",
+                "phone": d['supplierPhone'] or "2244-8800",
+                "whatsapp": d['supplierWhatsApp'] or "8844-8800",
+                "terms": d['supplierTerms'] or "Crédito 30 días"
+            }
+        })
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "currency": "CRC (₡)",
+        "totalSkusToReplenish": len(suggestions),
+        "totalEstimatedBudget": round(total_budget_needed, 2),
+        "suggestions": suggestions
+    }
+
+@app.get("/api/inventory/fefo-recommendations")
+def get_fefo_picking_recommendations():
+    """
+    Algoritmo FEFO (First Expired, First Out - Grocy & ERPNext Standard).
+    Prioriza los lotes que deben ser despachados primero por fecha de expiración próxima.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ProductId as id, Sku as sku, Name as name, Stock as stock,
+               COALESCE(BatchNumber, 'LOT-2026') as batchNumber,
+               COALESCE(ExpiryDate, '2028-12-31') as expiryDate,
+               COALESCE(HazardClass, 'NO_PELIGROSO') as hazardClass,
+               COALESCE(WarehouseLocation, 'PAS-01') as location
+        FROM Products
+        WHERE IsActive = 1 AND Stock > 0 AND ExpiryDate IS NOT NULL
+        ORDER BY ExpiryDate ASC
+        LIMIT 50
+    """)
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    today = date.today()
+    for p in rows:
+        exp_str = p['expiryDate']
+        try:
+            exp_d = datetime.strptime(exp_str[:10], "%Y-%m-%d").date()
+            p['daysRemaining'] = (exp_d - today).days
+            if p['daysRemaining'] < 0:
+                p['fefoStatus'] = 'VENCIDO - CUARENTENA'
+            elif p['daysRemaining'] <= 30:
+                p['fefoStatus'] = 'DESPACHO_URGENTE'
+            else:
+                p['fefoStatus'] = 'DISPONIBLE'
+        except Exception:
+            p['daysRemaining'] = 999
+            p['fefoStatus'] = 'DISPONIBLE'
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "policy": "FEFO (First Expired, First Out)",
+        "recommendations": rows
+    }
+
+@app.get("/api/inventory/export")
+def export_kardex_csv():
+    """
+    Exportación de Libro de Kardex y Movimientos en CSV para Auditoría Fiscal y Contable.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT MovementNumber, MovementDate, Sku, ProductName, MovementType, Quantity,
+               PreviousStock, FinalStock, UnitCost, TotalAmount, BatchNumber, ReferenceDocument, UserName, CreatedAt
+        FROM InventoryMovements
+        ORDER BY MovementId DESC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+
+    csv_lines = ["Numero_Movimiento,Fecha,SKU,Producto,Tipo_Movimiento,Cantidad,Saldo_Anterior,Saldo_Final,Costo_Unitario,Monto_Total,Lote,Documento_Referencia,Usuario,Fecha_Registro"]
+    for r in rows:
+        line = f'"{r[0]}","{r[1]}","{r[2]}","{r[3]}","{r[4]}",{r[5]},{r[6]},{r[7]},{r[8]},{r[9]},"{r[10]}","{r[11]}","{r[12]}","{r[13]}"'
+        csv_lines.append(line)
+
+    csv_content = "\n".join(csv_lines)
+    from fastapi.responses import Response
+    return Response(content=csv_content, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=kardex_fragama_oficial.csv"})
+
+@app.get("/healthz")
+def kubernetes_health():
+    """Endpoint estándar de liveness/readiness probe para contenedores Docker/Cloud."""
+    return {"status": "ok", "service": "fragama-wms", "timestamp": int(time.time())}
 
 # ==============================================================================
 # ARCHIVOS ESTÁTICOS Y ENRUTAMIENTO SPA

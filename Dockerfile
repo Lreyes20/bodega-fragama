@@ -24,5 +24,10 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8080
 
+# Healthcheck para monitor de contenedores Docker / Cloud
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-8080}/healthz || exit 1
+
 # Iniciar servidor FastAPI en el puerto asignado dinámicamente por Render ($PORT)
 CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8080}"]
+
