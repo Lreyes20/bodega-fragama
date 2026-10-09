@@ -24,6 +24,8 @@ obj/
 tunnel.log
 tunnel.pid
 fragama_local.db
+*.db-wal
+*.db-shm
 
 # Cloudflared binary
 cloudflared

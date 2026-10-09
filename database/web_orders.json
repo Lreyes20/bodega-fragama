@@ -1,5 +1,52 @@
 [
   {
+    "orderCode": "PED-WEB-53917",
+    "docType": "PEDIDO_WEB",
+    "source": "TIENDA_WEB",
+    "customerId": 9999,
+    "customerName": "Municpalidad de curridabat",
+    "customerTaxId": "3014042047",
+    "customerAddress": "jnnernñgñeirnkbnefonboiet",
+    "customerPhone": "8888-9999",
+    "assignedUserId": 6,
+    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserRole": "Vendedor",
+    "assignedUserHandle": "cpiedra",
+    "date": "2026-10-09",
+    "deliveryDate": "San José (Martes)",
+    "deliveryRoute": "San José (Martes)",
+    "terms": "Contado / Contra Entrega",
+    "status": "ALISTADO",
+    "notes": "Ruta: San José (Martes). Ruta: San José (Martes). Notas: ekrmgier´ópa´pokmge4t",
+    "items": [
+      {
+        "productId": 103,
+        "sku": "BAN-BAG-066",
+        "name": "Bandeja Hamburguesa 6x6 Bagazo de Caña",
+        "qty": 50,
+        "unitPrice": 48.0,
+        "subtotal": 2400.0
+      },
+      {
+        "productId": 104,
+        "sku": "PLA-BAG-006",
+        "name": "Plato #6 Bagazo de Caña (Paq 125u)",
+        "qty": 125,
+        "unitPrice": 75.0,
+        "subtotal": 9375.0
+      }
+    ],
+    "subtotalBruto": 11775.0,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 11775.0,
+    "iva": 1530.75,
+    "total": 13305.75,
+    "id": 108,
+    "preparedByName": "Christian Reyes",
+    "driverName": "Leonardo Reyes Hernández",
+    "stockDeducted": 0
+  },
+  {
     "orderCode": "PED-WEB-12345",
     "docType": "PEDIDO_WEB",
     "source": "TIENDA_WEB",
