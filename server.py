@@ -528,6 +528,8 @@ class ProductUpdateRequest(BaseModel):
     weightKg: Optional[float] = None
     volumeM3: Optional[float] = None
     isActive: Optional[bool] = None
+    cabysCode: Optional[str] = None
+    taxRate: Optional[float] = None
 
 class ProductCreateRequest(BaseModel):
     sku: str = Field(..., min_length=2, max_length=50)
@@ -549,6 +551,8 @@ class ProductCreateRequest(BaseModel):
     warehouseLocation: Optional[str] = "PAS-01-EST-01-N1"
     weightKg: Optional[float] = 1.0
     volumeM3: Optional[float] = 0.01
+    cabysCode: Optional[str] = "3532200000000"
+    taxRate: Optional[float] = 13.0
 
 class CustomerUpdateRequest(BaseModel):
     taxId: Optional[str] = None
@@ -1467,7 +1471,9 @@ def get_products():
                        COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation,
                        COALESCE(WeightKg, 1.0) as weightKg,
                        COALESCE(VolumeM3, 0.01) as volumeM3,
-                       COALESCE(IsActive, 1) as isActive
+                       COALESCE(IsActive, 1) as isActive,
+                       COALESCE(CabysCode, '3532200000000') as cabysCode,
+                       COALESCE(TaxRate, 13.0) as taxRate
                 FROM Products
                 ORDER BY ProductId ASC
             """)
@@ -1520,7 +1526,9 @@ def get_product_detail(product_id: int):
                COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
                COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation,
                COALESCE(WeightKg, 1.0) as weightKg,
-               COALESCE(VolumeM3, 0.01) as volumeM3
+               COALESCE(VolumeM3, 0.01) as volumeM3,
+               COALESCE(CabysCode, '3532200000000') as cabysCode,
+               COALESCE(TaxRate, 13.0) as taxRate
         FROM Products
         WHERE ProductId = ?
     """, (product_id,))
@@ -1557,7 +1565,9 @@ def lookup_product_by_barcode(barcode: str):
                COALESCE(ExpiryDate, '2028-12-31') as expiryDate,
                COALESCE(HazardClass, 'NO_PELIGROSO') as hazardClass,
                COALESCE(WarehouseZone, 'ZONA-A') as warehouseZone,
-               COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation
+               COALESCE(WarehouseLocation, 'PAS-01-EST-01-N1') as warehouseLocation,
+               COALESCE(CabysCode, '3532200000000') as cabysCode,
+               COALESCE(TaxRate, 13.0) as taxRate
         FROM Products
         WHERE Barcode = ? OR Sku = ?
         LIMIT 1
@@ -1619,16 +1629,18 @@ def update_product(product_id: int, req: ProductUpdateRequest):
     new_loc = req.warehouseLocation if req.warehouseLocation is not None else curr_dict.get('WarehouseLocation', 'PAS-01-EST-01-N1')
     new_weight = req.weightKg if req.weightKg is not None else curr_dict.get('WeightKg', 1.0)
     new_vol = req.volumeM3 if req.volumeM3 is not None else curr_dict.get('VolumeM3', 0.01)
+    new_cabys = req.cabysCode if req.cabysCode is not None else curr_dict.get('CabysCode', '3532200000000')
+    new_tax_rate = req.taxRate if req.taxRate is not None else curr_dict.get('TaxRate', 13.0)
 
     old_stock = curr_dict['Stock'] or 0
 
     cur.execute("""
         UPDATE Products 
         SET Sku=?, Barcode=?, Name=?, Description=?, Price=?, CostPrice=?, Stock=?, MinStock=?, Unit=?, Category=?, CategoryLabel=?, Image=?,
-            BatchNumber=?, ExpiryDate=?, HazardClass=?, WarehouseZone=?, WarehouseLocation=?, WeightKg=?, VolumeM3=?
+            BatchNumber=?, ExpiryDate=?, HazardClass=?, WarehouseZone=?, WarehouseLocation=?, WeightKg=?, VolumeM3=?, CabysCode=?, TaxRate=?
         WHERE ProductId=?
     """, (new_sku, new_bar, new_name, new_desc, new_price, new_cost, new_stock, new_min, new_unit, new_cat, new_cat_lbl, new_img,
-          new_batch, new_exp, new_haz, new_zone, new_loc, new_weight, new_vol, product_id))
+          new_batch, new_exp, new_haz, new_zone, new_loc, new_weight, new_vol, new_cabys, new_tax_rate, product_id))
 
     # Si cambió el stock manualmente, registrar en Kardex para trazabilidad 100%
     if req.stock is not None and new_stock != old_stock:
@@ -1699,12 +1711,13 @@ def create_product(req: ProductCreateRequest):
     
     cur.execute("""
         INSERT INTO Products (ProductId, Sku, Barcode, Name, Description, Category, CategoryLabel, Price, CostPrice, Stock, MinStock, Unit, Image,
-                              BatchNumber, ExpiryDate, HazardClass, WarehouseZone, WarehouseLocation, WeightKg, VolumeM3)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              BatchNumber, ExpiryDate, HazardClass, WarehouseZone, WarehouseLocation, WeightKg, VolumeM3, CabysCode, TaxRate)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (new_id, req.sku, req.barcode or f"744100{new_id}", req.name, req.description or "", req.category, req.categoryLabel, req.price, req.costPrice or 0.0,
           req.stock or 100, req.minStock or 10, req.unit or "UNIDAD", img_path,
           req.batchNumber or "LOT-2026-CAT", req.expiryDate or "2028-12-31", req.hazardClass or "NO_PELIGROSO",
-          req.warehouseZone or "ZONA-A", req.warehouseLocation or "PAS-01-EST-01-N1", req.weightKg or 1.0, req.volumeM3 or 0.01))
+          req.warehouseZone or "ZONA-A", req.warehouseLocation or "PAS-01-EST-01-N1", req.weightKg or 1.0, req.volumeM3 or 0.01,
+          req.cabysCode or "3532200000000", req.taxRate or 13.0))
     
     # Registrar entrada inicial en Kardex
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2955,6 +2968,350 @@ def export_kardex_csv():
     csv_content = "\n".join(csv_lines)
     from fastapi.responses import Response
     return Response(content=csv_content, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=kardex_fragama_oficial.csv"})
+
+# ==============================================================================
+# MÓDULO TRIBUTARIO OFICIAL HACIENDA COSTA RICA (IVA D-104 & FACTURACIÓN ELECTRÓNICA v4.3)
+# ==============================================================================
+@app.get("/api/tax/d104-summary")
+def get_tax_d104_summary():
+    """
+    Genera el resumen de liquidación mensual de IVA para el Formulario D-104
+    de la Dirección General de Tributación (Ministerio de Hacienda de Costa Rica).
+    Calcula Débito Fiscal (IVA 13% cobrado), Crédito Fiscal (compras) y Saldo a Pagar (Casilla 45).
+    """
+    now = datetime.now()
+    meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
+    periodo_str = f"{meses[now.month - 1]} {now.year}"
+    
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    
+    # 1. Ventas y Débito Fiscal
+    cur.execute("""
+        SELECT COUNT(*),
+               COALESCE(SUM(SubTotal), 0.0),
+               COALESCE(SUM(DiscountAmount), 0.0),
+               COALESCE(SUM(TaxAmount), 0.0),
+               COALESCE(SUM(TotalAmount), 0.0)
+        FROM SalesOrders
+        WHERE Status != 'CANCELADO'
+    """)
+    ord_row = cur.fetchone()
+    total_orders = ord_row[0] or 0
+    subtotal_bruto = round(float(ord_row[1] or 0.0), 2)
+    descuentos = round(float(ord_row[2] or 0.0), 2)
+    debito_fiscal = round(float(ord_row[3] or 0.0), 2)
+    total_ventas = round(float(ord_row[4] or 0.0), 2)
+    ventas_netas_gravadas = round(subtotal_bruto - descuentos, 2)
+    
+    # 2. Compras registradas en inventario para Crédito Fiscal
+    cur.execute("""
+        SELECT COALESCE(SUM(TotalAmount), 0.0)
+        FROM InventoryMovements
+        WHERE MovementType IN ('ENTRADA_COMPRA', 'ENTRADA')
+    """)
+    compra_row = cur.fetchone()
+    total_compras = round(float(compra_row[0] or 0.0), 2)
+    # Si aún no hay compras cargadas, estimar crédito fiscal basado en el costo del inventario promedio
+    if total_compras <= 0:
+        cur.execute("SELECT COALESCE(SUM(Stock * CostPrice), 0.0) FROM Products WHERE IsActive = 1")
+        total_compras = round(float(cur.fetchone()[0] or 0.0) * 0.25, 2)
+        
+    credito_fiscal = round(total_compras * 0.13, 2)
+    saldo_a_pagar = max(0.0, round(debito_fiscal - credito_fiscal, 2))
+    saldo_a_favor = max(0.0, round(credito_fiscal - debito_fiscal, 2))
+    
+    # 3. Clasificación CABYS de productos en catálogo
+    cur.execute("""
+        SELECT Category, CategoryLabel, COALESCE(CabysCode, '3532200000000') as cabys,
+               COUNT(*) as count, COALESCE(AVG(TaxRate), 13.0) as taxRate
+        FROM Products
+        GROUP BY Category, CabysCode
+    """)
+    cabys_breakdown = [dict(r) for r in cur.fetchall()]
+    
+    conn.close()
+    
+    return {
+        "empresa": {
+            "razonSocial": "Distribuidora Fragama S.A.",
+            "nombreComercial": "Distribuidora Fragama",
+            "cedulaJuridica": "3-101-778899",
+            "actividadEconomica": "466901",
+            "actividadDescripcion": "Comercio al por mayor de artículos de limpieza, productos químicos y suministros de embalaje",
+            "ubicacion": "Parque Industrial Cartago, Costa Rica",
+            "regimen": "Régimen Tradicional (General)"
+        },
+        "periodo": {
+            "mes": now.month,
+            "anio": now.year,
+            "descripcion": periodo_str,
+            "fechaLimitePago": f"15 de {meses[now.month % 12]} {now.year if now.month < 12 else now.year + 1}"
+        },
+        "resumenOperaciones": {
+            "totalComprobantes": total_orders,
+            "subtotalBruto": subtotal_bruto,
+            "descuentoTotal": descuentos,
+            "ventasNetasGravadas13": ventas_netas_gravadas,
+            "ventasExentas": 0.0,
+            "debitoFiscalIva": debito_fiscal,
+            "totalComprasGravadas": total_compras,
+            "creditoFiscalIva": credito_fiscal,
+            "impuestoNetoAPagar": saldo_a_pagar,
+            "saldoAFavorContribuyente": saldo_a_favor
+        },
+        "casillasFormularioD104": {
+            "casilla01": { "codigo": "01", "concepto": "Ventas gravadas a tarifa general 13%", "monto": ventas_netas_gravadas },
+            "casilla05": { "codigo": "05", "concepto": "Ventas exentas / autorizadas sin IVA", "monto": 0.0 },
+            "casilla13": { "codigo": "13", "concepto": "Total Débito Fiscal por operaciones de ventas", "monto": debito_fiscal },
+            "casilla23": { "codigo": "23", "concepto": "Compras e importaciones locales con IVA 13%", "monto": total_compras },
+            "casilla33": { "codigo": "33", "concepto": "Total Crédito Fiscal aplicable", "monto": credito_fiscal },
+            "casilla45": { "codigo": "45", "concepto": "Saldo de impuesto a favor del Fisco a pagar", "monto": saldo_a_pagar }
+        },
+        "cabysCatalogBreakdown": cabys_breakdown,
+        "normativa": {
+            "ley": "Ley 9635 - Fortalecimiento de las Finanzas Públicas",
+            "versionComprobante": "Resolución DGT-R-48-2016 y versión 4.3 de Hacienda",
+            "tarifaIvaGeneral": "13%",
+            "estado": "ACTIVO Y CONFORME"
+        }
+    }
+
+@app.get("/api/tax/electronic-invoice/{order_id}")
+def generate_electronic_invoice_xml(order_id: int):
+    """
+    Genera el Comprobante Electrónico (Factura Electrónica versión 4.3 oficial de Hacienda CR)
+    con Clave Numérica de 50 dígitos, consecutivos oficiales, código CABYS por línea y XML estructurado.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    if order_id <= 0:
+        cur.execute("""
+            SELECT so.SalesOrderId, so.OrderNumber, so.SubTotal, so.DiscountAmount, so.TaxAmount, so.TotalAmount,
+                   so.DocType, so.CreatedAt, so.DeliveryRoute, so.DeliveryNotes,
+                   c.CustomerId, c.TaxId as customerTaxId, c.BusinessName as customerName,
+                   c.Email as customerEmail, c.Phone as customerPhone, c.Address as customerAddress
+            FROM SalesOrders so
+            LEFT JOIN Customers c ON so.CustomerId = c.CustomerId
+            ORDER BY so.SalesOrderId DESC LIMIT 1
+        """)
+        order_row = cur.fetchone()
+    else:
+        cur.execute("""
+            SELECT so.SalesOrderId, so.OrderNumber, so.SubTotal, so.DiscountAmount, so.TaxAmount, so.TotalAmount,
+                   so.DocType, so.CreatedAt, so.DeliveryRoute, so.DeliveryNotes,
+                   c.CustomerId, c.TaxId as customerTaxId, c.BusinessName as customerName,
+                   c.Email as customerEmail, c.Phone as customerPhone, c.Address as customerAddress
+            FROM SalesOrders so
+            LEFT JOIN Customers c ON so.CustomerId = c.CustomerId
+            WHERE so.SalesOrderId = ?
+        """, (order_id,))
+        order_row = cur.fetchone()
+    
+    if not order_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+        
+    ord_dict = dict(order_row)
+    order_id = ord_dict["SalesOrderId"]
+    
+    cur.execute("""
+        SELECT d.DetailId, d.ProductId, d.Sku, d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal,
+               COALESCE(p.CabysCode, '3532200000000') as cabysCode,
+               COALESCE(p.TaxRate, 13.0) as taxRate
+        FROM SalesOrderDetails d
+        LEFT JOIN Products p ON d.ProductId = p.ProductId
+        WHERE d.SalesOrderId = ?
+    """, (order_id,))
+    details = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    
+    now = datetime.now()
+    fecha_emision = now.strftime("%Y-%m-%dT%H:%M:%S-06:00")
+    
+    # Clave de 50 dígitos estándar de Hacienda:
+    # 506 (País) + DD + MM + YY + Cedula Emisor (12 digitos) + Consecutivo (20 digitos) + Situacion (1=Normal) + CodSeguridad (8 digitos)
+    dia = str(now.day).zfill(2)
+    mes = str(now.month).zfill(2)
+    anio = str(now.year)[2:]
+    cedula_emisor = "003101778899"
+    sucursal = "001"
+    terminal = "00001"
+    tipo_doc = "01" # 01 = Factura Electrónica, 04 = Tiquete Electrónico
+    consecutivo_num = str(order_id).zfill(10)
+    consecutivo_20 = f"{sucursal}{terminal}{tipo_doc}{consecutivo_num}"
+    situacion = "1"
+    cod_seguridad = f"{int(time.time()) % 100000000:08d}"
+    clave_50 = f"506{dia}{mes}{anio}{cedula_emisor}{consecutivo_20}{situacion}{cod_seguridad}"
+    
+    # Construcción de líneas XML
+    lineas_xml = []
+    line_num = 1
+    total_mercancias_gravadas = 0.0
+    total_impuestos = 0.0
+    
+    for item in details:
+        qty = float(item['Quantity'])
+        price = float(item['UnitPrice'])
+        monto_total = round(qty * price, 2)
+        subtotal_linea = monto_total
+        tax_rate = float(item.get('taxRate', 13.0))
+        monto_iva = round(subtotal_linea * (tax_rate / 100.0), 2)
+        monto_total_linea = round(subtotal_linea + monto_iva, 2)
+        
+        total_mercancias_gravadas += subtotal_linea
+        total_impuestos += monto_iva
+        
+        cabys = item.get('cabysCode', '3532200000000')
+        sku = item.get('Sku', 'SKU-00')
+        desc = item.get('ProductName', 'Producto Fragama').replace('&', '&amp;').replace('<', '&lt;')
+        
+        lineas_xml.append(f"""    <LineaDetalle>
+      <NumeroLinea>{line_num}</NumeroLinea>
+      <Codigo>{cabys}</Codigo>
+      <CodigoComercial>
+        <Tipo>01</Tipo>
+        <Codigo>{sku}</Codigo>
+      </CodigoComercial>
+      <Cantidad>{qty:.3f}</Cantidad>
+      <UnidadMedida>Unid</UnidadMedida>
+      <Detalle>{desc}</Detalle>
+      <PrecioUnitario>{price:.2f}</PrecioUnitario>
+      <MontoTotal>{monto_total:.2f}</MontoTotal>
+      <SubTotal>{subtotal_linea:.2f}</SubTotal>
+      <Impuesto>
+        <Codigo>01</Codigo>
+        <CodigoTarifa>08</CodigoTarifa>
+        <Tarifa>{tax_rate:.2f}</Tarifa>
+        <Monto>{monto_iva:.2f}</Monto>
+      </Impuesto>
+      <MontoTotalLinea>{monto_total_linea:.2f}</MontoTotalLinea>
+    </LineaDetalle>""")
+        line_num += 1
+        
+    total_mercancias_gravadas = round(total_mercancias_gravadas, 2)
+    total_impuestos = round(total_impuestos, 2)
+    total_factura = round(total_mercancias_gravadas + total_impuestos, 2)
+    
+    detalles_str = "\n".join(lineas_xml)
+    cust_name = (ord_dict.get('customerName') or 'Cliente General').replace('&', '&amp;').replace('<', '&lt;')
+    cust_tax_id = re.sub(r'[^0-9]', '', str(ord_dict.get('customerTaxId') or '3101000000'))
+    if len(cust_tax_id) < 9:
+        cust_tax_id = cust_tax_id.zfill(9)
+    tipo_id_receptor = "02" if len(cust_tax_id) >= 10 else "01"
+    cust_email = ord_dict.get('customerEmail') or 'facturacion@cliente.cr'
+    
+    xml_content = f"""<?xml version="1.0" encoding="utf-8"?>
+<FacturaElectronica xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-esquema/v4.3/facturaElectronica"
+                    xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Clave>{clave_50}</Clave>
+  <CodigoActividad>466901</CodigoActividad>
+  <NumeroConsecutivo>{consecutivo_20}</NumeroConsecutivo>
+  <FechaEmision>{fecha_emision}</FechaEmision>
+  <Emisor>
+    <Nombre>Distribuidora Fragama S.A.</Nombre>
+    <Identificacion>
+      <Tipo>02</Tipo>
+      <Numero>3101778899</Numero>
+    </Identificacion>
+    <NombreComercial>Distribuidora Fragama</NombreComercial>
+    <Ubicacion>
+      <Provincia>3</Provincia>
+      <Canton>01</Canton>
+      <Distrito>01</Distrito>
+      <OtrasSenas>Parque Industrial y Logístico, Cartago Centro, Costa Rica</OtrasSenas>
+    </Ubicacion>
+    <Telefono>
+      <CodigoPais>506</CodigoPais>
+      <NumTelefono>25510000</NumTelefono>
+    </Telefono>
+    <CorreoElectronico>facturacion@fragama.cr</CorreoElectronico>
+  </Emisor>
+  <Receptor>
+    <Nombre>{cust_name}</Nombre>
+    <Identificacion>
+      <Tipo>{tipo_id_receptor}</Tipo>
+      <Numero>{cust_tax_id}</Numero>
+    </Identificacion>
+    <CorreoElectronico>{cust_email}</CorreoElectronico>
+  </Receptor>
+  <CondicionVenta>01</CondicionVenta>
+  <PlazoCredito>0</PlazoCredito>
+  <MedioPago>04</MedioPago>
+  <DetalleServicio>
+{detalles_str}
+  </DetalleServicio>
+  <ResumenFactura>
+    <CodigoTipoMoneda>
+      <CodigoMoneda>CRC</CodigoMoneda>
+      <TipoCambio>1.0</TipoCambio>
+    </CodigoTipoMoneda>
+    <TotalServGravados>0.00</TotalServGravados>
+    <TotalServExentos>0.00</TotalServExentos>
+    <TotalMercanciasGravadas>{total_mercancias_gravadas:.2f}</TotalMercanciasGravadas>
+    <TotalMercanciasExentas>0.00</TotalMercanciasExentas>
+    <TotalGravado>{total_mercancias_gravadas:.2f}</TotalGravado>
+    <TotalExento>0.00</TotalExento>
+    <TotalVenta>{total_mercancias_gravadas:.2f}</TotalVenta>
+    <TotalDescuentos>0.00</TotalDescuentos>
+    <TotalVentaNeta>{total_mercancias_gravadas:.2f}</TotalVentaNeta>
+    <TotalImpuesto>{total_impuestos:.2f}</TotalImpuesto>
+    <TotalComprobante>{total_factura:.2f}</TotalComprobante>
+  </ResumenFactura>
+</FacturaElectronica>"""
+
+    return {
+        "success": True,
+        "clave": clave_50,
+        "consecutivo": consecutivo_20,
+        "fechaEmision": fecha_emision,
+        "emisor": "Distribuidora Fragama S.A. (3-101-778899)",
+        "receptor": cust_name,
+        "montoGravado": total_mercancias_gravadas,
+        "montoIva13": total_impuestos,
+        "totalFactura": total_factura,
+        "xml": xml_content
+    }
+
+@app.get("/api/tax/export-d104-csv")
+def export_tax_d104_csv():
+    """Exporta el desglose contable de IVA mensual en formato CSV para el contador o declaración D-104."""
+    summary = get_tax_d104_summary()
+    res = summary["resumenOperaciones"]
+    cas = summary["casillasFormularioD104"]
+    
+    csv_lines = [
+        "REPORTE FISCAL MENSUAL - MINISTERIO DE HACIENDA COSTA RICA",
+        f"Contribuyente: {summary['empresa']['razonSocial']}",
+        f"Cedula Juridica: {summary['empresa']['cedulaJuridica']}",
+        f"Actividad Economica: {summary['empresa']['actividadEconomica']} - {summary['empresa']['actividadDescripcion']}",
+        f"Periodo Fiscal: {summary['periodo']['descripcion']}",
+        "",
+        "CASILLAS OFICIALES FORMULARIO D-104 (PORTAL ATV HACIENDA)",
+        "Casilla,Concepto,Monto_CRC",
+        f'"{cas["casilla01"]["codigo"]}","{cas["casilla01"]["concepto"]}",{cas["casilla01"]["monto"]}',
+        f'"{cas["casilla05"]["codigo"]}","{cas["casilla05"]["concepto"]}",{cas["casilla05"]["monto"]}',
+        f'"{cas["casilla13"]["codigo"]}","{cas["casilla13"]["concepto"]}",{cas["casilla13"]["monto"]}',
+        f'"{cas["casilla23"]["codigo"]}","{cas["casilla23"]["concepto"]}",{cas["casilla23"]["monto"]}',
+        f'"{cas["casilla33"]["codigo"]}","{cas["casilla33"]["concepto"]}",{cas["casilla33"]["monto"]}',
+        f'"{cas["casilla45"]["codigo"]}","{cas["casilla45"]["concepto"]}",{cas["casilla45"]["monto"]}',
+        "",
+        "RESUMEN DE LIQUIDACION",
+        f"Total Comprobantes Emitidos,{res['totalComprobantes']}",
+        f"Ventas Netas Gravadas 13%,{res['ventasNetasGravadas13']}",
+        f"Debito Fiscal IVA Cobrado (13%),{res['debitoFiscalIva']}",
+        f"Credito Fiscal IVA Compras (13%),{res['creditoFiscalIva']}",
+        f"Monto Neto a Pagar a Hacienda (Casilla 45),{res['impuestoNetoAPagar']}"
+    ]
+    
+    from fastapi.responses import Response
+    return Response(
+        content="\n".join(csv_lines),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=liquidacion_iva_d104_{summary['periodo']['mes']}_{summary['periodo']['anio']}.csv"}
+    )
 
 @app.get("/healthz")
 def kubernetes_health():

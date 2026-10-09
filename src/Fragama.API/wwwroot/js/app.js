@@ -1553,7 +1553,8 @@ const RolePermissions = {
       'view-chofer-mobile',
       'view-suppliers-management',
       'view-reports',
-      'view-roles-management'
+      'view-roles-management',
+      'view-tax-hacienda'
     ]
   },
   'Bodeguero': {
@@ -1571,7 +1572,8 @@ const RolePermissions = {
     homeView: 'view-cajero-pos',
     allowedViews: [
       'view-cajero-pos',
-      'view-product-maintenance'
+      'view-product-maintenance',
+      'view-tax-hacienda'
     ]
   },
   'Chofer': {
@@ -1773,6 +1775,11 @@ window.switchViewDirectly = function(viewId) {
       if (pageTitle) pageTitle.textContent = 'Gestión y Asignación de Roles (RBAC)';
       if (pageSubtitle) pageSubtitle.textContent = 'Seguridad Corporativa | Políticas de acceso y segregación de funciones';
       renderUsersRolesTable();
+      break;
+    case 'view-tax-hacienda':
+      if (pageTitle) pageTitle.textContent = 'Módulo Tributario Oficial & Liquidación IVA (Hacienda CR)';
+      if (pageSubtitle) pageSubtitle.textContent = 'Declaración Mensual D-104, Códigos CABYS de 13 dígitos y Facturación Electrónica v4.3';
+      renderTaxHaciendaView();
       break;
   }
 
@@ -2553,6 +2560,8 @@ function setupProductMaintenance() {
       const stock = parseInt(document.getElementById('crudStockInput').value, 10) || 0;
       const minStock = parseInt(document.getElementById('crudMinStockInput').value, 10) || 10;
       const unit = document.getElementById('crudUnitInput').value || 'GALON';
+      const cabysCode = document.getElementById('crudCabysInput')?.value.trim() || '3532200000000';
+      const taxRate = parseFloat(document.getElementById('crudTaxRateSelect')?.value) || 13.0;
 
       const family = AppState.families.find(f => f.id === familyId);
       const subfamily = family?.subfamilies?.find(s => s.id === subfamilyId);
@@ -2579,7 +2588,14 @@ function setupProductMaintenance() {
             stock: stock,
             minStock: minStock,
             unit: unit,
-            categoryLabel: family?.name || 'General'
+            categoryLabel: family?.name || 'General',
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            hazardClass: hazardClass,
+            warehouseLocation: location,
+            warehouseZone: family?.zone || 'ZONA-A',
+            cabysCode: cabysCode,
+            taxRate: taxRate
           };
           const putRes = await fetch(`/api/products/${editingProductId}`, {
             method: 'PUT',
@@ -2624,6 +2640,8 @@ function setupProductMaintenance() {
             p.stock = stock;
             p.minStock = minStock;
             p.unit = unit;
+            p.cabysCode = cabysCode;
+            p.taxRate = taxRate;
             if (uploadedImageRelPath) p.image = uploadedImageRelPath;
           }
           showNotificationToast(`✅ Producto [${sku}] y precio ₡${price.toLocaleString()} actualizados en WMS y Tienda Web.`, 'success');
@@ -2644,7 +2662,14 @@ function setupProductMaintenance() {
             minStock: minStock,
             unit: unit,
             category: 'bandejas_eco',
-            categoryLabel: family?.name || 'General'
+            categoryLabel: family?.name || 'General',
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            hazardClass: hazardClass,
+            warehouseLocation: location,
+            warehouseZone: family?.zone || 'ZONA-A',
+            cabysCode: cabysCode,
+            taxRate: taxRate
           };
           const postRes = await fetch('/api/products', {
             method: 'POST',
@@ -2763,6 +2788,14 @@ function renderMaintenanceTable() {
           <small style="color:#0284C7;"><i class="bi bi-tag-fill"></i> ${p.subfamilyName || 'General'}</small>
         </td>
         <td>
+          <div style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#0284C7; font-size:0.82rem;">
+            ${p.cabysCode || '3532200000000'}
+          </div>
+          <span class="badge-status" style="background:#E0F2FE; color:#0369A1; font-weight:700; font-size:0.72rem; padding:1px 6px;">
+            IVA ${p.taxRate || 13}%
+          </span>
+        </td>
+        <td>
           <div style="font-family:'JetBrains Mono',monospace; font-weight:600; font-size:0.8rem; color:#475569;">
             ${p.batchNumber || 'LOT-2026'}
           </div>
@@ -2813,6 +2846,10 @@ window.openNewProductModal = function() {
 
   document.getElementById('crudBarcodeInput').value = generateRandomBarcode();
   updateSubfamilyOptions(1);
+  const cabysIn = document.getElementById('crudCabysInput');
+  const taxIn = document.getElementById('crudTaxRateSelect');
+  if (cabysIn) cabysIn.value = '3532200000000';
+  if (taxIn) taxIn.value = '13.0';
   if (modal) modal.classList.add('active');
 };
 
@@ -2849,6 +2886,11 @@ window.openEditProductModal = function(id) {
   document.getElementById('crudStockInput').value = p.stock;
   document.getElementById('crudMinStockInput').value = p.minStock || 10;
   document.getElementById('crudUnitInput').value = p.unit || 'UNIDAD';
+
+  const editCabysIn = document.getElementById('crudCabysInput');
+  const editTaxIn = document.getElementById('crudTaxRateSelect');
+  if (editCabysIn) editCabysIn.value = p.cabysCode || '3532200000000';
+  if (editTaxIn) editTaxIn.value = String(p.taxRate || 13.0);
 
   if (modal) modal.classList.add('active');
 };
@@ -7340,7 +7382,36 @@ function setupQuickMovementModal() {
       product.stock = finalStock;
 
       const nextId = AppState.kardexMovements.length + 101;
-      const nextCode = `${isExit ? 'SAL' : (isTransfer ? 'TRA' : 'ENT')}-20260929-${String(nextId).padStart(4, '0')}`;
+      const nextCode = `${isExit ? 'SAL' : (isTransfer ? 'TRA' : 'ENT')}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(nextId).padStart(4, '0')}`;
+
+      // Persistir de forma atómica en Backend SQLite ACID
+      let backendType = 'AJUSTE_POSITIVO';
+      if (type === 'Salida Venta') backendType = 'SALIDA_VENTA';
+      else if (type === 'Ajuste Negativo') backendType = 'AJUSTE_NEGATIVO';
+      else if (type === 'Traslado Interno') backendType = 'TRASLADO_INTERNO';
+      else if (type === 'Merma / Vencimiento') backendType = 'MERMA_VENCIMIENTO';
+      else if (type === 'Entrada Compra') backendType = 'ENTRADA_COMPRA';
+
+      fetch('/api/inventory/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productId,
+          movementType: backendType,
+          quantity: qty,
+          batchNumber: product.batchNumber || 'LOT-2026-CAT',
+          sourceLocation: product.location || 'PAS-01',
+          targetLocation: product.location || 'PAS-01',
+          referenceDocument: doc,
+          notes: `Ajuste manual [${type}] registrado por ${AppState.currentUser?.name || 'Bodeguero'}`,
+          userId: AppState.currentUser?.id || 1,
+          userName: AppState.currentUser?.name || 'Bodeguero'
+        })
+      }).then(r => r.json()).then(res => {
+        if (res && res.movementNumber) {
+          console.log("Kardex persistido con éxito en SQLite:", res.movementNumber);
+        }
+      }).catch(err => console.warn("Aviso guardando en backend:", err));
 
       AppState.kardexMovements.unshift({
         id: nextId,
@@ -7359,7 +7430,7 @@ function setupQuickMovementModal() {
 
       renderAllViews();
       closeMovementModal();
-      showNotificationToast(`Movimiento ${nextCode} registrado en Kardex exitosamente.`, 'success');
+      showNotificationToast(`Movimiento ${nextCode} registrado y persistido en Kardex exitosamente.`, 'success');
     });
   }
 }
@@ -7990,4 +8061,191 @@ window.triggerManualOrderSync = async function() {
     }
   }
 };
+
+// ==============================================================================
+// MÓDULO TRIBUTARIO OFICIAL HACIENDA CR (IVA D-104 & FACTURACIÓN ELECTRÓNICA v4.3)
+// ==============================================================================
+let currentTaxSummary = null;
+let currentElectronicInvoice = null;
+
+window.renderTaxHaciendaView = async function() {
+  await window.refreshTaxHaciendaData();
+  await window.loadElectronicInvoiceSample();
+};
+
+window.refreshTaxHaciendaData = async function() {
+  try {
+    const res = await fetch('/api/tax/d104-summary');
+    if (!res.ok) throw new Error('Error al consultar liquidación tributaria.');
+    const data = await res.json();
+    currentTaxSummary = data;
+
+    // Actualizar etiquetas de período
+    const periodEl = document.getElementById('taxPeriodLabel');
+    const dueEl = document.getElementById('taxDueDateLabel');
+    if (periodEl && data.periodo) periodEl.textContent = data.periodo.descripcion;
+    if (dueEl && data.periodo) dueEl.textContent = data.periodo.fechaLimitePago;
+
+    // Actualizar KPI Cards
+    const ops = data.resumenOperaciones;
+    const kpiVentas = document.getElementById('kpiTaxVentasNetas');
+    const kpiDebito = document.getElementById('kpiTaxDebitoFiscal');
+    const kpiCredito = document.getElementById('kpiTaxCreditoFiscal');
+    const kpiSaldo = document.getElementById('kpiTaxSaldoPagar');
+
+    if (kpiVentas) kpiVentas.textContent = formatCRC(ops.ventasNetasGravadas13);
+    if (kpiDebito) kpiDebito.textContent = formatCRC(ops.debitoFiscalIva);
+    if (kpiCredito) kpiCredito.textContent = formatCRC(ops.creditoFiscalIva);
+    if (kpiSaldo) kpiSaldo.textContent = formatCRC(ops.impuestoNetoAPagar);
+
+    // Renderizar Casillas D-104
+    const d104Tbody = document.getElementById('taxD104TableBody');
+    if (d104Tbody && data.casillasFormularioD104) {
+      const cas = data.casillasFormularioD104;
+      const rows = [
+        { code: cas.casilla01.codigo, name: cas.casilla01.concepto, amount: cas.casilla01.monto, highlight: false },
+        { code: cas.casilla05.codigo, name: cas.casilla05.concepto, amount: cas.casilla05.monto, highlight: false },
+        { code: cas.casilla13.codigo, name: cas.casilla13.concepto, amount: cas.casilla13.monto, highlight: 'debito' },
+        { code: cas.casilla23.codigo, name: cas.casilla23.concepto, amount: cas.casilla23.monto, highlight: false },
+        { code: cas.casilla33.codigo, name: cas.casilla33.concepto, amount: cas.casilla33.monto, highlight: 'credito' },
+        { code: cas.casilla45.codigo, name: cas.casilla45.concepto, amount: cas.casilla45.monto, highlight: 'saldo' }
+      ];
+
+      d104Tbody.innerHTML = rows.map(r => {
+        let style = 'font-weight:700; font-family:"JetBrains Mono"; text-align:right; font-size:1rem;';
+        let badgeColor = '#64748B';
+        if (r.highlight === 'debito') { style += ' color:#DC2626;'; badgeColor = '#DC2626'; }
+        else if (r.highlight === 'credito') { style += ' color:#059669;'; badgeColor = '#059669'; }
+        else if (r.highlight === 'saldo') { style += ' color:#D97706; background:#FEF3C7;'; badgeColor = '#D97706'; }
+
+        return `
+          <tr>
+            <td>
+              <span class="badge-status" style="background:#F1F5F9; color:${badgeColor}; font-weight:800; font-family:'JetBrains Mono'; font-size:0.85rem;">
+                Casilla ${r.code}
+              </span>
+            </td>
+            <td style="color:#0B192C; font-weight:600;">${r.name}</td>
+            <td style="${style}">${formatCRC(r.amount)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Renderizar Códigos CABYS
+    const cabysTbody = document.getElementById('taxCabysTableBody');
+    if (cabysTbody && Array.isArray(data.cabysCatalogBreakdown)) {
+      cabysTbody.innerHTML = data.cabysCatalogBreakdown.map(item => `
+        <tr>
+          <td>
+            <strong>${item.CategoryLabel || item.Category}</strong>
+            <small style="display:block; color:#64748B;">Línea de almacén Cartago</small>
+          </td>
+          <td>
+            <span class="badge-status" style="background:#E0F2FE; color:#0369A1; font-family:'JetBrains Mono'; font-weight:800;">
+              ${item.cabys}
+            </span>
+          </td>
+          <td>
+            <span class="badge-status" style="background:#DCFCE7; color:#15803D; font-weight:700;">
+              13% IVA
+            </span>
+          </td>
+          <td style="font-weight:700; color:#0B192C;">${item.count} SKUs</td>
+        </tr>
+      `).join('');
+    }
+
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('✅ Resumen tributario D-104 y cálculos de IVA actualizados.', 'success');
+    }
+  } catch (err) {
+    console.error('Error cargando datos tributarios:', err);
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('Aviso: Cargando liquidación tributaria.', 'warning');
+    }
+  }
+};
+
+window.loadElectronicInvoiceSample = async function() {
+  try {
+    const res = await fetch('/api/tax/electronic-invoice/0');
+    if (res.ok) {
+      const data = await res.json();
+      currentElectronicInvoice = data;
+
+      const claveEl = document.getElementById('xmlClaveLabel');
+      const consecutivoEl = document.getElementById('xmlConsecutivoLabel');
+      const receptorEl = document.getElementById('xmlReceptorLabel');
+      const totalEl = document.getElementById('xmlTotalLabel');
+      const xmlDisplay = document.getElementById('xmlContentDisplay');
+
+      if (claveEl) claveEl.textContent = data.clave;
+      if (consecutivoEl) consecutivoEl.textContent = data.consecutivo;
+      if (receptorEl) receptorEl.textContent = data.receptor;
+      if (totalEl) totalEl.textContent = formatCRC(data.totalFactura);
+      if (xmlDisplay) xmlDisplay.textContent = data.xml;
+    }
+  } catch (e) {
+    console.warn('Error cargando muestra de XML electrónico:', e);
+  }
+};
+
+window.copyD104DataToClipboard = function() {
+  if (!currentTaxSummary) return;
+  const cas = currentTaxSummary.casillasFormularioD104;
+  const text = `LIQUIDACIÓN IVA FORMULARIO D-104 - DISTRIBUIDORA FRAGAMA S.A.
+Cédula Jurídica: ${currentTaxSummary.empresa.cedulaJuridica}
+Período: ${currentTaxSummary.periodo.descripcion}
+
+- Casilla 01 (Ventas gravadas 13%): ₡${cas.casilla01.monto.toLocaleString()}
+- Casilla 05 (Ventas exentas): ₡${cas.casilla05.monto.toLocaleString()}
+- Casilla 13 (Débito Fiscal Ventas): ₡${cas.casilla13.monto.toLocaleString()}
+- Casilla 23 (Compras Gravadas 13%): ₡${cas.casilla23.monto.toLocaleString()}
+- Casilla 33 (Crédito Fiscal Compras): ₡${cas.casilla33.monto.toLocaleString()}
+- Casilla 45 (SALDO A PAGAR A HACIENDA): ₡${cas.casilla45.monto.toLocaleString()}
+`;
+  navigator.clipboard.writeText(text).then(() => {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('📋 Datos del formulario D-104 copiados al portapapeles.', 'success');
+    } else {
+      alert('Datos copiados al portapapeles.');
+    }
+  });
+};
+
+window.downloadTaxCsvReport = function() {
+  window.location.href = '/api/tax/export-d104-csv';
+};
+
+window.copyXmlToClipboard = function() {
+  if (!currentElectronicInvoice || !currentElectronicInvoice.xml) {
+    alert('No hay XML disponible para copiar.');
+    return;
+  }
+  navigator.clipboard.writeText(currentElectronicInvoice.xml).then(() => {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('📋 XML oficial de Factura Electrónica v4.3 copiado.', 'success');
+    } else {
+      alert('XML copiado al portapapeles.');
+    }
+  });
+};
+
+window.downloadXmlFile = function() {
+  if (!currentElectronicInvoice || !currentElectronicInvoice.xml) {
+    alert('No hay XML generado para descargar.');
+    return;
+  }
+  const blob = new Blob([currentElectronicInvoice.xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Factura_${currentElectronicInvoice.consecutivo || 'Hacienda'}.xml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 

@@ -15,7 +15,9 @@
     "imageIcon": "bi-box2-heart",
     "image": "img/catalog/prod_101.jpg",
     "costPrice": 74.89999999999999,
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 102,
@@ -32,7 +34,9 @@
     "description": "Bandeja cuadrada de bagazo de caña resistente para almuerzos y comidas calientes.",
     "imageIcon": "bi-box2",
     "image": "img/catalog/prod_102.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 103,
@@ -49,7 +53,9 @@
     "description": "Bandeja tipo almeja perfecta para hamburguesas, repostería y porciones individuales.",
     "imageIcon": "bi-archive",
     "image": "img/catalog/prod_103.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 104,
@@ -67,7 +73,9 @@
     "description": "Plato pastelero/postre biodegradable y resistente a cortes y salsas.",
     "imageIcon": "bi-disc",
     "image": "img/catalog/prod_104.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 105,
@@ -85,7 +93,9 @@
     "description": "Plato grande para almuerzos ejecutivos y eventos, 100% compostable.",
     "imageIcon": "bi-record-circle",
     "image": "img/catalog/prod_105.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 106,
@@ -102,7 +112,9 @@
     "description": "Bandeja rectangular almeja ecológica para comidas completas con acompañamientos.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_106.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 107,
@@ -119,7 +131,9 @@
     "description": "Bowl kraft redondo térmico para ensaladas, sopas, poke bowls y pastas.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_107.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 108,
@@ -136,7 +150,9 @@
     "description": "Bowl kraft extra grande para porciones familiares, sopas y comidas completas.",
     "imageIcon": "bi-cup-hot",
     "image": "img/catalog/prod_108.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 109,
@@ -153,7 +169,9 @@
     "description": "Bandeja térmica con polipropileno reforzado con minerales, apta para microondas.",
     "imageIcon": "bi-box-seam-fill",
     "image": "img/catalog/prod_109.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 110,
@@ -170,7 +188,9 @@
     "description": "Bandeja almeja para hamburguesas y bocadillos, bisagra resistente.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_110.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 111,
@@ -187,7 +207,9 @@
     "description": "Bandeja cuadrada térmica de alta rigidez para servicio express.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_111.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 112,
@@ -204,7 +226,9 @@
     "description": "Bandeja MFPP color negro mate para presentación ejecutiva y gourmet.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_112.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 113,
@@ -221,7 +245,9 @@
     "description": "Bandeja formato intermedio de excelente calidad estructural para comidas calientes.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_113.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 114,
@@ -238,7 +264,9 @@
     "description": "Bandeja grande multi-compartimento para casados y banquetes.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_114.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 115,
@@ -255,7 +283,9 @@
     "description": "Bandeja abierta diseño rojo/blanco para papas, nuggets y tacos.",
     "imageIcon": "bi-basket2",
     "image": "img/catalog/prod_115.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 116,
@@ -272,7 +302,9 @@
     "description": "Bandeja de cartón rígida para hot dogs y raciones intermedias.",
     "imageIcon": "bi-basket2",
     "image": "img/catalog/prod_116.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 117,
@@ -289,7 +321,9 @@
     "description": "Bandeja resistente a la grasa para combos de comida rápida.",
     "imageIcon": "bi-basket2",
     "image": "img/catalog/prod_117.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 118,
@@ -306,7 +340,9 @@
     "description": "Bandeja tamaño grande de 2 lb para porciones familiares y parrilladas.",
     "imageIcon": "bi-basket2",
     "image": "img/catalog/prod_118.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 119,
@@ -323,7 +359,9 @@
     "description": "Envase burbuja transparente con cierre seguro para postres y pastelería.",
     "imageIcon": "bi-box-arrow-in-up-right",
     "image": "img/catalog/prod_119.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 120,
@@ -340,7 +378,9 @@
     "description": "Envase burbuja mediano transparente para porciones individuales.",
     "imageIcon": "bi-box-arrow-in-up-right",
     "image": "img/catalog/prod_120.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 121,
@@ -357,7 +397,9 @@
     "description": "Envase burbuja grande para queques, ensaladas frías y bocadillos.",
     "imageIcon": "bi-box-arrow-in-up-right",
     "image": "img/catalog/prod_121.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 122,
@@ -374,7 +416,9 @@
     "description": "Envase burbuja extra grande de alta visibilidad y sellado hermético.",
     "imageIcon": "bi-box-arrow-in-up-right",
     "image": "img/catalog/prod_122.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 123,
@@ -391,7 +435,9 @@
     "description": "Envase triangular de perfil alto diseñado para porciones de pie, cheesecake y tartas.",
     "imageIcon": "bi-triangle",
     "image": "img/catalog/prod_123.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 124,
@@ -409,7 +455,9 @@
     "description": "Base negra de almidón de maíz con tapa antifog antivaho. Resistente al calor y frío.",
     "imageIcon": "bi-egg-fried",
     "image": "img/catalog/prod_124.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215900000000",
+    "taxRate": 13.0
   },
   {
     "id": 201,
@@ -427,7 +475,9 @@
     "description": "Envase translúcido deli redondo con tapa a presión, ideal para ensaladas frías, postres y dips.",
     "imageIcon": "bi-circle",
     "image": "img/catalog/prod_201.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 202,
@@ -445,7 +495,9 @@
     "description": "Envase deli de 12oz con tapa de sellado hermético antiderrame.",
     "imageIcon": "bi-circle",
     "image": "img/catalog/prod_202.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 203,
@@ -463,7 +515,9 @@
     "description": "Envase de alta capacidad 24oz con tapa para comidas completas y ensaladas.",
     "imageIcon": "bi-circle",
     "image": "img/catalog/prod_203.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 204,
@@ -481,7 +535,9 @@
     "description": "Taza china color verde capacidad entera con tapa para sopas y arroz.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_204.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 205,
@@ -499,7 +555,9 @@
     "description": "Taza china media porción color verde con tapa incluida.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_205.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 206,
@@ -517,7 +575,9 @@
     "description": "Envase verde resistente al ácido cítrico y frío, especial ceviches.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_206.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 207,
@@ -535,7 +595,9 @@
     "description": "Taza china tradicional blanca tamaño entero con tapa ajustada.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_207.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 208,
@@ -553,7 +615,9 @@
     "description": "Taza china blanca medio tamaño para entradas y acompañamientos.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_208.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 209,
@@ -571,7 +635,9 @@
     "description": "Taza china cristalina para lucir el producto preparado con tapa.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_209.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 210,
@@ -589,7 +655,9 @@
     "description": "Taza china entera cristalina reforzada con tapa hermética.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_210.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 211,
@@ -607,7 +675,9 @@
     "description": "Copa soufflé pequeña para salsas, chiles, aderezos y degustaciones.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_211.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 212,
@@ -625,7 +695,9 @@
     "description": "Copa soufflé estándar para chimichurri, mayonesa y queso rallado.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_212.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 213,
@@ -643,7 +715,9 @@
     "description": "Copa soufflé mediana para porciones de guacamole y frijoles molidos.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_213.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 214,
@@ -661,7 +735,9 @@
     "description": "Copa soufflé de 4oz con tapa ajustada para ensaladitas y aderezos.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_214.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 215,
@@ -679,7 +755,9 @@
     "description": "Copa soufflé capacidad amplia para postres y ensaladas pequeñas.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_215.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 216,
@@ -697,7 +775,9 @@
     "description": "Envase soufflé 5oz con tapa abombada para cupcakes y postres decorados.",
     "imageIcon": "bi-stars",
     "image": "img/catalog/prod_216.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 217,
@@ -715,7 +795,9 @@
     "description": "Cubiertos individuales sellados herméticamente con servilleta incluida. Máxima inocuidad.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_217.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 218,
@@ -732,7 +814,9 @@
     "description": "Cuchara plástica resistente blanca #7 para postres y helados.",
     "imageIcon": "bi-slash-circle",
     "image": "img/catalog/prod_218.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 219,
@@ -749,7 +833,9 @@
     "description": "Tenedor blanco estándar con dientes reforzados.",
     "imageIcon": "bi-slash-circle",
     "image": "img/catalog/prod_219.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 220,
@@ -766,7 +852,9 @@
     "description": "Cuchillo blanco con filo dentado para carnes y comida express.",
     "imageIcon": "bi-slash-circle",
     "image": "img/catalog/prod_220.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 221,
@@ -783,7 +871,9 @@
     "description": "Cuchara honda especial para caldos, ollas de carne y sopas.",
     "imageIcon": "bi-slash-circle",
     "image": "img/catalog/prod_221.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 222,
@@ -800,7 +890,9 @@
     "description": "Spork híbrido versátil para ensaladas y postres.",
     "imageIcon": "bi-slash-circle",
     "image": "img/catalog/prod_222.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 223,
@@ -817,7 +909,9 @@
     "description": "Cuchara pequeña económica para café y nieves.",
     "imageIcon": "bi-slash-circle",
     "image": "img/catalog/prod_223.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 224,
@@ -834,7 +928,9 @@
     "description": "Removedor plástico corto blanco para tazas de café.",
     "imageIcon": "bi-dash-lg",
     "image": "img/catalog/prod_224.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 225,
@@ -851,7 +947,9 @@
     "description": "Removedor largo para vasos térmicos de 12oz a 16oz.",
     "imageIcon": "bi-dash-lg",
     "image": "img/catalog/prod_225.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 226,
@@ -868,7 +966,9 @@
     "description": "Paletas de madera pulida natural sin químicos para cafetería.",
     "imageIcon": "bi-tree",
     "image": "img/catalog/prod_226.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 301,
@@ -885,7 +985,9 @@
     "description": "Vaso de cartón decorado coffee con tapa tipo beberito para espresso y cappuccino.",
     "imageIcon": "bi-cup-hot-fill",
     "image": "img/catalog/prod_301.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 302,
@@ -902,7 +1004,9 @@
     "description": "Vaso térmico para café mediano con tapa hermética beberito.",
     "imageIcon": "bi-cup-hot-fill",
     "image": "img/catalog/prod_302.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 303,
@@ -919,7 +1023,9 @@
     "description": "Vaso grande para café americano y latte caliente.",
     "imageIcon": "bi-cup-hot-fill",
     "image": "img/catalog/prod_303.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 304,
@@ -936,7 +1042,9 @@
     "description": "Vaso blanco encerado para gaseosas y refrescos naturales.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_304.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 305,
@@ -953,7 +1061,9 @@
     "description": "Vaso encerado 16oz para bebidas frías con ranura para pajilla.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_305.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 306,
@@ -971,7 +1081,9 @@
     "description": "Vaso cónico de papel blanco para dispensadores de agua en oficinas y clínicas.",
     "imageIcon": "bi-cone-striped",
     "image": "img/catalog/prod_306.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 307,
@@ -988,7 +1100,9 @@
     "description": "Vaso cristalino para batidos, smoothies y frappés con tapa domo.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_307.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 308,
@@ -1005,7 +1119,9 @@
     "description": "El vaso más popular para batidos y malteadas con crema chantilly.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_308.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 309,
@@ -1022,7 +1138,9 @@
     "description": "Vaso jumbo para bebidas heladas y especialidades con tapa domo.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_309.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 310,
@@ -1039,7 +1157,9 @@
     "description": "Vaso cristalino con tapa plana sellada y ranura para pajilla.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_310.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 311,
@@ -1056,7 +1176,9 @@
     "description": "Vaso cristalino de 16oz con tapa plana para servicio express.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_311.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 312,
@@ -1073,7 +1195,9 @@
     "description": "Vaso extra grande de 22oz con tapa plana antiderrame.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_312.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 313,
@@ -1090,7 +1214,9 @@
     "description": "Película impresa para selladoras térmicas de vasos de bubble tea y batidos.",
     "imageIcon": "bi-film",
     "image": "img/catalog/prod_313.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 314,
@@ -1107,7 +1233,9 @@
     "description": "Copita cristalina rígida para licores, shots y muestras gastronómicas.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_314.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 315,
@@ -1124,7 +1252,9 @@
     "description": "Vaso pequeño para bebidas infantiles, jugos y degustación.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_315.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 316,
@@ -1141,7 +1271,9 @@
     "description": "Vaso plástico ranurado para eventos, fiestas y sodas.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_316.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 317,
@@ -1158,7 +1290,9 @@
     "description": "Vaso 7oz rígido con tapa hermética para gelatinas y jugos.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_317.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 318,
@@ -1175,7 +1309,9 @@
     "description": "Vaso de polipropileno ligero para agua y refrescos.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_318.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 319,
@@ -1192,7 +1328,9 @@
     "description": "Vaso tradicional de 8oz multiuso para soda y comedor.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_319.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 320,
@@ -1209,7 +1347,9 @@
     "description": "Vaso de tamaño mediano resistente a bebidas frías.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_320.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 321,
@@ -1226,7 +1366,9 @@
     "description": "Vaso 14oz con tapa a presión ideal para té frío y jugos naturales.",
     "imageIcon": "bi-cup",
     "image": "img/catalog/prod_321.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 322,
@@ -1243,7 +1385,9 @@
     "description": "Bandeja portavasos biodegradable con 4 cavidades para servicio para llevar express.",
     "imageIcon": "bi-grid-2x2",
     "image": "img/catalog/prod_322.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 323,
@@ -1260,7 +1404,9 @@
     "description": "Pajilla envuelta individualmente en papel para garantizar la higiene en restaurantes.",
     "imageIcon": "bi-slash-lg",
     "image": "img/catalog/prod_323.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 324,
@@ -1277,7 +1423,9 @@
     "description": "Palillos de madera resistentes en caja dispensadora.",
     "imageIcon": "bi-pin",
     "image": "img/catalog/prod_324.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 325,
@@ -1294,7 +1442,9 @@
     "description": "Sombrillas coloridas tradicionales de papel para coctelería y bebidas tropicales.",
     "imageIcon": "bi-umbrella",
     "image": "img/catalog/prod_325.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 326,
@@ -1311,7 +1461,9 @@
     "description": "Fundas de papel kraft para cubiertos con diseño impreso para mesa de restaurante.",
     "imageIcon": "bi-envelope",
     "image": "img/catalog/prod_326.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 327,
@@ -1328,7 +1480,9 @@
     "description": "Sobres de azúcar individual para cafeterías, restaurantes y hoteles.",
     "imageIcon": "bi-envelope-paper",
     "image": "img/catalog/prod_327.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3649000000000",
+    "taxRate": 13.0
   },
   {
     "id": 401,
@@ -1346,7 +1500,9 @@
     "description": "Bolsa de papel kraft resistente sin asas para panaderías y golosinas.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_401.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 402,
@@ -1364,7 +1520,9 @@
     "description": "Bolsa kraft para 1 libra de granos, café y panes pequeños.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_402.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 403,
@@ -1382,7 +1540,9 @@
     "description": "Bolsa kraft resistente para abarrotes y repostería.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_403.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 404,
@@ -1400,7 +1560,9 @@
     "description": "Bolsa de papel de 3 libras para compras y comidas para llevar.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_404.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 405,
@@ -1418,7 +1580,9 @@
     "description": "Bolsa de alta resistencia para pedidos de restaurantes y cafeterías.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_405.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 406,
@@ -1436,7 +1600,9 @@
     "description": "Bolsa kraft para 5 libras de capacidad con fondo plano.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_406.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 407,
@@ -1453,7 +1619,9 @@
     "description": "Bolsa de papel marrón resistente para verduras y despacho.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_407.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 408,
@@ -1470,7 +1638,9 @@
     "description": "Bolsa kraft de 8 libras excelente para envíos de comida.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_408.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 409,
@@ -1487,7 +1657,9 @@
     "description": "Bolsa kraft reforzada para 10 libras de peso.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_409.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 410,
@@ -1504,7 +1676,9 @@
     "description": "Bolsa kraft de gran capacidad y gramaje grueso.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_410.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 411,
@@ -1521,7 +1695,9 @@
     "description": "Bolsa de papel para 16 libras para mercaderías pesadas.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_411.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 412,
@@ -1538,7 +1714,9 @@
     "description": "Bolsa kraft extra pesada 20 libras para entrega de combos múltiples.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_412.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 413,
@@ -1555,7 +1733,9 @@
     "description": "Bolsa kraft de 25 libras para cargas voluminosas.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_413.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 414,
@@ -1572,7 +1752,9 @@
     "description": "Bolsita de papel blanco puro para farmacias, panaderías y golosinas.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_414.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 415,
@@ -1589,7 +1771,9 @@
     "description": "Bolsa blanca nacional de 1 lb limpia y elegante para venta al mostrador.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_415.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 416,
@@ -1606,7 +1790,9 @@
     "description": "Bolsa blanca de 2 libras para repostería fina y pan blanco.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_416.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 417,
@@ -1623,7 +1809,9 @@
     "description": "Bolsa de papel blanco grado alimentario para 3 libras.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_417.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 418,
@@ -1640,7 +1828,9 @@
     "description": "Bolsa blanca mediana de excelente presentación y blancura.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_418.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 419,
@@ -1657,7 +1847,9 @@
     "description": "Bolsa de papel blanco 5 lb con fuelle lateral.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_419.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 420,
@@ -1674,7 +1866,9 @@
     "description": "Bolsa blanca de 6 libras para tiendas y supermercados.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_420.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 421,
@@ -1691,7 +1885,9 @@
     "description": "Bolsa de papel blanco de 8 libras resistente.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_421.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 422,
@@ -1708,7 +1904,9 @@
     "description": "Bolsa de papel blanco grande con fondo resistente.",
     "imageIcon": "bi-bag-dash",
     "image": "img/catalog/prod_422.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 423,
@@ -1725,7 +1923,9 @@
     "description": "Bolsa larga de papel kraft con diseño impreso para barra de pan baguette.",
     "imageIcon": "bi-card-text",
     "image": "img/catalog/prod_423.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 424,
@@ -1742,7 +1942,9 @@
     "description": "Bolsa kraft ancha para transportar 2 barras de baguette.",
     "imageIcon": "bi-card-text",
     "image": "img/catalog/prod_424.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 425,
@@ -1759,7 +1961,9 @@
     "description": "Bolsa para pan baguette con franja de ventana transparente para exhibición.",
     "imageIcon": "bi-eye",
     "image": "img/catalog/prod_425.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215300000000",
+    "taxRate": 13.0
   },
   {
     "id": 501,
@@ -1777,7 +1981,9 @@
     "description": "Caja de pizza microcorrugado #8 con impresión tradicional a color.",
     "imageIcon": "bi-pie-chart",
     "image": "img/catalog/prod_501.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 502,
@@ -1795,7 +2001,9 @@
     "description": "Caja de pizza tamaño mediano con ventilación antigoteo.",
     "imageIcon": "bi-pie-chart",
     "image": "img/catalog/prod_502.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 503,
@@ -1813,7 +2021,9 @@
     "description": "Caja de pizza tradicional de 12 pulgadas para servicio a domicilio express.",
     "imageIcon": "bi-pie-chart",
     "image": "img/catalog/prod_503.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 504,
@@ -1831,7 +2041,9 @@
     "description": "Caja de pizza para 14 pulgadas resistente al peso y vapores calientes.",
     "imageIcon": "bi-pie-chart",
     "image": "img/catalog/prod_504.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 505,
@@ -1849,7 +2061,9 @@
     "description": "Caja de pizza extra grande para pizzerías y servicios familiares.",
     "imageIcon": "bi-pie-chart",
     "image": "img/catalog/prod_505.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 506,
@@ -1867,7 +2081,9 @@
     "description": "Caja gigante de 18 pulgadas, máxima resistencia estructural.",
     "imageIcon": "bi-pie-chart",
     "image": "img/catalog/prod_506.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 507,
@@ -1884,7 +2100,9 @@
     "description": "Salsa de tomate italiana sazonada para pizza, elaborada con tomates 100% selectos.",
     "imageIcon": "bi-basket3",
     "image": "img/catalog/prod_507.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 508,
@@ -1901,7 +2119,9 @@
     "description": "Sobres de queso seco para acompañar pedidos de pizza y pastas express.",
     "imageIcon": "bi-envelope",
     "image": "img/catalog/prod_508.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 509,
@@ -1918,7 +2138,9 @@
     "description": "Sobres de chile picante en hojuelas deshidratadas para pizzerías.",
     "imageIcon": "bi-fire",
     "image": "img/catalog/prod_509.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 510,
@@ -1935,7 +2157,9 @@
     "description": "Salsa de tomate para pizza nacional de gran rendimiento y sabor concentrado.",
     "imageIcon": "bi-droplet-half",
     "image": "img/catalog/prod_510.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 511,
@@ -1952,7 +2176,9 @@
     "description": "Caja quequera de cartón kraft natural con ventana para queques medianos.",
     "imageIcon": "bi-box2-heart",
     "image": "img/catalog/prod_511.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 512,
@@ -1969,7 +2195,9 @@
     "description": "Quequera grande kraft con ventana superior transparente para pasteles decorados.",
     "imageIcon": "bi-box2-heart",
     "image": "img/catalog/prod_512.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 513,
@@ -1986,7 +2214,9 @@
     "description": "Quequera extra alta con ventana para tortas de pisos y repostería alta.",
     "imageIcon": "bi-box2-heart",
     "image": "img/catalog/prod_513.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 514,
@@ -2003,7 +2233,9 @@
     "description": "Cajita kraft automontable para papas fritas y dedos de queso.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_514.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 515,
@@ -2020,7 +2252,9 @@
     "description": "Caja blanca multiuso de cartón encerado para pastelería y almuerzos.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_515.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 516,
@@ -2037,7 +2271,9 @@
     "description": "Caja de cartón blanca resistente para bandejas y postres.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_516.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 517,
@@ -2054,7 +2290,9 @@
     "description": "Caja cuadrada blanca #12 de excelente presentación.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_517.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 518,
@@ -2071,7 +2309,9 @@
     "description": "Caja grande blanca para catering, donas y bocadillos.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_518.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 519,
@@ -2088,7 +2328,9 @@
     "description": "Salsa de queso cheddar cremosa especial para nachos, hamburguesas y papas.",
     "imageIcon": "bi-egg",
     "image": "img/catalog/prod_519.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 520,
@@ -2105,7 +2347,9 @@
     "description": "Champiñones selectos rebanados en salmuera para pizzas, pastas y salsas.",
     "imageIcon": "bi-tree-fill",
     "image": "img/catalog/prod_520.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 521,
@@ -2122,7 +2366,9 @@
     "description": "Aderezo cremoso con queso cheddar Hellmann\\'s para restaurantes y cafeterías.",
     "imageIcon": "bi-droplet-half",
     "image": "img/catalog/prod_521.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3215100000000",
+    "taxRate": 13.0
   },
   {
     "id": 601,
@@ -2139,7 +2385,9 @@
     "description": "Bolsas plásticas transparentes en variedad de medidas: 4x8, 6x10, 8x12, 10x16, 12x18, 14x20, 20x30 y más.",
     "imageIcon": "bi-layers",
     "image": "img/catalog/prod_601.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 602,
@@ -2156,7 +2404,9 @@
     "description": "Bolsas termo-sellables ideales para bebidas frías y refrescos sin goteo. Taco 12x18 y lámina 12x18.",
     "imageIcon": "bi-water",
     "image": "img/catalog/prod_602.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 603,
@@ -2173,7 +2423,9 @@
     "description": "Bolsas resistentes al calor de comidas recién preparadas. Medidas: 6x12, 7x10, 8x12, 10x16, 12x18, 14x20.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_603.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 604,
@@ -2190,7 +2442,9 @@
     "description": "Bolsas tipo camiseta color blanco virgen para pulperías, carnicerías y tiendas.",
     "imageIcon": "bi-bag",
     "image": "img/catalog/prod_604.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 605,
@@ -2207,7 +2461,9 @@
     "description": "Bolsas con asas fabricadas en material recuperado ecológico. Medidas surtidas.",
     "imageIcon": "bi-recycle",
     "image": "img/catalog/prod_605.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 606,
@@ -2224,7 +2480,9 @@
     "description": "Bolsas cristalinas de alta claridad que conservan frescos los productos de panadería y dulces.",
     "imageIcon": "bi-stars",
     "image": "img/catalog/prod_606.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 607,
@@ -2241,7 +2499,9 @@
     "description": "Bobina plástica continua para sellado y envasado de productos. Medidas 6x25, 8x12, 10x16, 12x18.",
     "imageIcon": "bi-record",
     "image": "img/catalog/prod_607.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 608,
@@ -2258,7 +2518,9 @@
     "description": "Bolsas para selladora al vacío de 3 capas para carnes, embutidos y quesos.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_608.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 609,
@@ -2275,7 +2537,9 @@
     "description": "Bolsas de conservación al vacío para porciones medianas de alimentos.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_609.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 610,
@@ -2292,7 +2556,9 @@
     "description": "Bolsas al vacío para cortes de carne y pescado.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_610.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 611,
@@ -2309,7 +2575,9 @@
     "description": "Bolsas alargadas al vacío para lomitos, jamones y embutidos.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_611.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 612,
@@ -2326,7 +2594,9 @@
     "description": "Bolsas jumbo de empaque al vacío para piezas enteras.",
     "imageIcon": "bi-box",
     "image": "img/catalog/prod_612.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 613,
@@ -2343,7 +2613,9 @@
     "description": "Bolsas negras calibre pesado para basura institucional y municipal.",
     "imageIcon": "bi-trash",
     "image": "img/catalog/prod_613.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 614,
@@ -2360,7 +2632,9 @@
     "description": "Bolsas de jardín extra grandes para estañones y poda de áreas verdes.",
     "imageIcon": "bi-trash-fill",
     "image": "img/catalog/prod_614.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 615,
@@ -2377,7 +2651,9 @@
     "description": "Bolsas para basureros grandes de pasillos y oficinas.",
     "imageIcon": "bi-trash-fill",
     "image": "img/catalog/prod_615.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 616,
@@ -2394,7 +2670,9 @@
     "description": "Bolsa mediana para cestos de basura de baño y cocina.",
     "imageIcon": "bi-trash",
     "image": "img/catalog/prod_616.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 617,
@@ -2411,7 +2689,9 @@
     "description": "Bolsas para papeleras de escritorio y cubículos.",
     "imageIcon": "bi-trash",
     "image": "img/catalog/prod_617.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 618,
@@ -2428,7 +2708,9 @@
     "description": "Bolsas de marca Vikingo con fondo reforzado antigoteo.",
     "imageIcon": "bi-trash",
     "image": "img/catalog/prod_618.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 619,
@@ -2445,7 +2727,9 @@
     "description": "Bolsas grandes Vikingo para residuos pesados.",
     "imageIcon": "bi-trash",
     "image": "img/catalog/prod_619.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 620,
@@ -2462,7 +2746,9 @@
     "description": "Bolsas tamaño jardín calibre grueso Vikingo.",
     "imageIcon": "bi-trash-fill",
     "image": "img/catalog/prod_620.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 621,
@@ -2479,7 +2765,9 @@
     "description": "Bolsas negras en rollo precortado para fácil extracción en bodegas.",
     "imageIcon": "bi-record-circle",
     "image": "img/catalog/prod_621.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 622,
@@ -2496,7 +2784,9 @@
     "description": "Rollo de 50 bolsas grandes para limpieza de condominios y restaurantes.",
     "imageIcon": "bi-record-circle",
     "image": "img/catalog/prod_622.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 623,
@@ -2513,7 +2803,9 @@
     "description": "Rollo de papel aluminio para hornear y envolver alimentos.",
     "imageIcon": "bi-shield",
     "image": "img/catalog/prod_623.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 624,
@@ -2530,7 +2822,9 @@
     "description": "Rollo de papel aluminio Pal 25 pies para cocina.",
     "imageIcon": "bi-shield",
     "image": "img/catalog/prod_624.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 625,
@@ -2547,7 +2841,9 @@
     "description": "Papel aluminio rendidor para restaurantes y repostería.",
     "imageIcon": "bi-shield",
     "image": "img/catalog/prod_625.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 626,
@@ -2564,7 +2860,9 @@
     "description": "Papel aluminio calibre institucional en caja despachadora con sierra metálica.",
     "imageIcon": "bi-shield",
     "image": "img/catalog/prod_626.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 627,
@@ -2581,7 +2879,9 @@
     "description": "Rollo de 500 pies de aluminio para hoteles, cocinas industriales y caterings.",
     "imageIcon": "bi-shield",
     "image": "img/catalog/prod_627.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 628,
@@ -2598,7 +2898,9 @@
     "description": "El rollo de mayor rendimiento de aluminio para gastronomía industrial.",
     "imageIcon": "bi-shield",
     "image": "img/catalog/prod_628.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 629,
@@ -2615,7 +2917,9 @@
     "description": "Hojas de papel encerado grado alimenticio para hamburguesas y sándwiches.",
     "imageIcon": "bi-card-text",
     "image": "img/catalog/prod_629.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 630,
@@ -2632,7 +2936,9 @@
     "description": "Papel encerado tamaño 8x10 para envolver carnes frías y quesos.",
     "imageIcon": "bi-card-text",
     "image": "img/catalog/prod_630.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 631,
@@ -2649,7 +2955,9 @@
     "description": "Papel encerado cuadrado 10x10 para cestas de comida rápida.",
     "imageIcon": "bi-card-text",
     "image": "img/catalog/prod_631.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 632,
@@ -2666,7 +2974,9 @@
     "description": "Papel encerado 12x10 para envolver burritos, combos y repostería.",
     "imageIcon": "bi-card-text",
     "image": "img/catalog/prod_632.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 633,
@@ -2683,7 +2993,9 @@
     "description": "Película extensible transparente con cortador deslizante para frescura de alimentos.",
     "imageIcon": "bi-film",
     "image": "img/catalog/prod_633.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 634,
@@ -2700,7 +3012,9 @@
     "description": "Film adherente ancho de 18 pulgadas para bandejas grandes de carnicería.",
     "imageIcon": "bi-film",
     "image": "img/catalog/prod_634.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 635,
@@ -2717,7 +3031,9 @@
     "description": "Rollo de película estirable para fijación y embalaje de tarimas en bodegas.",
     "imageIcon": "bi-boxes",
     "image": "img/catalog/prod_635.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3641000000000",
+    "taxRate": 13.0
   },
   {
     "id": 701,
@@ -2734,7 +3050,9 @@
     "description": "Servilletas interdobladas que dispensan una a una ahorrando hasta un 30%.",
     "imageIcon": "bi-file-earmark-text",
     "image": "img/catalog/prod_701.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 702,
@@ -2751,7 +3069,9 @@
     "description": "Toalla de manos en rollo continuo blanco de alto metraje para baños públicos y cocinas.",
     "imageIcon": "bi-circle-square",
     "image": "img/catalog/prod_702.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 703,
@@ -2768,7 +3088,9 @@
     "description": "Papel higiénico institucional de gran metraje para dispensadores circulares.",
     "imageIcon": "bi-circle",
     "image": "img/catalog/prod_703.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 704,
@@ -2785,7 +3107,9 @@
     "description": "Papel higiénico de doble hoja de máxima suavidad y absorción marca líder TORK.",
     "imageIcon": "bi-circle",
     "image": "img/catalog/prod_704.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 705,
@@ -2802,7 +3126,9 @@
     "description": "Toalla de cocina absorbente multisuperficies marca Fiesta.",
     "imageIcon": "bi-circle-square",
     "image": "img/catalog/prod_705.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 706,
@@ -2819,7 +3145,9 @@
     "description": "Toallas dobladas en Z para dispensadores de pared en baños ejecutivos.",
     "imageIcon": "bi-file-earmark-text",
     "image": "img/catalog/prod_706.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 707,
@@ -2836,7 +3164,9 @@
     "description": "Servilletas de mesa blancas familiares de excelente suavidad.",
     "imageIcon": "bi-file-earmark-text",
     "image": "img/catalog/prod_707.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 708,
@@ -2853,7 +3183,9 @@
     "description": "Guantes de polietileno ligeros ideales para manipulación rápida de alimentos en sodas.",
     "imageIcon": "bi-hand-index-thumb",
     "image": "img/catalog/prod_708.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 709,
@@ -2870,7 +3202,9 @@
     "description": "Guantes ambidiestros de látex blanco elástico con polvo ligero para ajuste anatómico.",
     "imageIcon": "bi-hand-index",
     "image": "img/catalog/prod_709.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 710,
@@ -2887,7 +3221,9 @@
     "description": "Guantes de nitrilo color negro resistente a químicos y grasas. Favorito de chefs y tatuadores.",
     "imageIcon": "bi-hand-index-thumb-fill",
     "image": "img/catalog/prod_710.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 711,
@@ -2904,7 +3240,9 @@
     "description": "Guantes de protección de nitrilo azul para desinfección y laboratorios.",
     "imageIcon": "bi-hand-index-thumb-fill",
     "image": "img/catalog/prod_711.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 712,
@@ -2921,7 +3259,9 @@
     "description": "Cepillo hisopo sanitario con cerdas resistentes para limpieza de inodoros.",
     "imageIcon": "bi-brush",
     "image": "img/catalog/prod_712.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 713,
@@ -2938,7 +3278,9 @@
     "description": "Set completo de hisopo con base higiénica para guardar de forma limpia en el baño.",
     "imageIcon": "bi-brush-fill",
     "image": "img/catalog/prod_713.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 714,
@@ -2955,7 +3297,9 @@
     "description": "Pastilla con canastilla para inodoros que limpia y aromatiza en cada descarga.",
     "imageIcon": "bi-droplet-fill",
     "image": "img/catalog/prod_714.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 715,
@@ -2972,7 +3316,9 @@
     "description": "Cepillo ergonómico con mango para fregar ropa, zapatillas y juntas de azulejos.",
     "imageIcon": "bi-brush",
     "image": "img/catalog/prod_715.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3219300000000",
+    "taxRate": 13.0
   },
   {
     "id": 801,
@@ -2990,7 +3336,9 @@
     "description": "Presentación mayorista de cloro concentrado al 4% en pichinga resistente.",
     "imageIcon": "bi-bucket",
     "image": "img/catalog/prod_801.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 802,
@@ -3008,7 +3356,9 @@
     "description": "Pichinga de desinfectante concentrado multiaroma para pisos y superficies.",
     "imageIcon": "bi-bucket-fill",
     "image": "img/catalog/prod_802.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 803,
@@ -3025,7 +3375,9 @@
     "description": "Cloro doméstico e institucional para desinfección de pisos y blanqueo de ropa.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_803.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 804,
@@ -3042,7 +3394,9 @@
     "description": "Cloro reforzado al 6% de alta acción bactericida y fungicida.",
     "imageIcon": "bi-shield-fill",
     "image": "img/catalog/prod_804.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 805,
@@ -3059,7 +3413,9 @@
     "description": "Cloro hipoclorito al 12% para plantas procesadoras, piscinas y tratamiento de aguas.",
     "imageIcon": "bi-exclamation-triangle-fill",
     "image": "img/catalog/prod_805.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 806,
@@ -3076,7 +3432,9 @@
     "description": "Cloro al mejor precio para mantenimiento diario en comercio y hogares.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_806.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 807,
@@ -3093,7 +3451,9 @@
     "description": "Desinfectante para pisos con fragancias duraderas a limón, lavanda o bouquet floral.",
     "imageIcon": "bi-flower1",
     "image": "img/catalog/prod_807.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 808,
@@ -3111,7 +3471,9 @@
     "description": "Aromas: Floral, Naranja, Violeta, Limón, Lavanda, Baby, Pino, Maracuyá, Bouquet, Pinetron y Tutti Frutti.",
     "imageIcon": "bi-flower2",
     "image": "img/catalog/prod_808.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 809,
@@ -3128,7 +3490,9 @@
     "description": "Fórmula química que descompone las moléculas del mal olor en trampas de grasa, baños y basureros.",
     "imageIcon": "bi-wind",
     "image": "img/catalog/prod_809.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 810,
@@ -3145,7 +3509,9 @@
     "description": "Crema lavaplatos concentrada que corta la grasa y deja vajilla brillante.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_810.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 811,
@@ -3162,7 +3528,9 @@
     "description": "Jabón en pasta con glicerina para cuidar las manos y alto poder desengrasante.",
     "imageIcon": "bi-cup-straw",
     "image": "img/catalog/prod_811.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 812,
@@ -3179,7 +3547,9 @@
     "description": "Lana de acero con jabón limpiador para ollas y sartenes tiznados.",
     "imageIcon": "bi-stars",
     "image": "img/catalog/prod_812.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 813,
@@ -3196,7 +3566,9 @@
     "description": "Esponja con fibra verde abrasiva por un lado y espuma suave por el otro.",
     "imageIcon": "bi-square-fill",
     "image": "img/catalog/prod_813.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 814,
@@ -3213,7 +3585,9 @@
     "description": "Fibra suave azul especial para superficies antiadherentes, copas y acero inoxidable.",
     "imageIcon": "bi-square-fill",
     "image": "img/catalog/prod_814.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 815,
@@ -3230,7 +3604,9 @@
     "description": "Fibra verde tradicional para fregar parrilas, pisos y utensilios rústicos.",
     "imageIcon": "bi-square",
     "image": "img/catalog/prod_815.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 816,
@@ -3247,7 +3623,9 @@
     "description": "Espiral de alambre de acero inoxidable que no se oxida para remover grasa quemada.",
     "imageIcon": "bi-circle",
     "image": "img/catalog/prod_816.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 817,
@@ -3265,7 +3643,9 @@
     "description": "Emulsión acrílica blanca para pisos de mosaico, terrazo y vinil sin necesidad de pulidora.",
     "imageIcon": "bi-gem",
     "image": "img/catalog/prod_817.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 818,
@@ -3283,7 +3663,9 @@
     "description": "Cera autobrillante con pigmento rojo para restaurar y proteger pisos de barro y concreto.",
     "imageIcon": "bi-gem",
     "image": "img/catalog/prod_818.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 819,
@@ -3301,7 +3683,9 @@
     "description": "Líquido abrillantador para azulejos y cerámicas sin dejar residuos resbalosos.",
     "imageIcon": "bi-sparkles",
     "image": "img/catalog/prod_819.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 820,
@@ -3320,7 +3704,9 @@
     "description": "Tratamiento sellador y abrillantador premium de pisos para alto tráfico.",
     "imageIcon": "bi-stars",
     "image": "img/catalog/prod_820.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 821,
@@ -3337,7 +3723,9 @@
     "description": "Polvo limpiador con cloro para fregar pilas, lozas de baño y sartenes.",
     "imageIcon": "bi-capsule",
     "image": "img/catalog/prod_821.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 822,
@@ -3354,7 +3742,9 @@
     "description": "Barra de jabón azul tradicional para lavado a mano de ropa blanca y de color.",
     "imageIcon": "bi-square-fill",
     "image": "img/catalog/prod_822.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 823,
@@ -3371,7 +3761,9 @@
     "description": "Suavizante concentrado que facilita el planchado y deja aroma fresco prolongado.",
     "imageIcon": "bi-heart",
     "image": "img/catalog/prod_823.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 824,
@@ -3388,7 +3780,9 @@
     "description": "Detergente en polvo enzimático moteado para lavadoras automáticas y lavado a mano.",
     "imageIcon": "bi-box-seam",
     "image": "img/catalog/prod_824.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 825,
@@ -3406,7 +3800,9 @@
     "description": "Detergente líquido biodegradable sin fosfatos para ropa blanca y oscura.",
     "imageIcon": "bi-droplet-half",
     "image": "img/catalog/prod_825.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 826,
@@ -3424,7 +3820,9 @@
     "description": "Jabón líquido humectante con pH neutro para dispensadores de lavamanos.",
     "imageIcon": "bi-heart-pulse",
     "image": "img/catalog/prod_826.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 827,
@@ -3441,7 +3839,9 @@
     "description": "Gel antibacterial al 70% de alcohol con agentes hidratantes para manos.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_827.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 828,
@@ -3458,7 +3858,9 @@
     "description": "Alcohol desinfectante líquido al 80% para nebulización y esterilización de objetos.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_828.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 829,
@@ -3476,7 +3878,9 @@
     "description": "Fórmula que disuelve polvo y huellas en cristales, espejos y parabrisas sin dejar marcas.",
     "imageIcon": "bi-aspect-ratio",
     "image": "img/catalog/prod_829.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 830,
@@ -3493,7 +3897,9 @@
     "description": "Potente removedor alcalino de aceites, hollín y grasa vegetal en campanas y pisos de cocina.",
     "imageIcon": "bi-lightning-charge",
     "image": "img/catalog/prod_830.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 831,
@@ -3511,7 +3917,9 @@
     "description": "Espuma activa de pH neutro con carnauba para lavado de vehículos sin dañar la pintura.",
     "imageIcon": "bi-car-front",
     "image": "img/catalog/prod_831.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 832,
@@ -3528,7 +3936,9 @@
     "description": "Guantes de goma látex amarillo con palma antideslizante para fregado y químicos.",
     "imageIcon": "bi-hand-index-thumb",
     "image": "img/catalog/prod_832.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 833,
@@ -3545,7 +3955,9 @@
     "description": "Set estelar: Cubo con escurridor 12L + Cabo de aluminio 140cm + Mecha trenzeta 100% microfibra máxima absorción.",
     "imageIcon": "bi-bucket",
     "image": "img/catalog/prod_833.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 834,
@@ -3562,7 +3974,9 @@
     "description": "Mecha de trenzas de microfibra que no suelta pelusas y dura 3 veces más que el algodón.",
     "imageIcon": "bi-tools",
     "image": "img/catalog/prod_834.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 835,
@@ -3579,7 +3993,9 @@
     "description": "Balde plástico resistente de 12 litros con escurridor a presión y asa metálica.",
     "imageIcon": "bi-bucket",
     "image": "img/catalog/prod_835.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 836,
@@ -3596,7 +4012,9 @@
     "description": "Palo de aluminio liviano e inoxidable con rosca universal para mopas y escobas.",
     "imageIcon": "bi-slash",
     "image": "img/catalog/prod_836.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 837,
@@ -3613,7 +4031,9 @@
     "description": "Escoba de cerdas con memoria para barrido suave en interiores.",
     "imageIcon": "bi-brush",
     "image": "img/catalog/prod_837.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 838,
@@ -3630,7 +4050,9 @@
     "description": "Escoba con cabezal extra ancho para pasillos, aceras y bodegas.",
     "imageIcon": "bi-brush-fill",
     "image": "img/catalog/prod_838.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 839,
@@ -3647,7 +4069,9 @@
     "description": "Pala plástica con filo de hule y mango alto de 80cm para recolección cómoda.",
     "imageIcon": "bi-box-arrow-in-down",
     "image": "img/catalog/prod_839.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 840,
@@ -3664,7 +4088,9 @@
     "description": "Bloque higiénico para tanque que tiñe el agua de azul y combate el sarro.",
     "imageIcon": "bi-droplet",
     "image": "img/catalog/prod_840.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 841,
@@ -3681,7 +4107,9 @@
     "description": "Tiras adhesivas que se aplican directo en la taza del inodoro para fragancia continua.",
     "imageIcon": "bi-flower3",
     "image": "img/catalog/prod_841.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 842,
@@ -3698,7 +4126,9 @@
     "description": "Gel viscoso con cuello especial para alcanzar debajo del borde del inodoro.",
     "imageIcon": "bi-shield-check",
     "image": "img/catalog/prod_842.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 843,
@@ -3715,7 +4145,9 @@
     "description": "Insecticida fulminante contra moscas, zancudos, cucarachas y hormigas con suave aroma.",
     "imageIcon": "bi-bug",
     "image": "img/catalog/prod_843.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 844,
@@ -3732,7 +4164,9 @@
     "description": "Aromatizante ambiental en aerosol que elimina olores al instante.",
     "imageIcon": "bi-soundwave",
     "image": "img/catalog/prod_844.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 845,
@@ -3749,7 +4183,9 @@
     "description": "Repuesto para dispensador automático de aromatizante de baterías.",
     "imageIcon": "bi-clock-history",
     "image": "img/catalog/prod_845.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 846,
@@ -3766,7 +4202,9 @@
     "description": "Lustrador en aerosol para nutrir madera, repeler polvo y dar brillo natural.",
     "imageIcon": "bi-tree",
     "image": "img/catalog/prod_846.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   },
   {
     "id": 847,
@@ -3783,6 +4221,8 @@
     "description": "Presentación económica grande de 378ml para mantenimiento de oficinas.",
     "imageIcon": "bi-tree",
     "image": "img/catalog/prod_847.jpg",
-    "stock": 150
+    "stock": 150,
+    "cabysCode": "3532200000000",
+    "taxRate": 13.0
   }
 ]

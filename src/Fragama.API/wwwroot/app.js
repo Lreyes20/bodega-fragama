@@ -774,37 +774,65 @@ function initRealtimeOrderSync() {
   
   _orderSyncInterval = setInterval(async () => {
     try {
+      // Actualizar estampa de tiempo de sincronización en vivo en la UI
+      const tsEl = document.getElementById('liveSyncTimestamp');
+      if (tsEl) tsEl.textContent = new Date().toLocaleTimeString('es-CR');
+
       const res = await fetch('/api/orders');
       if (!res.ok) return;
       const serverOrders = await res.json();
       if (!Array.isArray(serverOrders)) return;
 
-      const currentCodes = new Set(AppState.salesOrders.map(o => o.orderCode));
+      // Sincronización con pedidos web locales (localStorage) creados en el navegador
+      try {
+        const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+        if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
+          const srvCodes = new Set(serverOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
+          for (const lwo of localWebOrders) {
+            const cleanLwoCode = (lwo.orderCode || '').trim().toUpperCase();
+            if (cleanLwoCode && !srvCodes.has(cleanLwoCode)) {
+              serverOrders.unshift(lwo);
+              srvCodes.add(cleanLwoCode);
+              // Asentar silenciosamente en el servidor
+              fetch('/api/public/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(lwo)
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {}
+
+      const currentCodes = new Set(AppState.salesOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
       let hasNewOrders = false;
       let newestOrder = null;
 
       serverOrders.forEach(so => {
-        if (!currentCodes.has(so.orderCode)) {
+        const soCode = (so.orderCode || '').trim().toUpperCase();
+        if (soCode && !currentCodes.has(soCode)) {
           hasNewOrders = true;
           if (!newestOrder) newestOrder = so;
         }
       });
 
-      if (hasNewOrders || serverOrders.length !== AppState.salesOrders.length) {
-        AppState.salesOrders = serverOrders;
-        updateWebOrdersBadges();
-        renderDashboardAnalytics();
-        
-        // Refrescar bandeja dedicada de pedidos web si está disponible
-        if (typeof renderWebOrdersFullTable === 'function') {
-          renderWebOrdersFullTable();
+      let hasStatusChange = false;
+      if (!hasNewOrders && serverOrders.length === AppState.salesOrders.length) {
+        for (const so of serverOrders) {
+          const ex = AppState.salesOrders.find(o => 
+            String(o.id) === String(so.id) || 
+            (o.orderCode && o.orderCode.trim().toUpperCase() === (so.orderCode || '').trim().toUpperCase())
+          );
+          if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
+            hasStatusChange = true;
+            break;
+          }
         }
+      }
 
-        // Refrescar historial si está activo
-        const historyTbody = document.getElementById('orderHistoryTableBody');
-        if (historyTbody) {
-          renderOrderHistory();
-        }
+      if (hasNewOrders || serverOrders.length !== AppState.salesOrders.length || hasStatusChange) {
+        AppState.salesOrders = serverOrders;
+        refreshAllOrderViews();
 
         // Si llegó un nuevo pedido web, emitir chime y notificación toast
         if (newestOrder) {
@@ -817,7 +845,7 @@ function initRealtimeOrderSync() {
     } catch (err) {
       // Ignorar fallas momentáneas de red
     }
-  }, 4000);
+  }, 3000);
 }
 
 function playOrderChime() {
@@ -964,9 +992,60 @@ function renderAllViews() {
   renderUsersRolesTable();
 }
 
+// Actualización omnicanal de pedidos en todas las vistas de la bodega
+function refreshAllOrderViews() {
+  if (typeof renderOrderHistory === 'function') renderOrderHistory();
+  if (typeof renderWebOrdersFullTable === 'function') renderWebOrdersFullTable();
+  if (typeof updateWebOrdersBadges === 'function') updateWebOrdersBadges();
+  if (typeof renderDashboardAnalytics === 'function') renderDashboardAnalytics();
+  if (typeof renderDriverDispatches === 'function') renderDriverDispatches();
+}
+window.refreshAllOrderViews = refreshAllOrderViews;
+
 function formatCRC(amount) {
   return '₡' + Number(amount).toLocaleString('es-CR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
+
+// Sanitización contra inyección XSS en todos los campos renderizados desde la BD
+function escapeHtml(text) {
+  if (text === undefined || text === null) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Función rápida del dashboard para marcar un pedido como alistado sin abrir el modal completo
+window.markOrderAlistado = async function(orderIdentifier) {
+  if (!confirm(`¿Desea marcar el pedido ${orderIdentifier} como ALISTADO en bodega?`)) return;
+
+  try {
+    const payload = {
+      status: 'ALISTADO',
+      notes: 'Alistado rápido desde panel de control del dashboard.'
+    };
+
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderIdentifier)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    if (res.ok && result.success) {
+      const ord = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+      if (ord) ord.status = 'ALISTADO';
+      renderAllViews();
+      showNotificationToast(`✅ Pedido ${orderIdentifier} marcado como ALISTADO.`, 'success');
+    } else {
+      showNotificationToast(`Error: ${result.detail || result.message || 'No se pudo actualizar el estado.'}`, 'error');
+    }
+  } catch (err) {
+    showNotificationToast('Error de conexión al actualizar el pedido.', 'error');
+  }
+};
 
 // Función global robusta para ver/ocultar contraseñas mediante el icono de ojo
 window.togglePasswordVisibility = function(inputId, btnId) {
@@ -1474,7 +1553,8 @@ const RolePermissions = {
       'view-chofer-mobile',
       'view-suppliers-management',
       'view-reports',
-      'view-roles-management'
+      'view-roles-management',
+      'view-tax-hacienda'
     ]
   },
   'Bodeguero': {
@@ -1492,7 +1572,8 @@ const RolePermissions = {
     homeView: 'view-cajero-pos',
     allowedViews: [
       'view-cajero-pos',
-      'view-product-maintenance'
+      'view-product-maintenance',
+      'view-tax-hacienda'
     ]
   },
   'Chofer': {
@@ -1694,6 +1775,11 @@ window.switchViewDirectly = function(viewId) {
       if (pageTitle) pageTitle.textContent = 'Gestión y Asignación de Roles (RBAC)';
       if (pageSubtitle) pageSubtitle.textContent = 'Seguridad Corporativa | Políticas de acceso y segregación de funciones';
       renderUsersRolesTable();
+      break;
+    case 'view-tax-hacienda':
+      if (pageTitle) pageTitle.textContent = 'Módulo Tributario Oficial & Liquidación IVA (Hacienda CR)';
+      if (pageSubtitle) pageSubtitle.textContent = 'Declaración Mensual D-104, Códigos CABYS de 13 dígitos y Facturación Electrónica v4.3';
+      renderTaxHaciendaView();
       break;
   }
 
@@ -2474,6 +2560,8 @@ function setupProductMaintenance() {
       const stock = parseInt(document.getElementById('crudStockInput').value, 10) || 0;
       const minStock = parseInt(document.getElementById('crudMinStockInput').value, 10) || 10;
       const unit = document.getElementById('crudUnitInput').value || 'GALON';
+      const cabysCode = document.getElementById('crudCabysInput')?.value.trim() || '3532200000000';
+      const taxRate = parseFloat(document.getElementById('crudTaxRateSelect')?.value) || 13.0;
 
       const family = AppState.families.find(f => f.id === familyId);
       const subfamily = family?.subfamilies?.find(s => s.id === subfamilyId);
@@ -2500,7 +2588,14 @@ function setupProductMaintenance() {
             stock: stock,
             minStock: minStock,
             unit: unit,
-            categoryLabel: family?.name || 'General'
+            categoryLabel: family?.name || 'General',
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            hazardClass: hazardClass,
+            warehouseLocation: location,
+            warehouseZone: family?.zone || 'ZONA-A',
+            cabysCode: cabysCode,
+            taxRate: taxRate
           };
           const putRes = await fetch(`/api/products/${editingProductId}`, {
             method: 'PUT',
@@ -2545,6 +2640,8 @@ function setupProductMaintenance() {
             p.stock = stock;
             p.minStock = minStock;
             p.unit = unit;
+            p.cabysCode = cabysCode;
+            p.taxRate = taxRate;
             if (uploadedImageRelPath) p.image = uploadedImageRelPath;
           }
           showNotificationToast(`✅ Producto [${sku}] y precio ₡${price.toLocaleString()} actualizados en WMS y Tienda Web.`, 'success');
@@ -2565,7 +2662,14 @@ function setupProductMaintenance() {
             minStock: minStock,
             unit: unit,
             category: 'bandejas_eco',
-            categoryLabel: family?.name || 'General'
+            categoryLabel: family?.name || 'General',
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            hazardClass: hazardClass,
+            warehouseLocation: location,
+            warehouseZone: family?.zone || 'ZONA-A',
+            cabysCode: cabysCode,
+            taxRate: taxRate
           };
           const postRes = await fetch('/api/products', {
             method: 'POST',
@@ -2684,6 +2788,14 @@ function renderMaintenanceTable() {
           <small style="color:#0284C7;"><i class="bi bi-tag-fill"></i> ${p.subfamilyName || 'General'}</small>
         </td>
         <td>
+          <div style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#0284C7; font-size:0.82rem;">
+            ${p.cabysCode || '3532200000000'}
+          </div>
+          <span class="badge-status" style="background:#E0F2FE; color:#0369A1; font-weight:700; font-size:0.72rem; padding:1px 6px;">
+            IVA ${p.taxRate || 13}%
+          </span>
+        </td>
+        <td>
           <div style="font-family:'JetBrains Mono',monospace; font-weight:600; font-size:0.8rem; color:#475569;">
             ${p.batchNumber || 'LOT-2026'}
           </div>
@@ -2734,6 +2846,10 @@ window.openNewProductModal = function() {
 
   document.getElementById('crudBarcodeInput').value = generateRandomBarcode();
   updateSubfamilyOptions(1);
+  const cabysIn = document.getElementById('crudCabysInput');
+  const taxIn = document.getElementById('crudTaxRateSelect');
+  if (cabysIn) cabysIn.value = '3532200000000';
+  if (taxIn) taxIn.value = '13.0';
   if (modal) modal.classList.add('active');
 };
 
@@ -2770,6 +2886,11 @@ window.openEditProductModal = function(id) {
   document.getElementById('crudStockInput').value = p.stock;
   document.getElementById('crudMinStockInput').value = p.minStock || 10;
   document.getElementById('crudUnitInput').value = p.unit || 'UNIDAD';
+
+  const editCabysIn = document.getElementById('crudCabysInput');
+  const editTaxIn = document.getElementById('crudTaxRateSelect');
+  if (editCabysIn) editCabysIn.value = p.cabysCode || '3532200000000';
+  if (editTaxIn) editTaxIn.value = String(p.taxRate || 13.0);
 
   if (modal) modal.classList.add('active');
 };
@@ -5113,9 +5234,15 @@ async function saveOrder(isQuote = false) {
 function openOrderPrintModal(order) {
   const modal = document.getElementById('orderPrintModal');
   const body = document.getElementById('orderPrintModalBody');
-  if (!modal || !body) return;
+  if (!modal || !body || !order) return;
 
   const isQuote = (order.docType === 'COTIZACION');
+  const printItems = Array.isArray(order.items) ? order.items : [];
+  const tot = Number(order.total) || 0;
+  const subBruto = (order.subtotalBruto !== undefined && order.subtotalBruto !== null) ? Number(order.subtotalBruto) : Math.round(tot / 1.13);
+  const descTot = (order.descuentoTotal !== undefined && order.descuentoTotal !== null) ? Number(order.descuentoTotal) : 0;
+  const subNeto = (order.subtotalNeto !== undefined && order.subtotalNeto !== null) ? Number(order.subtotalNeto) : (subBruto - descTot);
+  const ivaAmount = (order.iva !== undefined && order.iva !== null) ? Number(order.iva) : (tot - subNeto);
 
   body.innerHTML = `
     <!-- ENCABEZADO CORPORATIVO OFICIAL FRAGAMA CON LOGO DE FACEBOOK -->
@@ -5135,8 +5262,8 @@ function openOrderPrintModal(order) {
         <span style="display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:800; background:${isQuote ? '#E0F2FE' : '#DCFCE7'}; color:${isQuote ? '#0284C7' : '#15803D'}; border:1px solid ${isQuote ? '#38BDF8' : '#86EFAC'}; margin-bottom:4px;">
           ${isQuote ? 'PROFORMA / COTIZACIÓN' : 'ORDEN DE PEDIDO & ALISTO'}
         </span>
-        <div style="font-family:'JetBrains Mono',monospace; font-size:1.15rem; font-weight:800; color:#0B192C;">${order.orderCode}</div>
-        <div style="font-size:0.75rem; color:#64748B;">Emisión: ${order.date}</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:1.15rem; font-weight:800; color:#0B192C;">${escapeHtml(order.orderCode)}</div>
+        <div style="font-size:0.75rem; color:#64748B;">Emisión: ${escapeHtml(order.date || 'Hoy')}</div>
       </div>
     </div>
 
@@ -5144,19 +5271,19 @@ function openOrderPrintModal(order) {
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.82rem;">
       <div>
         <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Facturado / Dirigido a:</div>
-        <div style="font-weight:800; font-size:0.95rem; color:#0B192C;">${order.customerName}</div>
-        <div><strong>Cédula:</strong> ${order.customerTaxId || 'N/A'}</div>
-        <div><strong>Contacto:</strong> ${order.customerContact || 'N/A'}</div>
-        <div><strong>Teléfono:</strong> ${order.customerPhone || 'N/A'}</div>
+        <div style="font-weight:800; font-size:0.95rem; color:#0B192C;">${escapeHtml(order.customerName || 'Cliente')}</div>
+        <div><strong>Cédula:</strong> ${escapeHtml(order.customerTaxId || 'N/A')}</div>
+        <div><strong>Contacto:</strong> ${escapeHtml(order.customerContact || 'N/A')}</div>
+        <div><strong>Teléfono:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
       </div>
       <div>
         <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Datos de Despacho Nacional (Costa Rica):</div>
-        <div><strong>Responsable Asignado(a):</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-person-badge"></i> ${order.assignedUserName || 'Colaborador Fragama'} (${order.assignedUserRole || 'Encargado'})</span></div>
-        <div><strong>Provincia / Destino:</strong> <span style="font-weight:700; color:#0284C7;">${order.customerProvince || 'Cartago'} &bull; ${order.customerCanton || 'Central'}</span></div>
-        <div><strong>Fecha de Entrega:</strong> ${order.deliveryDate || order.date}</div>
-        <div><strong>Condición de Pago:</strong> ${order.terms || 'Contado'}</div>
-        <div><strong>Dirección:</strong> ${order.customerAddress || 'Retiro en Bodega'}</div>
-        ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${order.notes}</div>` : ''}
+        <div><strong>Responsable Asignado(a):</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-person-badge"></i> ${escapeHtml(order.assignedUserName || order.preparedByName || 'Colaborador Fragama')} (${escapeHtml(order.assignedUserRole || 'Encargado')})</span></div>
+        <div><strong>Provincia / Destino:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
+        <div><strong>Fecha de Entrega:</strong> ${escapeHtml(order.deliveryDate || order.date || 'Inmediata')}</div>
+        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado')}</div>
+        <div><strong>Dirección:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
+        ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${escapeHtml(order.notes)}</div>` : ''}
       </div>
     </div>
 
@@ -5168,7 +5295,7 @@ function openOrderPrintModal(order) {
       <div style="display:flex; justify-content:center;">
         <svg id="printOrderBarcodeSvg"></svg>
       </div>
-      <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${order.orderCode}')">
+      <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${escapeHtml(order.orderCode)}')">
         <i class="bi bi-search"></i> Probar Lectura de este Pedido
       </button>
     </div>
@@ -5195,7 +5322,7 @@ function openOrderPrintModal(order) {
       <div style="text-align:center;">
         <div id="printOrderQrBox" style="width:116px; height:116px; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:8px; padding:6px; display:flex; align-items:center; justify-content:center;">
         </div>
-        <span style="font-size:0.7rem; font-weight:800; color:#64748B; font-family:'JetBrains Mono',monospace; margin-top:3px; display:block;">${order.orderCode}</span>
+        <span style="font-size:0.7rem; font-weight:800; color:#64748B; font-family:'JetBrains Mono',monospace; margin-top:3px; display:block;">${escapeHtml(order.orderCode)}</span>
       </div>
     </div>
 
@@ -5212,16 +5339,24 @@ function openOrderPrintModal(order) {
         </tr>
       </thead>
       <tbody>
-        ${order.items.map((it, idx) => `
+        ${printItems.length === 0 ? `
+          <tr><td colspan="6" style="padding:16px; text-align:center; color:#64748B;">No hay líneas de artículos detalladas en este pedido.</td></tr>
+        ` : printItems.map((it, idx) => {
+          const qty = Number(it.qty || it.quantity || 1);
+          const uPrice = Number(it.unitPrice || 0);
+          const disc = Number(it.discountPct || 0);
+          const sub = Number(it.subtotal || (qty * uPrice));
+          return `
           <tr style="border-bottom:1px solid #E2E8F0; background:${idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA'};">
-            <td style="padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#475569;">${it.sku}</td>
-            <td style="padding:7px 10px; font-weight:600; color:#0B192C;">${it.name} <span style="font-size:0.7rem; color:#64748B;">(${it.unit || 'UND'})</span></td>
-            <td style="padding:7px 8px; text-align:center; font-weight:700;">${it.qty}</td>
-            <td style="padding:7px 10px; text-align:right;">${formatCRC(it.unitPrice)}</td>
-            <td style="padding:7px 8px; text-align:center; color:${it.discountPct > 0 ? '#DC2626' : '#64748B'};">${it.discountPct}%</td>
-            <td style="padding:7px 10px; text-align:right; font-weight:800; color:#0B192C;">${formatCRC(it.subtotal)}</td>
+            <td style="padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#475569;">${escapeHtml(it.sku || 'N/A')}</td>
+            <td style="padding:7px 10px; font-weight:600; color:#0B192C;">${escapeHtml(it.name || it.productName || 'Artículo')} <span style="font-size:0.7rem; color:#64748B;">(${escapeHtml(it.unit || 'UND')})</span></td>
+            <td style="padding:7px 8px; text-align:center; font-weight:700;">${qty}</td>
+            <td style="padding:7px 10px; text-align:right;">${formatCRC(uPrice)}</td>
+            <td style="padding:7px 8px; text-align:center; color:${disc > 0 ? '#DC2626' : '#64748B'};">${disc}%</td>
+            <td style="padding:7px 10px; text-align:right; font-weight:800; color:#0B192C;">${formatCRC(sub)}</td>
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
       </tbody>
     </table>
 
@@ -5230,23 +5365,23 @@ function openOrderPrintModal(order) {
       <div style="width:280px; font-size:0.84rem;">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
           <span style="color:#64748B;">Subtotal Bruto:</span>
-          <span style="font-weight:600;">${formatCRC(order.subtotalBruto)}</span>
+          <span style="font-weight:600;">${formatCRC(subBruto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#DC2626;">
           <span>Descuento Comercial:</span>
-          <span style="font-weight:600;">-${formatCRC(order.descuentoTotal)}</span>
+          <span style="font-weight:600;">-${formatCRC(descTot)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
           <span style="color:#64748B;">Subtotal Gravable:</span>
-          <span style="font-weight:600;">${formatCRC(order.subtotalNeto)}</span>
+          <span style="font-weight:600;">${formatCRC(subNeto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
           <span style="color:#64748B;">IVA Costa Rica (13%):</span>
-          <span style="font-weight:600;">${formatCRC(order.iva)}</span>
+          <span style="font-weight:600;">${formatCRC(ivaAmount)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:1.15rem; font-weight:900; color:#0B192C; border-top:2px solid #0284C7; padding-top:6px;">
           <span>TOTAL:</span>
-          <span style="color:#0284C7;">${formatCRC(order.total)}</span>
+          <span style="color:#0284C7;">${formatCRC(tot)}</span>
         </div>
       </div>
     </div>
@@ -5440,7 +5575,7 @@ function renderOrderHistory() {
             <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="showQrForOrder('${o.orderCode}')" title="Código QR de Carga y Bultos">
               <i class="bi bi-qr-code text-primary"></i>
             </button>
-            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id})" title="Ver e Imprimir Comprobante Oficial">
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Ver e Imprimir Comprobante Oficial">
               <i class="bi bi-printer"></i>
             </button>
 
@@ -5625,15 +5760,21 @@ window.handleConfirmOrderPicking = async function(event) {
   const driverSelect = document.getElementById('pickingDriverSelect');
   const packingNotes = document.getElementById('pickingPackingNotes').value.trim();
 
-  const respId = respSelect ? Number(respSelect.value) : 1;
-  const respName = respSelect ? respSelect.options[respSelect.selectedIndex].text.split(' (')[0] : 'Colaborador';
+  const respId = (respSelect && respSelect.value) ? Number(respSelect.value) : 1;
+  const respName = (respSelect && respSelect.selectedIndex >= 0 && respSelect.options[respSelect.selectedIndex]) 
+    ? respSelect.options[respSelect.selectedIndex].text.split(' (')[0] 
+    : 'Colaborador Fragama';
   
-  const driverId = driverSelect ? Number(driverSelect.value) : 1;
-  const driverName = driverSelect ? driverSelect.options[driverSelect.selectedIndex].text.split(' (')[0] : 'Chofer';
+  const driverId = (driverSelect && driverSelect.value) ? Number(driverSelect.value) : 1;
+  const driverName = (driverSelect && driverSelect.selectedIndex >= 0 && driverSelect.options[driverSelect.selectedIndex]) 
+    ? driverSelect.options[driverSelect.selectedIndex].text.split(' (')[0] 
+    : 'Chofer de Ruta';
 
   const submitBtn = document.getElementById('btnConfirmPickingSubmit');
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Guardando Trazabilidad...`;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Guardando Trazabilidad...`;
+  }
 
   try {
     const payload = {
@@ -5661,8 +5802,7 @@ window.handleConfirmOrderPicking = async function(event) {
         ord.driverName = driverName;
       }
       closeModalDirectly('orderPickingModal');
-      renderOrderHistory();
-      updateWebOrdersBadges();
+      refreshAllOrderViews();
       showNotificationToast(`✅ Pedido ${orderCode} Alistado con éxito por ${respName}. Asignado a ${driverName}.`, 'success');
     } else {
       alert(result.detail || "Error al registrar el alistado del pedido.");
@@ -5702,8 +5842,7 @@ window.dispatchOrderToRoute = async function(orderIdentifier) {
 
     if (res.ok) {
       order.status = 'EN_RUTA';
-      renderOrderHistory();
-      updateWebOrdersBadges();
+      refreshAllOrderViews();
       showNotificationToast(`🚚 Pedido ${order.orderCode} en ruta de entrega con ${driver}.`, 'info');
     }
   } catch(e) {
@@ -5752,10 +5891,7 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
         fetchProducts();
       }
       
-      renderOrderHistory();
-      updateWebOrdersBadges();
-      renderDashboardAnalytics();
-      
+      refreshAllOrderViews();
       showNotificationToast(`🎉 Pedido ${order.orderCode} entregado. ¡Inventario Kardex descontado automáticamente sin descuadre!`, 'success');
     } else {
       alert(result.detail || "Error al confirmar entrega.");
@@ -5808,8 +5944,10 @@ window.handleConfirmUndeliveredOrder = async function(event) {
   errDiv.style.display = 'none';
 
   const repSelect = document.getElementById('undeliveredReporterSelect');
-  const repId = repSelect ? Number(repSelect.value) : 1;
-  const repName = repSelect ? repSelect.options[repSelect.selectedIndex].text.split(' (')[0] : 'Chofer';
+  const repId = (repSelect && repSelect.value) ? Number(repSelect.value) : 1;
+  const repName = (repSelect && repSelect.selectedIndex >= 0 && repSelect.options[repSelect.selectedIndex]) 
+    ? repSelect.options[repSelect.selectedIndex].text.split(' (')[0] 
+    : 'Chofer de Ruta';
 
   try {
     const res = await fetch(`/api/orders/${encodeURIComponent(orderCode || orderId)}/status`, {
@@ -5839,8 +5977,7 @@ window.handleConfirmUndeliveredOrder = async function(event) {
         fetchProducts();
       }
 
-      renderOrderHistory();
-      updateWebOrdersBadges();
+      refreshAllOrderViews();
       showNotificationToast(`⚠️ Incidencia registrada para pedido ${orderCode}. Stock reingresado a bodega.`, 'warning');
     } else {
       alert(result.detail || "Error registrando no entrega.");
@@ -7245,7 +7382,36 @@ function setupQuickMovementModal() {
       product.stock = finalStock;
 
       const nextId = AppState.kardexMovements.length + 101;
-      const nextCode = `${isExit ? 'SAL' : (isTransfer ? 'TRA' : 'ENT')}-20260929-${String(nextId).padStart(4, '0')}`;
+      const nextCode = `${isExit ? 'SAL' : (isTransfer ? 'TRA' : 'ENT')}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(nextId).padStart(4, '0')}`;
+
+      // Persistir de forma atómica en Backend SQLite ACID
+      let backendType = 'AJUSTE_POSITIVO';
+      if (type === 'Salida Venta') backendType = 'SALIDA_VENTA';
+      else if (type === 'Ajuste Negativo') backendType = 'AJUSTE_NEGATIVO';
+      else if (type === 'Traslado Interno') backendType = 'TRASLADO_INTERNO';
+      else if (type === 'Merma / Vencimiento') backendType = 'MERMA_VENCIMIENTO';
+      else if (type === 'Entrada Compra') backendType = 'ENTRADA_COMPRA';
+
+      fetch('/api/inventory/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productId,
+          movementType: backendType,
+          quantity: qty,
+          batchNumber: product.batchNumber || 'LOT-2026-CAT',
+          sourceLocation: product.location || 'PAS-01',
+          targetLocation: product.location || 'PAS-01',
+          referenceDocument: doc,
+          notes: `Ajuste manual [${type}] registrado por ${AppState.currentUser?.name || 'Bodeguero'}`,
+          userId: AppState.currentUser?.id || 1,
+          userName: AppState.currentUser?.name || 'Bodeguero'
+        })
+      }).then(r => r.json()).then(res => {
+        if (res && res.movementNumber) {
+          console.log("Kardex persistido con éxito en SQLite:", res.movementNumber);
+        }
+      }).catch(err => console.warn("Aviso guardando en backend:", err));
 
       AppState.kardexMovements.unshift({
         id: nextId,
@@ -7264,7 +7430,7 @@ function setupQuickMovementModal() {
 
       renderAllViews();
       closeMovementModal();
-      showNotificationToast(`Movimiento ${nextCode} registrado en Kardex exitosamente.`, 'success');
+      showNotificationToast(`Movimiento ${nextCode} registrado y persistido en Kardex exitosamente.`, 'success');
     });
   }
 }
@@ -7486,7 +7652,7 @@ function renderDashboardAnalytics() {
                     <i class="bi bi-check-circle-fill"></i> Listo
                   </button>
                 `}
-                <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id || 1})" title="Imprimir Comprobante de Alisto">
+                <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${o.orderCode || o.id}')" title="Imprimir Comprobante de Alisto">
                   <i class="bi bi-printer"></i>
                 </button>
                 ${o.customerPhone ? `
@@ -7760,8 +7926,18 @@ window.renderWebOrdersFullTable = function() {
     const targetCode = o.orderCode || o.id;
 
     const itemsSummary = items.length > 0 
-      ? items.slice(0, 3).map(it => `• <strong>${it.qty}x</strong> ${escapeHtml(it.name || it.sku)}`).join('<br>') + (items.length > 3 ? `<br><small style="color:#64748B;">(+${items.length - 3} artículos más...)</small>` : '')
-      : '<span style="color:#94A3B8;">Sin artículos detallados</span>';
+      ? `<div style="max-height:160px; overflow-y:auto; padding-right:4px;">` + items.map(it => `
+          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:4px; font-size:0.78rem;">
+            <span style="background:#E0F2FE; color:#0284C7; font-weight:800; padding:1px 6px; border-radius:4px; font-size:0.72rem; white-space:nowrap; border:1px solid #BAE6FD; flex-shrink:0;">
+              ${it.qty || 1}x
+            </span>
+            <div style="line-height:1.25;">
+              <span style="font-weight:700; color:#0F172A;">${escapeHtml(it.name || it.sku || 'Artículo')}</span>
+              ${it.sku ? `<span style="font-size:0.68rem; color:#64748B; font-family:'JetBrains Mono',monospace; margin-left:4px;">[${escapeHtml(it.sku)}]</span>` : ''}
+            </div>
+          </div>
+        `).join('') + `</div>`
+      : '<span style="color:#94A3B8; font-style:italic;">Sin artículos detallados</span>';
 
     return `
       <tr style="border-bottom:1px solid #E2E8F0; ${isPending ? 'background:#F0FDF4;' : ''}">
@@ -7843,13 +8019,20 @@ window.renderWebOrdersFullTable = function() {
               </button>
             ` : ''}
 
-            <!-- 4. TRAZABILIDAD / AUDITORÍA -->
+            <!-- 4. REPROGRAMAR / REINTENTAR ALISTADO SI FUE RECHAZADO -->
+            ${isUndelivered ? `
+              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#F59E0B; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderPickingModal('${targetCode}')" title="Reintentar Alistado y Reprogramar Despacho">
+                <i class="bi bi-arrow-repeat"></i> Reprogramar
+              </button>
+            ` : ''}
+
+            <!-- 5. TRAZABILIDAD / AUDITORÍA -->
             <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Bitácora de Trazabilidad y Tiempos">
               <i class="bi bi-clock-history"></i>
             </button>
 
-            <!-- 5. IMPRIMIR COMPROBANTE -->
-            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint(${o.id || 1})" title="Imprimir Comprobante Oficial">
+            <!-- 6. IMPRIMIR COMPROBANTE -->
+            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante Oficial">
               <i class="bi bi-printer"></i>
             </button>
           </div>
@@ -7878,4 +8061,191 @@ window.triggerManualOrderSync = async function() {
     }
   }
 };
+
+// ==============================================================================
+// MÓDULO TRIBUTARIO OFICIAL HACIENDA CR (IVA D-104 & FACTURACIÓN ELECTRÓNICA v4.3)
+// ==============================================================================
+let currentTaxSummary = null;
+let currentElectronicInvoice = null;
+
+window.renderTaxHaciendaView = async function() {
+  await window.refreshTaxHaciendaData();
+  await window.loadElectronicInvoiceSample();
+};
+
+window.refreshTaxHaciendaData = async function() {
+  try {
+    const res = await fetch('/api/tax/d104-summary');
+    if (!res.ok) throw new Error('Error al consultar liquidación tributaria.');
+    const data = await res.json();
+    currentTaxSummary = data;
+
+    // Actualizar etiquetas de período
+    const periodEl = document.getElementById('taxPeriodLabel');
+    const dueEl = document.getElementById('taxDueDateLabel');
+    if (periodEl && data.periodo) periodEl.textContent = data.periodo.descripcion;
+    if (dueEl && data.periodo) dueEl.textContent = data.periodo.fechaLimitePago;
+
+    // Actualizar KPI Cards
+    const ops = data.resumenOperaciones;
+    const kpiVentas = document.getElementById('kpiTaxVentasNetas');
+    const kpiDebito = document.getElementById('kpiTaxDebitoFiscal');
+    const kpiCredito = document.getElementById('kpiTaxCreditoFiscal');
+    const kpiSaldo = document.getElementById('kpiTaxSaldoPagar');
+
+    if (kpiVentas) kpiVentas.textContent = formatCRC(ops.ventasNetasGravadas13);
+    if (kpiDebito) kpiDebito.textContent = formatCRC(ops.debitoFiscalIva);
+    if (kpiCredito) kpiCredito.textContent = formatCRC(ops.creditoFiscalIva);
+    if (kpiSaldo) kpiSaldo.textContent = formatCRC(ops.impuestoNetoAPagar);
+
+    // Renderizar Casillas D-104
+    const d104Tbody = document.getElementById('taxD104TableBody');
+    if (d104Tbody && data.casillasFormularioD104) {
+      const cas = data.casillasFormularioD104;
+      const rows = [
+        { code: cas.casilla01.codigo, name: cas.casilla01.concepto, amount: cas.casilla01.monto, highlight: false },
+        { code: cas.casilla05.codigo, name: cas.casilla05.concepto, amount: cas.casilla05.monto, highlight: false },
+        { code: cas.casilla13.codigo, name: cas.casilla13.concepto, amount: cas.casilla13.monto, highlight: 'debito' },
+        { code: cas.casilla23.codigo, name: cas.casilla23.concepto, amount: cas.casilla23.monto, highlight: false },
+        { code: cas.casilla33.codigo, name: cas.casilla33.concepto, amount: cas.casilla33.monto, highlight: 'credito' },
+        { code: cas.casilla45.codigo, name: cas.casilla45.concepto, amount: cas.casilla45.monto, highlight: 'saldo' }
+      ];
+
+      d104Tbody.innerHTML = rows.map(r => {
+        let style = 'font-weight:700; font-family:"JetBrains Mono"; text-align:right; font-size:1rem;';
+        let badgeColor = '#64748B';
+        if (r.highlight === 'debito') { style += ' color:#DC2626;'; badgeColor = '#DC2626'; }
+        else if (r.highlight === 'credito') { style += ' color:#059669;'; badgeColor = '#059669'; }
+        else if (r.highlight === 'saldo') { style += ' color:#D97706; background:#FEF3C7;'; badgeColor = '#D97706'; }
+
+        return `
+          <tr>
+            <td>
+              <span class="badge-status" style="background:#F1F5F9; color:${badgeColor}; font-weight:800; font-family:'JetBrains Mono'; font-size:0.85rem;">
+                Casilla ${r.code}
+              </span>
+            </td>
+            <td style="color:#0B192C; font-weight:600;">${r.name}</td>
+            <td style="${style}">${formatCRC(r.amount)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Renderizar Códigos CABYS
+    const cabysTbody = document.getElementById('taxCabysTableBody');
+    if (cabysTbody && Array.isArray(data.cabysCatalogBreakdown)) {
+      cabysTbody.innerHTML = data.cabysCatalogBreakdown.map(item => `
+        <tr>
+          <td>
+            <strong>${item.CategoryLabel || item.Category}</strong>
+            <small style="display:block; color:#64748B;">Línea de almacén Cartago</small>
+          </td>
+          <td>
+            <span class="badge-status" style="background:#E0F2FE; color:#0369A1; font-family:'JetBrains Mono'; font-weight:800;">
+              ${item.cabys}
+            </span>
+          </td>
+          <td>
+            <span class="badge-status" style="background:#DCFCE7; color:#15803D; font-weight:700;">
+              13% IVA
+            </span>
+          </td>
+          <td style="font-weight:700; color:#0B192C;">${item.count} SKUs</td>
+        </tr>
+      `).join('');
+    }
+
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('✅ Resumen tributario D-104 y cálculos de IVA actualizados.', 'success');
+    }
+  } catch (err) {
+    console.error('Error cargando datos tributarios:', err);
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('Aviso: Cargando liquidación tributaria.', 'warning');
+    }
+  }
+};
+
+window.loadElectronicInvoiceSample = async function() {
+  try {
+    const res = await fetch('/api/tax/electronic-invoice/0');
+    if (res.ok) {
+      const data = await res.json();
+      currentElectronicInvoice = data;
+
+      const claveEl = document.getElementById('xmlClaveLabel');
+      const consecutivoEl = document.getElementById('xmlConsecutivoLabel');
+      const receptorEl = document.getElementById('xmlReceptorLabel');
+      const totalEl = document.getElementById('xmlTotalLabel');
+      const xmlDisplay = document.getElementById('xmlContentDisplay');
+
+      if (claveEl) claveEl.textContent = data.clave;
+      if (consecutivoEl) consecutivoEl.textContent = data.consecutivo;
+      if (receptorEl) receptorEl.textContent = data.receptor;
+      if (totalEl) totalEl.textContent = formatCRC(data.totalFactura);
+      if (xmlDisplay) xmlDisplay.textContent = data.xml;
+    }
+  } catch (e) {
+    console.warn('Error cargando muestra de XML electrónico:', e);
+  }
+};
+
+window.copyD104DataToClipboard = function() {
+  if (!currentTaxSummary) return;
+  const cas = currentTaxSummary.casillasFormularioD104;
+  const text = `LIQUIDACIÓN IVA FORMULARIO D-104 - DISTRIBUIDORA FRAGAMA S.A.
+Cédula Jurídica: ${currentTaxSummary.empresa.cedulaJuridica}
+Período: ${currentTaxSummary.periodo.descripcion}
+
+- Casilla 01 (Ventas gravadas 13%): ₡${cas.casilla01.monto.toLocaleString()}
+- Casilla 05 (Ventas exentas): ₡${cas.casilla05.monto.toLocaleString()}
+- Casilla 13 (Débito Fiscal Ventas): ₡${cas.casilla13.monto.toLocaleString()}
+- Casilla 23 (Compras Gravadas 13%): ₡${cas.casilla23.monto.toLocaleString()}
+- Casilla 33 (Crédito Fiscal Compras): ₡${cas.casilla33.monto.toLocaleString()}
+- Casilla 45 (SALDO A PAGAR A HACIENDA): ₡${cas.casilla45.monto.toLocaleString()}
+`;
+  navigator.clipboard.writeText(text).then(() => {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('📋 Datos del formulario D-104 copiados al portapapeles.', 'success');
+    } else {
+      alert('Datos copiados al portapapeles.');
+    }
+  });
+};
+
+window.downloadTaxCsvReport = function() {
+  window.location.href = '/api/tax/export-d104-csv';
+};
+
+window.copyXmlToClipboard = function() {
+  if (!currentElectronicInvoice || !currentElectronicInvoice.xml) {
+    alert('No hay XML disponible para copiar.');
+    return;
+  }
+  navigator.clipboard.writeText(currentElectronicInvoice.xml).then(() => {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('📋 XML oficial de Factura Electrónica v4.3 copiado.', 'success');
+    } else {
+      alert('XML copiado al portapapeles.');
+    }
+  });
+};
+
+window.downloadXmlFile = function() {
+  if (!currentElectronicInvoice || !currentElectronicInvoice.xml) {
+    alert('No hay XML generado para descargar.');
+    return;
+  }
+  const blob = new Blob([currentElectronicInvoice.xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Factura_${currentElectronicInvoice.consecutivo || 'Hacienda'}.xml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 

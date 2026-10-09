@@ -436,6 +436,20 @@
         </a>
       </div>
 
+      <!-- HACIENDA, IVA & CABYS (CR) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-hacienda" onclick="toggleSidebarAccordion('menu-hacienda', this)" data-roles="Administrador,Cajero">
+        <i class="bi bi-file-earmark-ruled-fill" style="color:#0284C7;"></i>
+        <span>Hacienda &amp; IVA (CR)</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-hacienda" data-roles="Administrador,Cajero">
+        <a class="nav-link" data-view="view-tax-hacienda" data-roles="Administrador,Cajero" style="font-weight:700;">
+          <i class="bi bi-calculator-fill" style="color:#0284C7;"></i>
+          <span>Declaración D-104 &amp; CABYS</span>
+          <span class="badge-count" style="background:rgba(2,132,199,0.18); color:#0284C7;">13% IVA</span>
+        </a>
+      </div>
+
       <!-- SEGURIDAD & ASIGNACIÓN DE ROLES (RBAC) -->
       <a class="nav-link tree-toggle" data-collapse="menu-seguridad" onclick="toggleSidebarAccordion('menu-seguridad', this)" data-roles="Administrador">
         <i class="bi bi-shield-lock-fill"></i>
@@ -855,6 +869,7 @@
                   <th>SKU</th>
                   <th>Producto / Peligrosidad</th>
                   <th>Familia &amp; Subfamilia</th>
+                  <th>Código CABYS (CR)</th>
                   <th>Lote / Vencimiento</th>
                   <th>Ubicación</th>
                   <th>Costo</th>
@@ -1281,6 +1296,206 @@
         <!-- CONTENEDOR OCULTO PARA IMPRESIÓN OFICIAL FORMAL (MEMBRETE, TABLA Y FIRMAS) -->
         <div id="printableOfficialReport">
           <!-- Inyectado dinámicamente antes de window.print() -->
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           VISTA TRIBUTARIA: HACIENDA CR, IVA D-104, CABYS & FACTURACIÓN ELECTRÓNICA
+           ==================================================================== -->
+      <section class="role-view" id="view-tax-hacienda">
+        <!-- Tarjeta de Membrete Oficial y Normativa -->
+        <div class="content-card" style="margin-bottom:1.5rem; background:linear-gradient(135deg, #0B192C 0%, #1E3E62 100%); color:#FFF; border:none;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                <span style="font-size:1.5rem;">🇨🇷</span>
+                <h2 style="font-size:1.4rem; font-weight:800; margin:0; letter-spacing:-0.5px;">
+                  Módulo Tributario Oficial &amp; Liquidación de IVA (Hacienda CR)
+                </h2>
+                <span class="badge-status" style="background:#10B981; color:#FFF; font-weight:700;">
+                  <i class="bi bi-shield-check"></i> 100% Conforme DGT
+                </span>
+              </div>
+              <p style="margin:0 0 6px 0; color:#94A3B8; font-size:0.9rem;">
+                <strong>Distribuidora Fragama S.A.</strong> | Cédula Jurídica: <span style="font-family:'JetBrains Mono'; color:#38BDF8;">3-101-778899</span> | Actividad Económica: <span style="font-family:'JetBrains Mono'; color:#38BDF8;">466901</span> (Venta al por mayor de artículos de limpieza y químicos)
+              </p>
+              <div style="font-size:0.8rem; color:#CBD5E1; display:flex; gap:18px; flex-wrap:wrap;">
+                <span><i class="bi bi-geo-alt-fill text-warning"></i> Cartago, Costa Rica</span>
+                <span><i class="bi bi-calendar-check text-info"></i> Período: <strong id="taxPeriodLabel" style="color:#FFF;">Octubre 2026</strong></span>
+                <span><i class="bi bi-clock-history text-danger"></i> Vencimiento Declaración: <strong id="taxDueDateLabel" style="color:#FBBF24;">15 de Noviembre 2026</strong></span>
+              </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-fragama" onclick="refreshTaxHaciendaData()" style="background:rgba(255,255,255,0.15); color:#FFF; border:1px solid rgba(255,255,255,0.25);">
+                <i class="bi bi-arrow-clockwise"></i> Recalcular En Vivo
+              </button>
+              <button class="btn-fragama" onclick="downloadTaxCsvReport()" style="background:#0284C7; color:#FFF; border:none;">
+                <i class="bi bi-file-earmark-excel-fill"></i> Descargar CSV Contador
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas KPI Tributarias -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px; margin-bottom:1.5rem;">
+          
+          <div class="content-card" style="margin:0; border-left:4px solid #0284C7;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <small style="color:#64748B; font-weight:600; text-transform:uppercase; font-size:0.75rem;">Ventas Gravadas 13%</small>
+                <div style="font-size:1.6rem; font-weight:800; color:#0B192C; font-family:'JetBrains Mono';" id="kpiTaxVentasNetas">₡0.00</div>
+              </div>
+              <div style="width:46px; height:46px; border-radius:10px; background:#E0F2FE; color:#0284C7; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                <i class="bi bi-receipt-cutoff"></i>
+              </div>
+            </div>
+            <small style="color:#64748B; font-size:0.78rem; display:block; margin-top:6px;">Base imponible total facturada</small>
+          </div>
+
+          <div class="content-card" style="margin:0; border-left:4px solid #EF4444;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <small style="color:#64748B; font-weight:600; text-transform:uppercase; font-size:0.75rem;">Débito Fiscal (IVA Cobrado)</small>
+                <div style="font-size:1.6rem; font-weight:800; color:#DC2626; font-family:'JetBrains Mono';" id="kpiTaxDebitoFiscal">₡0.00</div>
+              </div>
+              <div style="width:46px; height:46px; border-radius:10px; background:#FEE2E2; color:#DC2626; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                <i class="bi bi-arrow-up-right-circle-fill"></i>
+              </div>
+            </div>
+            <small style="color:#64748B; font-size:0.78rem; display:block; margin-top:6px;">13% recaudado de clientes en ventas</small>
+          </div>
+
+          <div class="content-card" style="margin:0; border-left:4px solid #10B981;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <small style="color:#64748B; font-weight:600; text-transform:uppercase; font-size:0.75rem;">Crédito Fiscal (Compras)</small>
+                <div style="font-size:1.6rem; font-weight:800; color:#059669; font-family:'JetBrains Mono';" id="kpiTaxCreditoFiscal">₡0.00</div>
+              </div>
+              <div style="width:46px; height:46px; border-radius:10px; background:#DCFCE7; color:#059669; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                <i class="bi bi-arrow-down-left-circle-fill"></i>
+              </div>
+            </div>
+            <small style="color:#64748B; font-size:0.78rem; display:block; margin-top:6px;">IVA soportado en compras a proveedores</small>
+          </div>
+
+          <div class="content-card" style="margin:0; border-left:4px solid #F59E0B; background:#FFFBEB;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <small style="color:#92400E; font-weight:700; text-transform:uppercase; font-size:0.75rem;">A Pagar a Hacienda (Casilla 45)</small>
+                <div style="font-size:1.6rem; font-weight:800; color:#B45309; font-family:'JetBrains Mono';" id="kpiTaxSaldoPagar">₡0.00</div>
+              </div>
+              <div style="width:46px; height:46px; border-radius:10px; background:#FEF3C7; color:#D97706; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                <i class="bi bi-cash-stack"></i>
+              </div>
+            </div>
+            <small style="color:#92400E; font-size:0.78rem; display:block; margin-top:6px; font-weight:600;">Saldo neto a transferir vía ATV</small>
+          </div>
+
+        </div>
+
+        <!-- Mapeo Formulario D-104 y Catálogo CABYS (2 Columnas) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:1.5rem;">
+          
+          <!-- Columna Izquierda: Casillas Oficiales ATV D-104 -->
+          <div class="content-card" style="margin:0;">
+            <div class="card-header-custom" style="padding-bottom:12px;">
+              <div class="card-header-title">
+                <i class="bi bi-input-cursor-text text-primary"></i> Casillas del Formulario D-104 (Portal ATV)
+              </div>
+              <button class="btn-fragama btn-outline-fragama" style="font-size:0.78rem; padding:4px 10px;" onclick="copyD104DataToClipboard()">
+                <i class="bi bi-clipboard"></i> Copiar para ATV
+              </button>
+            </div>
+            <p style="color:#64748B; font-size:0.83rem; margin-top:0;">
+              Ingrese estos montos exactos en su declaración mensual en el sitio web de Hacienda antes del día 15:
+            </p>
+            <div style="overflow-x:auto;">
+              <table class="custom-table" style="font-size:0.88rem;">
+                <thead>
+                  <tr>
+                    <th style="width:70px;">Casilla</th>
+                    <th>Concepto Tributario Oficial</th>
+                    <th style="text-align:right;">Monto en Colones (₡)</th>
+                  </tr>
+                </thead>
+                <tbody id="taxD104TableBody">
+                  <!-- Inyectado vía JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Catálogo CABYS por Categoría de Bodega -->
+          <div class="content-card" style="margin:0;">
+            <div class="card-header-custom" style="padding-bottom:12px;">
+              <div class="card-header-title">
+                <i class="bi bi-qr-code text-primary"></i> Códigos CABYS de Bodega (Hacienda CR)
+              </div>
+              <span class="badge-status" style="background:#E0F2FE; color:#0369A1; font-weight:700;">
+                13 Dígitos BCCR
+              </span>
+            </div>
+            <p style="color:#64748B; font-size:0.83rem; margin-top:0;">
+              Clasificación oficial asignada a cada producto del catálogo según la resolución de Hacienda:
+            </p>
+            <div style="overflow-x:auto;">
+              <table class="custom-table" style="font-size:0.85rem;">
+                <thead>
+                  <tr>
+                    <th>Categoría de Bodega</th>
+                    <th>Código CABYS</th>
+                    <th>Tarifa IVA</th>
+                    <th>Productos</th>
+                  </tr>
+                </thead>
+                <tbody id="taxCabysTableBody">
+                  <!-- Inyectado vía JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Visor de Factura Electrónica v4.3 (XML & Clave 50 Dígitos) -->
+        <div class="content-card">
+          <div class="card-header-custom">
+            <div class="card-header-title">
+              <i class="bi bi-file-earmark-code text-primary"></i> Comprobante Electrónico v4.3 (Clave Numérica de 50 Dígitos &amp; XML)
+            </div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn-fragama btn-outline-fragama" onclick="copyXmlToClipboard()">
+                <i class="bi bi-clipboard-check"></i> Copiar XML
+              </button>
+              <button class="btn-fragama btn-primary-fragama" onclick="downloadXmlFile()">
+                <i class="bi bi-download"></i> Descargar XML Hacienda
+              </button>
+            </div>
+          </div>
+          
+          <div style="background:#0F172A; border-radius:10px; padding:16px; color:#E2E8F0; margin-bottom:1rem;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:0.85rem; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:12px;">
+              <div>
+                <span style="color:#94A3B8; display:block; font-size:0.75rem;">CLAVE NUMÉRICA (50 DÍGITOS):</span>
+                <strong id="xmlClaveLabel" style="font-family:'JetBrains Mono'; color:#38BDF8; font-size:0.92rem; word-break:break-all;">50600000000000000000000000000000000000000000000000</strong>
+              </div>
+              <div>
+                <span style="color:#94A3B8; display:block; font-size:0.75rem;">NÚMERO CONSECUTIVO:</span>
+                <strong id="xmlConsecutivoLabel" style="font-family:'JetBrains Mono'; color:#4ADE80;">00100001010000000001</strong>
+              </div>
+              <div>
+                <span style="color:#94A3B8; display:block; font-size:0.75rem;">CLIENTE RECEPTOR:</span>
+                <strong id="xmlReceptorLabel" style="color:#F8FAFC;">Supermercado Cartago</strong>
+              </div>
+              <div>
+                <span style="color:#94A3B8; display:block; font-size:0.75rem;">TOTAL COMPROBANTE:</span>
+                <strong id="xmlTotalLabel" style="font-family:'JetBrains Mono'; color:#FCD34D;">₡0.00</strong>
+              </div>
+            </div>
+
+            <pre id="xmlContentDisplay" style="background:#020617; padding:12px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:#A7F3D0; overflow:auto; max-height:280px; margin:0; line-height:1.5;">Cargando estructura XML oficial de Hacienda v4.3...</pre>
+          </div>
         </div>
 
       </section>
@@ -2319,6 +2534,25 @@
           <div style="margin-bottom:1rem;">
             <label class="login-form-label">Ubicación Física en Bodega Cartago</label>
             <input type="text" id="crudLocationInput" class="login-input" style="padding-left:14px;" placeholder="PAS-QUIM-01 / EST-01 / N-1 / P-01">
+          </div>
+
+          <!-- REQUISITOS TRIBUTARIOS HACIENDA COSTA RICA -->
+          <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:10px; padding:12px 14px; margin-bottom:1rem; display:grid; grid-template-columns:2fr 1fr; gap:12px; align-items:center;">
+            <div>
+              <label class="login-form-label" style="color:#0369A1; font-weight:700;">
+                <i class="bi bi-qr-code"></i> Código CABYS (Hacienda CR - 13 dígitos)
+              </label>
+              <input type="text" id="crudCabysInput" class="login-input" style="padding-left:14px; font-family:'JetBrains Mono',monospace; font-weight:700; color:#0369A1; background:#FFF;" placeholder="3532200000000" maxlength="13" value="3532200000000">
+              <small style="color:#0284C7; font-size:0.75rem;">Requisito obligatorio para Facturación Electrónica v4.3</small>
+            </div>
+            <div>
+              <label class="login-form-label" style="color:#0369A1; font-weight:700;">Tarifa IVA</label>
+              <select id="crudTaxRateSelect" style="width:100%; padding:10px; border:1px solid #7DD3FC; border-radius:8px; font-family:inherit; font-weight:700; background:#FFF; color:#0369A1;">
+                <option value="13.0">13% General</option>
+                <option value="1.0">1% Canasta Básica</option>
+                <option value="0.0">0% Exento</option>
+              </select>
+            </div>
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:1rem;">

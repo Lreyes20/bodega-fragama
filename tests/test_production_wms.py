@@ -271,3 +271,47 @@ class TestErpAdvancedWms:
         assert "text/csv" in res.headers["content-type"]
         assert "Numero_Movimiento" in res.text
 
+class TestHaciendaTaxCostaRica:
+    def test_d104_tax_summary(self, client):
+        res = client.get("/api/tax/d104-summary")
+        assert res.status_code == 200
+        data = res.json()
+        assert "empresa" in data
+        assert data["empresa"]["cedulaJuridica"] == "3-101-778899"
+        assert data["empresa"]["actividadEconomica"] == "466901"
+        assert "resumenOperaciones" in data
+        assert "casillasFormularioD104" in data
+        assert data["casillasFormularioD104"]["casilla01"]["codigo"] == "01"
+        assert data["casillasFormularioD104"]["casilla13"]["codigo"] == "13"
+        assert data["casillasFormularioD104"]["casilla45"]["codigo"] == "45"
+        assert len(data["cabysCatalogBreakdown"]) >= 5
+
+    def test_electronic_invoice_xml_generation(self, client):
+        res = client.get("/api/tax/electronic-invoice/0")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert len(data["clave"]) == 50
+        assert data["clave"].startswith("506")
+        assert len(data["consecutivo"]) == 20
+        assert "<FacturaElectronica" in data["xml"]
+        assert "<Clave>" in data["xml"]
+        assert "<CodigoActividad>466901</CodigoActividad>" in data["xml"]
+
+    def test_d104_csv_export(self, client):
+        res = client.get("/api/tax/export-d104-csv")
+        assert res.status_code == 200
+        assert "text/csv" in res.headers["content-type"]
+        assert "CASILLAS OFICIALES FORMULARIO D-104" in res.text
+
+    def test_products_have_cabys_code(self, client):
+        res = client.get("/api/products")
+        assert res.status_code == 200
+        prods = res.json()
+        assert len(prods) > 0
+        p = prods[0]
+        assert "cabysCode" in p
+        assert len(p["cabysCode"]) == 13
+        assert p["taxRate"] == 13.0
+
+
