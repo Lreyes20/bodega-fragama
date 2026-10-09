@@ -155,6 +155,9 @@ BEGIN
         UnitOfMeasure NVARCHAR(20) NOT NULL DEFAULT 'GALON',
         WeightKg DECIMAL(8,2) NOT NULL DEFAULT 0.00,
         VolumeM3 DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+        -- Normativa Tributaria Hacienda Costa Rica
+        CabysCode NVARCHAR(13) NOT NULL DEFAULT '3532200000000', -- Código CABYS (13 dígitos) BCCR
+        TaxRate DECIMAL(5,2) NOT NULL DEFAULT 13.00,             -- Tarifa IVA (%)
         IsActive BIT NOT NULL DEFAULT 1,
         RowVersion ROWVERSION NOT NULL,
         CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),

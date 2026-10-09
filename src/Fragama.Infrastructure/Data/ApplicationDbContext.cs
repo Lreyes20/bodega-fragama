@@ -61,6 +61,8 @@ namespace Fragama.Infrastructure.Data
                 entity.Property(e => e.SalePrice).HasPrecision(18, 2);
                 entity.Property(e => e.WeightKg).HasPrecision(8, 2);
                 entity.Property(e => e.VolumeM3).HasPrecision(8, 4);
+                entity.Property(e => e.CabysCode).HasMaxLength(13).HasDefaultValue("3532200000000");
+                entity.Property(e => e.TaxRate).HasPrecision(5, 2).HasDefaultValue(13.0m);
                 entity.Property(e => e.RowVersion).IsRowVersion();
 
                 entity.HasOne(e => e.Category)

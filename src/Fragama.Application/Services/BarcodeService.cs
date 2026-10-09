@@ -38,7 +38,9 @@ namespace Fragama.Application.Services
                     MinimumStock = p.MinimumStock,
                     MaximumStock = p.MaximumStock,
                     UnitOfMeasure = p.UnitOfMeasure,
-                    HasLowStockAlert = p.HasLowStockAlert
+                    HasLowStockAlert = p.HasLowStockAlert,
+                    CabysCode = p.CabysCode,
+                    TaxRate = p.TaxRate
                 });
             }
             return list;
@@ -61,7 +63,9 @@ namespace Fragama.Application.Services
                 MinimumStock = p.MinimumStock,
                 MaximumStock = p.MaximumStock,
                 UnitOfMeasure = p.UnitOfMeasure,
-                HasLowStockAlert = p.HasLowStockAlert
+                HasLowStockAlert = p.HasLowStockAlert,
+                CabysCode = p.CabysCode,
+                TaxRate = p.TaxRate
             };
         }
 
@@ -103,6 +107,8 @@ namespace Fragama.Application.Services
                 MaximumStock = dto.MaximumStock,
                 UnitOfMeasure = dto.UnitOfMeasure,
                 WeightKg = dto.WeightKg,
+                CabysCode = string.IsNullOrWhiteSpace(dto.CabysCode) ? "3532200000000" : dto.CabysCode,
+                TaxRate = dto.TaxRate > 0 ? dto.TaxRate : 13.0m,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -143,7 +149,9 @@ namespace Fragama.Application.Services
                 CurrentStock = product.CurrentStock,
                 MinimumStock = product.MinimumStock,
                 MaximumStock = product.MaximumStock,
-                UnitOfMeasure = product.UnitOfMeasure
+                UnitOfMeasure = product.UnitOfMeasure,
+                CabysCode = product.CabysCode,
+                TaxRate = product.TaxRate
             };
         }
 

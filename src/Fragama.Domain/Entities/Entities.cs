@@ -120,6 +120,10 @@ namespace Fragama.Domain.Entities
         public decimal WeightKg { get; set; }             // Peso para capacidad de camión
         public decimal VolumeM3 { get; set; }             // Volumen cúbico para estiba
 
+        // Normativa Tributaria y Facturación Hacienda Costa Rica
+        public string CabysCode { get; set; } = "3532200000000"; // Catálogo de Bienes y Servicios (13 dígitos) BCCR
+        public decimal TaxRate { get; set; } = 13.0m;             // Tarifa IVA general (13%)
+
         public bool IsActive { get; set; } = true;
         public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
@@ -175,6 +179,12 @@ namespace Fragama.Domain.Entities
         public PaymentMethod PaymentMethod { get; set; }
         public string Status { get; set; } = "EMITIDA";
         public bool RequiresDelivery { get; set; }
+
+        // Facturación Electrónica v4.3 (Hacienda Costa Rica)
+        public string? ElectronicInvoiceKey { get; set; } // Clave numérica de 50 dígitos
+        public string? ConsecutiveNumber { get; set; }    // Consecutivo oficial de 20 dígitos
+        public string EconomicActivityCode { get; set; } = "466901"; // Actividad económica DGT
+
         public ICollection<InvoiceDetail> Details { get; set; } = new List<InvoiceDetail>();
     }
 
@@ -187,6 +197,8 @@ namespace Fragama.Domain.Entities
         public string? BatchNumber { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+        public string CabysCode { get; set; } = "3532200000000";
+        public decimal TaxRate { get; set; } = 13.0m;
         public decimal TotalLine => Quantity * UnitPrice;
     }
 
@@ -216,6 +228,8 @@ namespace Fragama.Domain.Entities
         public string? BatchNumber { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+        public string CabysCode { get; set; } = "3532200000000";
+        public decimal TaxRate { get; set; } = 13.0m;
         public decimal TotalLine => Quantity * UnitPrice;
     }
 

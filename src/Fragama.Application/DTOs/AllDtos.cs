@@ -46,6 +46,8 @@ namespace Fragama.Application.DTOs
         public int MaximumStock { get; set; }
         public string UnitOfMeasure { get; set; } = "UNIDAD";
         public bool HasLowStockAlert { get; set; }
+        public string CabysCode { get; set; } = "3532200000000";
+        public decimal TaxRate { get; set; } = 13.0m;
     }
 
     public class CreateProductDto
@@ -63,6 +65,8 @@ namespace Fragama.Application.DTOs
         public int MaximumStock { get; set; } = 500;
         public string UnitOfMeasure { get; set; } = "UNIDAD";
         public decimal WeightKg { get; set; }
+        public string? CabysCode { get; set; }
+        public decimal TaxRate { get; set; } = 13.0m;
     }
 
     public class BarcodePrintDto

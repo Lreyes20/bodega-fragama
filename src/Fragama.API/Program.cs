@@ -52,6 +52,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IProductService, BarcodeService>();
 builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<ITaxService, TaxService>();
 
 // 4. Autenticación JWT y Políticas de Roles (RBAC)
 var jwtSecret = builder.Configuration["Jwt:SecretKey"] ?? "FragamaSuperSecretProductionKey2026!MustBeVeryLongAndSecure#";
