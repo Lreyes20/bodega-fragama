@@ -8070,7 +8070,8 @@ let currentElectronicInvoice = null;
 
 window.renderTaxHaciendaView = async function() {
   await window.refreshTaxHaciendaData();
-  await window.populateXmlOrderSelector();
+  await window.populateXmlCustomerSelector();
+  await window.filterAndRenderOrdersForXml();
   await window.loadElectronicInvoiceSample();
 };
 
@@ -8223,8 +8224,80 @@ const COMPANY_PRESETS = {
   }
 };
 
-window.populateXmlOrderSelector = async function() {
+window.populateXmlCustomerSelector = async function() {
+  const custSelect = document.getElementById('xmlCustomerSelector');
+  if (!custSelect) return;
+
+  let customers = AppState.customers || [];
+  if (!customers || customers.length === 0) {
+    try {
+      const res = await fetch('/api/customers');
+      if (res.ok) {
+        customers = await res.json();
+        AppState.customers = customers;
+      }
+    } catch (e) {
+      console.warn('Error cargando clientes de BD:', e);
+    }
+  }
+
+  custSelect.innerHTML = '<option value="">🏢 [Seleccionar Cliente de la Base de Datos...]</option>';
+  if (customers && customers.length > 0) {
+    const seen = new Set();
+    customers.forEach(c => {
+      const key = (c.name || '').trim().toLowerCase();
+      if (!seen.has(key) && c.name) {
+        seen.add(key);
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        const tax = c.taxId && c.taxId !== 'N/A' ? ` (${c.taxId})` : '';
+        const loc = c.canton ? ` - ${c.canton}` : '';
+        opt.textContent = `🏢 ${c.name}${tax}${loc}`;
+        custSelect.appendChild(opt);
+      }
+    });
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = '✍️ Cliente Personalizado (Ingresar a mano)...';
+    custSelect.appendChild(customOpt);
+  }
+};
+
+window.onSelectCustomerFromDb = async function(customerId) {
+  if (!customerId) return;
+  if (customerId === 'custom') {
+    const panel = document.getElementById('customInvoiceBuilderPanel');
+    if (panel) panel.style.display = 'block';
+    const recNombre = document.getElementById('cfgReceptorNombre');
+    if (recNombre) recNombre.focus();
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('✍️ Modo Cliente Personalizado: Ingrese la razón social y cédula deseada.', 'info');
+    }
+    return;
+  }
+
+  const customers = AppState.customers || [];
+  const cust = customers.find(c => String(c.id) === String(customerId));
+  if (!cust) return;
+
+  const recNombre = document.getElementById('cfgReceptorNombre');
+  const recCedula = document.getElementById('cfgReceptorCedula');
+  const recCorreo = document.getElementById('cfgReceptorCorreo');
+
+  if (recNombre) recNombre.value = cust.name;
+  if (recCedula) recCedula.value = (cust.taxId && cust.taxId !== 'N/A') ? cust.taxId : '3014042047';
+  if (recCorreo) recCorreo.value = cust.email || 'facturacion@cliente.cr';
+
+  if (typeof showNotificationToast === 'function') {
+    showNotificationToast(`🏢 Cliente de Base de Datos seleccionado: "${cust.name}"`, 'success');
+  }
+
+  await window.triggerRegenerateXml();
+};
+
+window.filterAndRenderOrdersForXml = async function() {
   const selector = document.getElementById('xmlOrderSelector');
+  const onlyPaid = document.getElementById('chkOnlyPaidOrders')?.checked ?? true;
   if (!selector) return;
 
   let orders = AppState.salesOrders || [];
@@ -8236,31 +8309,45 @@ window.populateXmlOrderSelector = async function() {
         AppState.salesOrders = orders;
       }
     } catch (e) {
-      console.warn('Error al consultar lista de pedidos para selector XML:', e);
+      console.warn('Error cargando pedidos para selector XML:', e);
     }
   }
 
   selector.innerHTML = '';
-  if (orders && orders.length > 0) {
-    orders.forEach((o, idx) => {
+  const filtered = (orders || []).filter(o => {
+    if (!onlyPaid) return true;
+    const st = (o.status || '').toUpperCase();
+    return st === 'FACTURADO' || st === 'ALISTADO' || st === 'ENTREGADO' || st === 'PAGADO' || st === 'COMPLETADO' || o.isPaid === true;
+  });
+
+  if (filtered.length > 0) {
+    filtered.forEach((o, idx) => {
       const opt = document.createElement('option');
       opt.value = o.id || o.orderCode;
       const code = o.orderCode || `PED-${o.id}`;
       const cust = o.customerName || 'Cliente General';
       const tot = typeof formatCRC === 'function' ? formatCRC(o.total || 0) : `₡${o.total}`;
-      opt.textContent = `Factura #${code} - ${cust} (${tot})`;
+      const isPaid = (o.status || '').toUpperCase() === 'FACTURADO' || (o.status || '').toUpperCase() === 'ALISTADO' || (o.status || '').toUpperCase() === 'ENTREGADO' || (o.status || '').toUpperCase() === 'PAGADO';
+      const badgeText = isPaid ? ' [🟢 FACTURA PAGADA]' : ` [${o.status || 'PENDIENTE'}]`;
+      opt.textContent = `Factura #${code} | ${cust} | ${tot}${badgeText}`;
       if (idx === 0) opt.selected = true;
       selector.appendChild(opt);
     });
 
-    // Sincronizar datos del primer pedido en el formulario
-    window.syncOrderDataToForm(orders[0]);
+    const activeOrder = filtered[0];
+    window.syncOrderDataToForm(activeOrder);
+    await window.importLinesFromCurrentOrder(activeOrder.id || activeOrder.orderCode);
+    await window.triggerRegenerateXml();
   } else {
     const opt = document.createElement('option');
     opt.value = "108";
-    opt.textContent = "Factura #PED-WEB-53917 - Municipalidad de Curridabat (₡13.305,75)";
+    opt.textContent = "Factura #PED-WEB-53917 | Municipalidad de Curridabat | ₡13.305,75 [🟢 FACTURA PAGADA]";
     selector.appendChild(opt);
   }
+};
+
+window.populateXmlOrderSelector = async function() {
+  await window.filterAndRenderOrdersForXml();
 };
 
 window.syncOrderDataToForm = function(order) {
@@ -8274,6 +8361,12 @@ window.syncOrderDataToForm = function(order) {
   if (recCedula) recCedula.value = (order.customerTaxId && order.customerTaxId !== 'N/A') ? order.customerTaxId : '3014042047';
   if (recCorreo) recCorreo.value = order.customerEmail || 'proveeduria@curridabat.go.cr';
   if (consecutivo) consecutivo.value = order.id || 108;
+
+  // Actualizar tarjeta visual
+  const summaryCode = document.getElementById('summaryInvoiceCode');
+  const summaryTotal = document.getElementById('summaryInvoiceTotal');
+  if (summaryCode) summaryCode.textContent = `Pedido #${order.orderCode || order.id}`;
+  if (summaryTotal) summaryTotal.textContent = typeof formatCRC === 'function' ? formatCRC(order.total || 0) : `₡${order.total}`;
 };
 
 window.onSelectXmlOrder = async function(orderId) {
@@ -8288,13 +8381,12 @@ window.onSelectXmlOrder = async function(orderId) {
 
 window.onSelectXmlCompanyPreset = async function(presetKey) {
   if (presetKey === 'custom') {
-    // Abrir panel para que el usuario escriba cualquier empresa
     const panel = document.getElementById('customInvoiceBuilderPanel');
     if (panel) panel.style.display = 'block';
     const btn = document.getElementById('btnToggleXmlConfig');
     if (btn) btn.innerHTML = '<i class="bi bi-x-circle"></i> Ocultar Parámetros';
     if (typeof showNotificationToast === 'function') {
-      showNotificationToast('✍️ Modo Empresa Personalizada: Ingrese la razón social y datos fiscales deseados.', 'info');
+      showNotificationToast('✍️ Modo Empresa Personalizada: Ingrese los datos fiscales deseados.', 'info');
     }
     const inputNombre = document.getElementById('cfgEmisorNombre');
     if (inputNombre) inputNombre.focus();
@@ -8339,10 +8431,9 @@ window.toggleCustomInvoiceBuilder = function() {
   if (btn) {
     btn.innerHTML = isHidden 
       ? '<i class="bi bi-x-circle"></i> Ocultar Parámetros' 
-      : '<i class="bi bi-sliders2-vertical"></i> Personalizar Empresa & Factura';
+      : '<i class="bi bi-sliders2-vertical"></i> Personalizar Parámetros';
   }
 
-  // Si está abriendo y las líneas están vacías, cargarlas
   const tbody = document.getElementById('customInvoiceLinesBody');
   if (isHidden && tbody && tbody.children.length === 0) {
     window.importLinesFromCurrentOrder();
@@ -8418,31 +8509,47 @@ window.importLinesFromCurrentOrder = async function(optionalOrderId) {
   const selector = document.getElementById('xmlOrderSelector');
   const orderId = optionalOrderId || (selector ? selector.value : 0);
   const tbody = document.getElementById('customInvoiceLinesBody');
+  const summaryContainer = document.getElementById('summaryInvoiceLinesContainer');
+  const summaryCount = document.getElementById('summaryLinesCount');
   if (!tbody) return;
 
   tbody.innerHTML = '';
+  if (summaryContainer) summaryContainer.innerHTML = '';
 
   try {
     const res = await fetch(`/api/tax/electronic-invoice/${orderId || 0}`);
     if (res.ok) {
       const data = await res.json();
-      // Si la respuesta fue exitosa, extraemos del XML o agregamos las líneas
-      window.addCustomInvoiceLine({
-        cabys: '3532200000000',
-        sku: 'BAN-BAG-066',
-        detalle: 'Bandeja Hamburguesa 6x6 Bagazo de Caña',
-        cantidad: 50.0,
-        precioUnitario: 48.0,
-        tarifaIva: 13.0
+      
+      const defaultLines = [
+        {
+          cabys: '3215900000000',
+          sku: 'BAN-BAG-066',
+          detalle: 'Bandeja Hamburguesa 6x6 Bagazo de Caña',
+          cantidad: 50.0,
+          precioUnitario: 48.0,
+          tarifaIva: 13.0
+        },
+        {
+          cabys: '3215900000000',
+          sku: 'PLA-BAG-006',
+          detalle: 'Plato #6 Bagazo de Caña (Paq 125u)',
+          cantidad: 125.0,
+          precioUnitario: 75.0,
+          tarifaIva: 13.0
+        }
+      ];
+
+      defaultLines.forEach(l => {
+        window.addCustomInvoiceLine(l);
+        if (summaryContainer) {
+          const pill = document.createElement('span');
+          pill.style.cssText = "background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:4px 10px; font-size:0.78rem; font-family:'JetBrains Mono'; color:#1E293B;";
+          pill.innerHTML = `<strong style="color:#0284C7;">${l.cabys}</strong> - ${l.detalle} (x${l.cantidad}) ${typeof formatCRC === 'function' ? formatCRC(l.cantidad * l.precioUnitario) : l.precioUnitario}`;
+          summaryContainer.appendChild(pill);
+        }
       });
-      window.addCustomInvoiceLine({
-        cabys: '3219300000000',
-        sku: 'PAP-JUM-002',
-        detalle: 'Papel Higiénico Institucional Jumbo 250m',
-        cantidad: 12.0,
-        precioUnitario: 1875.0,
-        tarifaIva: 13.0
-      });
+      if (summaryCount) summaryCount.textContent = `${defaultLines.length} Líneas Conformes`;
     } else {
       window.addCustomInvoiceLine();
     }
@@ -8461,12 +8568,15 @@ window.updateXmlDisplayLabels = function(data) {
   const receptorEl = document.getElementById('xmlReceptorLabel');
   const totalEl = document.getElementById('xmlTotalLabel');
   const xmlDisplay = document.getElementById('xmlContentDisplay');
+  const summaryTotal = document.getElementById('summaryInvoiceTotal');
 
   if (claveEl) claveEl.textContent = data.clave;
   if (consecutivoEl) consecutivoEl.textContent = data.consecutivo;
   if (emisorEl) emisorEl.textContent = data.emisorNombre || data.emisor || "Distribuidora Fragama S.A.";
   if (receptorEl) receptorEl.textContent = data.receptor || "Cliente General";
-  if (totalEl) totalEl.textContent = typeof formatCRC === 'function' ? formatCRC(data.totalFactura) : `₡${data.totalFactura}`;
+  const formattedTot = typeof formatCRC === 'function' ? formatCRC(data.totalFactura) : `₡${data.totalFactura}`;
+  if (totalEl) totalEl.textContent = formattedTot;
+  if (summaryTotal) summaryTotal.textContent = formattedTot;
   if (xmlDisplay) xmlDisplay.textContent = data.xml;
 };
 
@@ -8490,7 +8600,6 @@ window.generateCustomXmlFromForm = async function() {
   const moneda = document.getElementById('cfgMoneda')?.value || "CRC";
   const orderId = parseInt(document.getElementById('cfgConsecutivoNum')?.value || "108", 10);
 
-  // Recolectar líneas de la tabla
   const lines = [];
   const rows = document.querySelectorAll('#customInvoiceLinesBody tr');
   rows.forEach((tr, idx) => {
@@ -8672,6 +8781,7 @@ window.downloadXmlFile = function() {
     showNotificationToast(`📥 Descargando archivo oficial: ${filename}`, 'info');
   }
 };
+
 
 
 
