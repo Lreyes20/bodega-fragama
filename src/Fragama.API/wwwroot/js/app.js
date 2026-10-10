@@ -1565,6 +1565,7 @@ const RolePermissions = {
       'view-excel-bulk-import',
       'view-bodega-kardex',
       'view-customer-orders',
+      'view-customers-management',
       'view-chofer-mobile'
     ]
   },
@@ -1675,6 +1676,16 @@ window.switchMobileNav = function(viewId, el) {
 };
 
 window.switchViewDirectly = function(viewId) {
+  // En móviles, cerrar sidebar overlay de inmediato al pulsar cualquier opción
+  if (window.innerWidth <= 991) {
+    const sidebar = document.getElementById('appSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar) sidebar.classList.remove('show');
+    if (overlay) overlay.classList.remove('show');
+    document.body.classList.remove('sidebar-open');
+    document.body.style.overflow = '';
+  }
+
   const roleConfig = RolePermissions[AppState.currentRole] || RolePermissions['Administrador'];
   const allowed = roleConfig.allowedViews;
 
@@ -1814,6 +1825,7 @@ window.filterUsersView = function(filterStatus, btnEl) {
 };
 
 function renderUsersRolesTable() {
+  window.renderUsersRolesTable = renderUsersRolesTable;
   const tbody = document.getElementById('usersRolesTableBody');
   if (!tbody) return;
 
@@ -2731,7 +2743,7 @@ function setupProductMaintenance() {
           showNotificationToast(`✅ Nuevo producto [${sku}] publicado con éxito en el Catálogo y Tienda Web.`, 'success');
         }
 
-        modal.classList.remove('active');
+        closeModalDirectly('productCrudModal');
         renderAllViews();
       } catch (err) {
         alert('Error al guardar producto: ' + err.message);
@@ -2746,6 +2758,7 @@ function setupProductMaintenance() {
 }
 
 function renderMaintenanceTable() {
+  window.renderMaintenanceTable = renderMaintenanceTable;
   const tbody = document.getElementById('maintenanceTableBody');
   if (!tbody) return;
 
@@ -2836,6 +2849,10 @@ function renderMaintenanceTable() {
   }).join('');
 }
 
+window.closeProductModal = function() {
+  closeModalDirectly('productCrudModal');
+};
+
 window.openNewProductModal = function() {
   editingProductId = null;
   const modal = document.getElementById('productCrudModal');
@@ -2857,7 +2874,7 @@ window.openNewProductModal = function() {
   const taxIn = document.getElementById('crudTaxRateSelect');
   if (cabysIn) cabysIn.value = '3532200000000';
   if (taxIn) taxIn.value = '13.0';
-  if (modal) modal.classList.add('active');
+  openModalDirectly('productCrudModal');
 };
 
 window.openEditProductModal = function(id) {
@@ -2899,7 +2916,7 @@ window.openEditProductModal = function(id) {
   if (editCabysIn) editCabysIn.value = p.cabysCode || '3532200000000';
   if (editTaxIn) editTaxIn.value = String(p.taxRate || 13.0);
 
-  if (modal) modal.classList.add('active');
+  openModalDirectly('productCrudModal');
 };
 
 window.deleteProduct = async function(id) {
@@ -2918,9 +2935,7 @@ window.deleteProduct = async function(id) {
     AppState.products = AppState.products.filter(x => x.id !== id);
     showNotificationToast(`🗑️ Producto [${p.sku}] eliminado exitosamente del catálogo y la tienda web.`, 'info');
     
-    const modal = document.getElementById('productCrudModal');
-    if (modal) modal.classList.remove('active');
-    
+    closeModalDirectly('productCrudModal');
     renderAllViews();
   } catch (err) {
     alert('Error al eliminar producto: ' + err.message);
@@ -8954,12 +8969,18 @@ window.filterCustomerDirectoryTable = function() {
         </td>
 
         <td style="padding:14px 16px; text-align:right;">
-          <div style="display:inline-flex; gap:6px; flex-wrap:nowrap;">
+          <div style="display:inline-flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
             <button class="btn-fragama btn-primary-fragama" onclick="emitInvoiceForCustomer(${c.id})" style="padding:5px 10px; font-size:0.76rem; background:#0284C7; border:none; border-radius:6px;" title="Emitir Factura Electrónica v4.3">
-              <i class="bi bi-receipt"></i> Emitir FE v4.3
+              <i class="bi bi-receipt"></i> Facturar FE
             </button>
-            <button class="btn-fragama btn-outline-fragama" onclick="openEditCustomerTaxModal(${c.id})" style="padding:5px 9px; font-size:0.76rem; border-radius:6px;" title="Editar Ficha">
+            <button class="btn-fragama btn-outline-fragama" onclick="createOrderForCustomer(${c.id})" style="padding:5px 9px; font-size:0.76rem; border-radius:6px; color:#10B981; border-color:#10B981;" title="Crear Pedido / Cotización">
+              <i class="bi bi-cart-plus"></i> Pedido
+            </button>
+            <button class="btn-fragama btn-outline-fragama" onclick="openEditCustomerTaxModal(${c.id})" style="padding:5px 9px; font-size:0.76rem; border-radius:6px;" title="Editar Ficha Oficial">
               <i class="bi bi-pencil-square"></i>
+            </button>
+            <button class="btn-fragama btn-outline-fragama" onclick="deleteCustomer(${c.id})" style="padding:5px 9px; font-size:0.76rem; border-radius:6px; color:#EF4444; border-color:#FCA5A5;" title="Eliminar del Directorio">
+              <i class="bi bi-trash"></i>
             </button>
           </div>
         </td>
@@ -8969,47 +8990,130 @@ window.filterCustomerDirectoryTable = function() {
 };
 
 window.openNewCustomerTaxModal = function() {
-  const modal = document.getElementById('customerTaxModal');
   const form = document.getElementById('customerTaxForm');
   const title = document.getElementById('customerTaxModalTitle');
-  if (!modal || !form) return;
-
-  form.reset();
-  document.getElementById('custModalId').value = '';
+  if (form) form.reset();
+  const idEl = document.getElementById('custModalId');
+  if (idEl) idEl.value = '';
   if (title) title.textContent = 'Registrar Nuevo Cliente Tributario (DGT Costa Rica)';
-  modal.style.display = 'flex';
+  openModalDirectly('customerTaxModal');
 };
 
 window.openEditCustomerTaxModal = function(id) {
   const customer = AppState.customers.find(c => c.id === id);
   if (!customer) return;
 
-  const modal = document.getElementById('customerTaxModal');
   const title = document.getElementById('customerTaxModalTitle');
-  if (!modal) return;
+  const idEl = document.getElementById('custModalId');
+  if (idEl) idEl.value = customer.id;
 
-  document.getElementById('custModalId').value = customer.id;
-  document.getElementById('custModalDocType').value = customer.docType || '02';
-  document.getElementById('custModalTaxId').value = customer.taxId || '';
-  document.getElementById('custModalName').value = customer.name || '';
-  document.getElementById('custModalTradeName').value = customer.tradeName || '';
-  document.getElementById('custModalEmail').value = customer.email || '';
-  document.getElementById('custModalPhone').value = customer.phone || '';
-  document.getElementById('custModalProvince').value = customer.province || 'Cartago';
-  document.getElementById('custModalCanton').value = customer.canton || 'Cartago';
-  document.getElementById('custModalDistrict').value = customer.district || 'Oriental';
-  document.getElementById('custModalAddress').value = customer.address || '';
-  document.getElementById('custModalTerms').value = customer.terms || 'Contado';
-  document.getElementById('custModalPaymentMethod').value = customer.paymentMethodDefault || '04';
-  document.getElementById('custModalActivity').value = customer.economicActivity || '466901';
+  const docEl = document.getElementById('custModalDocType');
+  const taxIdEl = document.getElementById('custModalTaxId');
+  const nameEl = document.getElementById('custModalName');
+  const tradeEl = document.getElementById('custModalTradeName');
+  const emailEl = document.getElementById('custModalEmail');
+  const phoneEl = document.getElementById('custModalPhone');
+  const provEl = document.getElementById('custModalProvince');
+  const cantEl = document.getElementById('custModalCanton');
+  const distEl = document.getElementById('custModalDistrict');
+  const addrEl = document.getElementById('custModalAddress');
+  const termsEl = document.getElementById('custModalTerms');
+  const payEl = document.getElementById('custModalPaymentMethod');
+  const actEl = document.getElementById('custModalActivity');
+
+  if (docEl) docEl.value = customer.docType || '02';
+  if (taxIdEl) taxIdEl.value = customer.taxId || '';
+  if (nameEl) nameEl.value = customer.name || '';
+  if (tradeEl) tradeEl.value = customer.tradeName || '';
+  if (emailEl) emailEl.value = customer.email || '';
+  if (phoneEl) phoneEl.value = customer.phone || '';
+  if (provEl) provEl.value = customer.province || 'Cartago';
+  if (cantEl) cantEl.value = customer.canton || 'Cartago';
+  if (distEl) distEl.value = customer.district || 'Oriental';
+  if (addrEl) addrEl.value = customer.address || '';
+  if (termsEl) termsEl.value = customer.terms || 'Contado';
+  if (payEl) payEl.value = customer.paymentMethodDefault || '04';
+  if (actEl) actEl.value = customer.economicActivity || '466901';
 
   if (title) title.textContent = `Editar Ficha Tributaria: ${customer.name}`;
-  modal.style.display = 'flex';
+  openModalDirectly('customerTaxModal');
 };
 
 window.closeCustomerTaxModal = function() {
-  const modal = document.getElementById('customerTaxModal');
-  if (modal) modal.style.display = 'none';
+  closeModalDirectly('customerTaxModal');
+};
+
+window.deleteCustomer = async function(id) {
+  const c = AppState.customers.find(x => x.id === id);
+  const name = c ? c.name : `ID #${id}`;
+  if (!confirm(`¿Confirma eliminar al cliente '${name}' del directorio oficial?\n\nEsta acción no se puede deshacer.`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Error al eliminar el cliente');
+    }
+    AppState.customers = AppState.customers.filter(x => x.id !== id);
+    showNotificationToast(`🗑️ Cliente '${name}' eliminado del directorio oficial.`, 'info');
+    await renderCustomerDirectoryTable();
+    if (typeof populateXmlCustomerSelector === 'function') {
+      populateXmlCustomerSelector();
+    }
+  } catch (err) {
+    alert(`❌ Error al eliminar cliente: ${err.message}`);
+  }
+};
+
+window.exportCustomersToCsv = function() {
+  if (!AppState.customers || AppState.customers.length === 0) {
+    showNotificationToast('No hay clientes registrados para exportar.', 'warning');
+    return;
+  }
+  const headers = ['ID', 'Tipo Doc', 'Cédula / Identificación', 'Razón Social Oficial', 'Nombre Fantasía', 'Correo Factura Electrónica', 'Teléfono', 'Provincia', 'Cantón', 'Distrito', 'Dirección Exacta', 'Condición Pago', 'Método Pago DGT', 'Actividad Económica CIUU'];
+  const rows = AppState.customers.map(c => [
+    c.id,
+    c.docType || '02',
+    `"${(c.taxId || '').replace(/"/g, '""')}"`,
+    `"${(c.name || '').replace(/"/g, '""')}"`,
+    `"${(c.tradeName || '').replace(/"/g, '""')}"`,
+    `"${(c.email || '').replace(/"/g, '""')}"`,
+    `"${(c.phone || '').replace(/"/g, '""')}"`,
+    `"${(c.province || '').replace(/"/g, '""')}"`,
+    `"${(c.canton || '').replace(/"/g, '""')}"`,
+    `"${(c.district || '').replace(/"/g, '""')}"`,
+    `"${(c.address || '').replace(/"/g, '""')}"`,
+    `"${(c.terms || 'Contado').replace(/"/g, '""')}"`,
+    `"${(c.paymentMethodDefault || '04').replace(/"/g, '""')}"`,
+    `"${(c.economicActivity || '466901').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `directorio_clientes_fragama_dgt_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showNotificationToast('📥 Directorio oficial de clientes descargado en CSV.', 'success');
+};
+
+window.createOrderForCustomer = function(customerId) {
+  const cust = AppState.customers.find(c => c.id === customerId);
+  if (!cust) return;
+  switchViewDirectly('view-customer-orders');
+  switchOrderTabDirectly('new');
+  const select = document.getElementById('orderCustomerSelect');
+  if (select) {
+    select.value = String(cust.id);
+    const event = new Event('change');
+    select.dispatchEvent(event);
+  }
+  showNotificationToast(`🛒 Formulario de pedido precargado con: ${cust.name}`, 'info');
 };
 
 window.saveCustomerTaxForm = async function(event) {

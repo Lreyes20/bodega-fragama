@@ -296,159 +296,178 @@
     <div class="nav flex-column mt-2">
 
       <!-- Inicio -->
-      <a class="nav-link active" data-view="view-admin-dashboard" data-roles="Administrador">
+      <a class="nav-link active" data-view="view-admin-dashboard" onclick="switchViewDirectly('view-admin-dashboard')" href="javascript:void(0)" data-roles="Administrador">
         <i class="bi bi-house-door-fill"></i>
         <span>Inicio</span>
       </a>
 
       <!-- CATÁLOGO & MANTENIMIENTO DE PRODUCTOS (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-catalogo" onclick="toggleSidebarAccordion('menu-catalogo', this)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+      <a class="nav-link tree-toggle" data-collapse="menu-catalogo" onclick="toggleSidebarAccordion('menu-catalogo', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
         <i class="bi bi-box-seam-fill" style="color:var(--fragama-orange-main);"></i>
         <span style="font-weight:800;">Catálogo de Productos</span>
         <span class="badge-count" id="sidebarProductCountBadge" style="background:var(--fragama-orange-main); color:#FFF; font-weight:800;">220</span>
       </a>
 
       <div class="collapse-menu show" id="menu-catalogo" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
-        <a class="nav-link" data-view="view-product-maintenance" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="font-weight:700;">
+        <a class="nav-link" data-view="view-product-maintenance" onclick="switchViewDirectly('view-product-maintenance')" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="font-weight:700;">
           <i class="bi bi-sliders"></i>
           <span>Mantenimiento de Productos</span>
           <span class="badge-count" style="background:#0284C7; color:#FFF;">220</span>
         </a>
 
-        <a class="nav-link" onclick="openNewProductModal()" data-roles="Administrador,Bodeguero" style="color:#38BDF8; font-weight:700;">
+        <a class="nav-link" onclick="openNewProductModal()" href="javascript:void(0)" data-roles="Administrador,Bodeguero" style="color:#38BDF8; font-weight:700;">
           <i class="bi bi-plus-circle-fill"></i>
           <span>+ Nuevo Producto</span>
           <span class="badge-count" style="background:var(--fragama-orange-main); color:#FFF;">Crear</span>
         </a>
 
-        <a class="nav-link" data-view="view-families-management" data-roles="Administrador">
+        <a class="nav-link" data-view="view-families-management" onclick="switchViewDirectly('view-families-management')" href="javascript:void(0)" data-roles="Administrador">
           <i class="bi bi-diagram-3"></i>
           <span>Familias &amp; Zonas</span>
           <span class="badge-count">4</span>
         </a>
 
-        <a class="nav-link" data-view="view-excel-bulk-import" data-roles="Administrador,Bodeguero">
+        <a class="nav-link" data-view="view-excel-bulk-import" onclick="switchViewDirectly('view-excel-bulk-import')" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
           <i class="bi bi-file-earmark-spreadsheet"></i>
           <span>Carga Masiva Excel</span>
         </a>
       </div>
 
+      <!-- DIRECTORIO DE CLIENTES TRIBUTARIOS DGT (Tree-toggle Dedicado) -->
+      <a class="nav-link tree-toggle" data-collapse="menu-clientes" onclick="toggleSidebarAccordion('menu-clientes', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="background:rgba(2,132,199,0.08); border-left:3px solid #0284C7;">
+        <i class="bi bi-people-fill" style="color:#0284C7;"></i>
+        <span style="font-weight:800; color:#0284C7;">Directorio de Clientes</span>
+        <span class="badge-count" id="customersBadgeCount" style="background:#0284C7; color:#FFF; font-weight:800;">10</span>
+      </a>
+
+      <div class="collapse-menu show" id="menu-clientes" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+        <a class="nav-link" data-view="view-customers-management" onclick="switchViewDirectly('view-customers-management')" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="font-weight:700;">
+          <i class="bi bi-person-lines-fill"></i>
+          <span>Directorio Oficial DGT</span>
+          <span class="badge-count" style="background:rgba(2,132,199,0.18); color:#0284C7;">10</span>
+        </a>
+        <a class="nav-link" onclick="openNewCustomerTaxModal()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="color:#0284C7; font-weight:700;">
+          <i class="bi bi-person-plus-fill"></i>
+          <span>+ Registrar Nuevo Cliente</span>
+          <span class="badge-count" style="background:var(--fragama-orange-main); color:#FFF;">Nuevo</span>
+        </a>
+        <a class="nav-link" onclick="exportCustomersToCsv()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+          <i class="bi bi-file-earmark-arrow-down"></i>
+          <span>Exportar a Excel / CSV</span>
+        </a>
+      </div>
+
       <!-- OPERACIONES DE BODEGA (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-bodega" onclick="toggleSidebarAccordion('menu-bodega', this)" data-roles="Administrador,Bodeguero">
+      <a class="nav-link tree-toggle" data-collapse="menu-bodega" onclick="toggleSidebarAccordion('menu-bodega', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
         <i class="bi bi-boxes"></i>
         <span>Operaciones Bodega</span>
       </a>
 
       <div class="collapse-menu show" id="menu-bodega" data-roles="Administrador,Bodeguero">
-        <a class="nav-link" data-view="view-bodega-kardex" data-roles="Administrador,Bodeguero">
+        <a class="nav-link" data-view="view-bodega-kardex" onclick="switchViewDirectly('view-bodega-kardex')" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
           Kardex por Lotes
           <span class="badge-count">ACID</span>
         </a>
 
-        <a class="nav-link" onclick="openMovementModal()" data-roles="Administrador,Bodeguero">
+        <a class="nav-link" onclick="openMovementModal()" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
           Entradas y Salidas
         </a>
 
-        <a class="nav-link" onclick="openBarcodeScannerModal()" data-roles="Administrador,Bodeguero,Cajero,Chofer">
+        <a class="nav-link" onclick="openBarcodeScannerModal()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Chofer">
           <i class="bi bi-upc-scan"></i>
           <span>Lector de Barras</span>
           <span class="badge-count" style="background:#0284C7; color:#FFF;">Lector</span>
         </a>
 
-        <a class="nav-link" onclick="showBarcodeForProduct(1)" data-roles="Administrador,Bodeguero">
+        <a class="nav-link" onclick="showBarcodeForProduct(1)" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
           Etiquetas EAN-13
         </a>
       </div>
 
       <!-- VENTAS & PEDIDOS DE CLIENTES (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-ventas" onclick="toggleSidebarAccordion('menu-ventas', this)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+      <a class="nav-link tree-toggle" data-collapse="menu-ventas" onclick="toggleSidebarAccordion('menu-ventas', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
         <i class="bi bi-cart-check-fill"></i>
         <span>Ventas &amp; Pedidos</span>
       </a>
 
       <div class="collapse-menu show" id="menu-ventas" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
-        <a class="nav-link" data-view="view-alistado-web" data-roles="Administrador,Bodeguero,Vendedor,Chofer" id="navAlistadoBodega" style="background:rgba(16,185,129,0.12); border-left:3px solid #10B981;">
+        <a class="nav-link" data-view="view-alistado-web" onclick="switchViewDirectly('view-alistado-web')" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Vendedor,Chofer" id="navAlistadoBodega" style="background:rgba(16,185,129,0.12); border-left:3px solid #10B981;">
           <i class="bi bi-box-seam-fill" style="color:#10B981;"></i>
           <span>Alistado Pedidos Web</span>
           <span class="badge-count" id="badgePendingWebOrders" style="background:#10B981; color:#FFFFFF; font-weight:800;">0</span>
         </a>
-        <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('new')" data-roles="Administrador,Bodeguero,Vendedor">
+        <a class="nav-link" data-view="view-customer-orders" onclick="switchViewDirectly('view-customer-orders'); switchOrderTabDirectly('new');" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Vendedor">
           <i class="bi bi-cart-plus"></i>
           <span>Nueva Cotización / Pedido</span>
         </a>
-        <a class="nav-link" data-view="view-customer-orders" onclick="switchOrderTabDirectly('history')" data-roles="Administrador,Bodeguero,Vendedor">
+        <a class="nav-link" data-view="view-customer-orders" onclick="switchViewDirectly('view-customer-orders'); switchOrderTabDirectly('history');" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Vendedor">
           <i class="bi bi-journal-text"></i>
           <span>Historial General de Pedidos</span>
         </a>
-        <a class="nav-link" data-view="view-cajero-pos" data-roles="Administrador,Cajero">
+        <a class="nav-link" data-view="view-cajero-pos" onclick="switchViewDirectly('view-cajero-pos')" href="javascript:void(0)" data-roles="Administrador,Cajero">
           <i class="bi bi-receipt"></i>
           <span>Venta Rápida (Caja POS)</span>
-        </a>
-        <a class="nav-link" data-view="view-customers-management" data-roles="Administrador,Cajero,Vendedor">
-          <i class="bi bi-people-fill" style="color:#0284C7;"></i>
-          <span>Directorio de Clientes</span>
-          <span class="badge-count" id="customersBadgeCount" style="background:rgba(2,132,199,0.18); color:#0284C7;">10</span>
         </a>
       </div>
 
       <!-- LOGÍSTICA & RUTAS (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-despachos" onclick="toggleSidebarAccordion('menu-despachos', this)" data-roles="Administrador,Bodeguero,Chofer">
+      <a class="nav-link tree-toggle" data-collapse="menu-despachos" onclick="toggleSidebarAccordion('menu-despachos', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Chofer">
         <i class="bi bi-truck"></i>
         <span>Logística &amp; Reparto</span>
       </a>
 
       <div class="collapse-menu show" id="menu-despachos" data-roles="Administrador,Bodeguero,Chofer">
-        <a class="nav-link" data-view="view-chofer-mobile" data-roles="Administrador,Bodeguero,Chofer">
+        <a class="nav-link" data-view="view-chofer-mobile" onclick="switchViewDirectly('view-chofer-mobile')" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Chofer">
           Rutas Nacionales (Móvil)
           <span class="badge-count" id="navDispatchCount">7</span>
         </a>
       </div>
 
       <!-- PROVEEDORES & COMPRAS (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-proveedores" onclick="toggleSidebarAccordion('menu-proveedores', this)" data-roles="Administrador">
+      <a class="nav-link tree-toggle" data-collapse="menu-proveedores" onclick="toggleSidebarAccordion('menu-proveedores', this)" href="javascript:void(0)" data-roles="Administrador">
         <i class="bi bi-building-up"></i>
         <span>Proveedores &amp; Compras</span>
       </a>
 
       <div class="collapse-menu show" id="menu-proveedores" data-roles="Administrador">
-        <a class="nav-link" data-view="view-suppliers-management" data-roles="Administrador">
+        <a class="nav-link" data-view="view-suppliers-management" onclick="switchViewDirectly('view-suppliers-management')" href="javascript:void(0)" data-roles="Administrador">
           Directorio de Proveedores
           <span class="badge-count" id="suppliersBadgeCount" style="background:rgba(255,130,0,0.25); color:var(--fragama-orange-main);">5</span>
         </a>
       </div>
 
       <!-- REPORTERÍA (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-reporteria" onclick="toggleSidebarAccordion('menu-reporteria', this)" data-roles="Administrador">
+      <a class="nav-link tree-toggle" data-collapse="menu-reporteria" onclick="toggleSidebarAccordion('menu-reporteria', this)" href="javascript:void(0)" data-roles="Administrador">
         <i class="bi bi-bar-chart-fill"></i>
         <span>Reportería</span>
       </a>
 
       <div class="collapse-menu" id="menu-reporteria" data-roles="Administrador">
-        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('physical')" data-roles="Administrador">
+        <a class="nav-link" data-view="view-reports" onclick="switchViewDirectly('view-reports'); switchReportTab('physical');" href="javascript:void(0)" data-roles="Administrador">
           <i class="bi bi-clipboard2-check"></i> <span>Toma de Inventario Físico</span>
         </a>
-        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('valuation')" data-roles="Administrador">
+        <a class="nav-link" data-view="view-reports" onclick="switchViewDirectly('view-reports'); switchReportTab('valuation');" href="javascript:void(0)" data-roles="Administrador">
           <i class="bi bi-cash-coin"></i> <span>Inventario General Valorizado</span>
         </a>
-        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('reorder')" data-roles="Administrador">
+        <a class="nav-link" data-view="view-reports" onclick="switchViewDirectly('view-reports'); switchReportTab('reorder');" href="javascript:void(0)" data-roles="Administrador">
           <i class="bi bi-exclamation-triangle"></i> <span>Alertas de Reposición</span>
         </a>
-        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('fefo')" data-roles="Administrador">
+        <a class="nav-link" data-view="view-reports" onclick="switchViewDirectly('view-reports'); switchReportTab('fefo');" href="javascript:void(0)" data-roles="Administrador">
           <i class="bi bi-calendar2-range"></i> <span>Lotes FEFO y Vencimientos</span>
         </a>
-        <a class="nav-link" data-view="view-reports" onclick="switchReportTab('family')" data-roles="Administrador">
+        <a class="nav-link" data-view="view-reports" onclick="switchViewDirectly('view-reports'); switchReportTab('family');" href="javascript:void(0)" data-roles="Administrador">
           <i class="bi bi-pie-chart"></i> <span>Resumen por Familias</span>
         </a>
       </div>
 
       <!-- HACIENDA, IVA & CABYS (CR) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-hacienda" onclick="toggleSidebarAccordion('menu-hacienda', this)" data-roles="Administrador,Cajero">
+      <a class="nav-link tree-toggle" data-collapse="menu-hacienda" onclick="toggleSidebarAccordion('menu-hacienda', this)" href="javascript:void(0)" data-roles="Administrador,Cajero">
         <i class="bi bi-file-earmark-ruled-fill" style="color:#0284C7;"></i>
         <span>Hacienda &amp; IVA (CR)</span>
       </a>
 
       <div class="collapse-menu show" id="menu-hacienda" data-roles="Administrador,Cajero">
-        <a class="nav-link" data-view="view-tax-hacienda" data-roles="Administrador,Cajero" style="font-weight:700;">
+        <a class="nav-link" data-view="view-tax-hacienda" onclick="switchViewDirectly('view-tax-hacienda')" href="javascript:void(0)" data-roles="Administrador,Cajero" style="font-weight:700;">
           <i class="bi bi-calculator-fill" style="color:#0284C7;"></i>
           <span>Declaración D-104 &amp; CABYS</span>
           <span class="badge-count" style="background:rgba(2,132,199,0.18); color:#0284C7;">13% IVA</span>
@@ -456,18 +475,18 @@
       </div>
 
       <!-- SEGURIDAD & ASIGNACIÓN DE ROLES (RBAC) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-seguridad" onclick="toggleSidebarAccordion('menu-seguridad', this)" data-roles="Administrador">
+      <a class="nav-link tree-toggle" data-collapse="menu-seguridad" onclick="toggleSidebarAccordion('menu-seguridad', this)" href="javascript:void(0)" data-roles="Administrador">
         <i class="bi bi-shield-lock-fill"></i>
         <span>Seguridad &amp; Roles</span>
       </a>
 
       <div class="collapse-menu show" id="menu-seguridad" data-roles="Administrador">
-        <a class="nav-link" data-view="view-roles-management" data-roles="Administrador">
+        <a class="nav-link" data-view="view-roles-management" onclick="switchViewDirectly('view-roles-management')" href="javascript:void(0)" data-roles="Administrador" style="font-weight:700;">
           <i class="bi bi-people-fill"></i>
           <span>Mantenimiento de Usuarios</span>
           <span class="badge-count" style="background:#0284C7; color:#FFF;">6</span>
         </a>
-        <a class="nav-link" onclick="openNewUserModal()" data-roles="Administrador" style="color:#38BDF8; font-weight:700;">
+        <a class="nav-link" onclick="openNewUserModal()" href="javascript:void(0)" data-roles="Administrador" style="color:#38BDF8; font-weight:700;">
           <i class="bi bi-person-plus-fill"></i>
           <span>+ Crear Nuevo Usuario</span>
           <span class="badge-count" style="background:var(--fragama-orange-main); color:#FFF;">Nuevo</span>
@@ -475,13 +494,13 @@
       </div>
 
       <!-- Cambiar mi Contraseña -->
-      <a class="nav-link" onclick="openSelfPasswordModal()" style="cursor:pointer;" title="Actualizar mi contraseña personal">
+      <a class="nav-link" onclick="openSelfPasswordModal()" href="javascript:void(0)" style="cursor:pointer;" title="Actualizar mi contraseña personal">
         <i class="bi bi-key-fill text-warning"></i>
         <span>Cambiar mi Contraseña</span>
       </a>
 
       <!-- Salir -->
-      <a class="nav-link" id="sidebarLogoutBtn" style="margin-top:1rem; border-top:1px solid rgba(255,255,255,0.15); padding-top:1rem;">
+      <a class="nav-link" id="sidebarLogoutBtn" href="javascript:void(0)" style="margin-top:1rem; border-top:1px solid rgba(255,255,255,0.15); padding-top:1rem;">
         <i class="bi bi-box-arrow-right"></i>
         <span>Cerrar Sesión</span>
       </a>
@@ -852,15 +871,15 @@
 
           <div style="padding: 1rem 1.4rem; background: #F8FAFC; border-bottom: 1px solid var(--border-color); display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <div style="flex:1; min-width:220px; position:relative;">
-              <input type="text" id="maintenanceSearchInput" class="login-input" placeholder="Buscar por SKU, Nombre, Barcode o Lote..." style="padding-left:36px;">
+              <input type="text" id="maintenanceSearchInput" oninput="renderMaintenanceTable()" class="login-input" placeholder="Buscar por SKU, Nombre, Barcode o Lote..." style="padding-left:36px;">
               <i class="bi bi-search" style="position:absolute; left:12px; top:12px; color:#94A3B8;"></i>
             </div>
 
-            <select id="maintenanceFamilyFilter" style="padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; background:#FFF; font-weight:600;">
+            <select id="maintenanceFamilyFilter" onchange="renderMaintenanceTable()" style="padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; background:#FFF; font-weight:600;">
               <!-- Opciones inyectadas por JS -->
             </select>
 
-            <select id="maintenanceStockFilter" style="padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; background:#FFF;">
+            <select id="maintenanceStockFilter" onchange="renderMaintenanceTable()" style="padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; background:#FFF;">
               <option value="">Todo el Stock</option>
               <option value="low">Solo Stock Bajo / Crítico</option>
               <option value="normal">Stock Normal</option>
@@ -2328,8 +2347,11 @@
               </div>
             </div>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-fragama btn-outline-fragama" onclick="exportCustomersToCsv()" style="background:rgba(255,255,255,0.12); color:#FFF; border:1px solid rgba(255,255,255,0.25); font-weight:700; border-radius:8px; padding:8px 14px;">
+                <i class="bi bi-file-earmark-arrow-down"></i> Exportar a Excel / CSV
+              </button>
               <button class="btn-fragama" onclick="openNewCustomerTaxModal()" style="background:#0284C7; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px;">
-                <i class="bi bi-person-plus-fill"></i> + Registrar Nuevo Cliente Tributario
+                <i class="bi bi-person-plus-fill"></i> + Registrar Nuevo Cliente
               </button>
             </div>
           </div>
@@ -2904,7 +2926,7 @@
         <h3 style="font-size:1.1rem; font-weight:700; color:#0B192C;" id="crudModalTitle">
           Nuevo Producto en Catálogo Fragama (WMS)
         </h3>
-        <button onclick="document.getElementById('productCrudModal').classList.remove('active')" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+        <button type="button" onclick="closeProductModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
       </div>
 
       <form id="productCrudForm">
@@ -3045,7 +3067,7 @@
             </button>
           </div>
           <div style="display:flex; gap:10px;">
-            <button type="button" class="btn-fragama btn-outline-fragama" onclick="document.getElementById('productCrudModal').classList.remove('active')">Cancelar</button>
+            <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeProductModal()">Cancelar</button>
             <button type="submit" id="btnSaveProductCrud" class="btn-fragama btn-primary-fragama">
               <i class="bi bi-cloud-arrow-up-fill"></i> Guardar y Sincronizar en Tienda
             </button>
@@ -4529,6 +4551,6 @@
   <script src="js/qrcode.min.js"></script>
   <script src="js/html5-qrcode.min.js"></script>
   <script src="js/catalog-data.js?v=20261001_4"></script>
-  <script src="js/app.js?v=20261010_buttons_operational_v4"></script>
+  <script src="js/app.js?v=20261010_directorio_clientes_v6"></script>
 </body>
 </html>
