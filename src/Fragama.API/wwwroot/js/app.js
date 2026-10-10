@@ -1263,10 +1263,21 @@ window.handleForceChangePasswordSubmit = async function(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
   if (!pendingForceChangeUser) return;
 
-  const currentPass = document.getElementById('forceCurrentPass').value;
-  const newPass = document.getElementById('forceNewPass').value;
-  const confirmPass = document.getElementById('forceConfirmPass').value;
+  const currentPassEl = document.getElementById('forceCurrentPass');
+  const newPassEl = document.getElementById('forceNewPass');
+  const confirmPassEl = document.getElementById('forceConfirmPass');
   const alertEl = document.getElementById('forcePassAlert');
+
+  if (!currentPassEl || !newPassEl || !confirmPassEl) {
+    const user = pendingForceChangeUser;
+    pendingForceChangeUser = null;
+    completeUserLoginSuccess(user);
+    return;
+  }
+
+  const currentPass = currentPassEl.value;
+  const newPass = newPassEl.value;
+  const confirmPass = confirmPassEl.value;
 
   const showForceError = (msg) => {
     if (alertEl) {
@@ -1434,6 +1445,29 @@ window.handleSelfChangePasswordSubmit = async function(e) {
 // ==============================================================================
 // 2. NAVEGACIÓN Y SIDEBAR RESPONSIVO
 // ==============================================================================
+// Manejo de acordeón colapsable global (tree-toggle) disponible de inmediato
+window.toggleSidebarAccordion = function(targetId, toggleEl) {
+  const targetMenu = document.getElementById(targetId);
+  if (!targetMenu) return;
+
+  if (!toggleEl) {
+    toggleEl = document.querySelector(`.sidebar .tree-toggle[data-collapse="${targetId}"]`);
+  }
+
+  // Comprobar si actualmente está visible
+  const isCurrentlyVisible = targetMenu.classList.contains('show') && targetMenu.style.display !== 'none';
+
+  if (isCurrentlyVisible) {
+    targetMenu.classList.remove('show');
+    targetMenu.style.setProperty('display', 'none', 'important');
+    if (toggleEl) toggleEl.classList.add('collapsed');
+  } else {
+    targetMenu.classList.add('show');
+    targetMenu.style.setProperty('display', 'flex', 'important');
+    if (toggleEl) toggleEl.classList.remove('collapsed');
+  }
+};
+
 function setupNavigationAndSidebar() {
   const sidebar = document.getElementById('appSidebar');
   const overlay = document.getElementById('sidebarOverlay');
@@ -1480,29 +1514,6 @@ function setupNavigationAndSidebar() {
       closeSidebar();
     }
   });
-
-  // Manejo de acordeón colapsable (tree-toggle)
-  window.toggleSidebarAccordion = function(targetId, toggleEl) {
-    const targetMenu = document.getElementById(targetId);
-    if (!targetMenu) return;
-
-    if (!toggleEl) {
-      toggleEl = document.querySelector(`.sidebar .tree-toggle[data-collapse="${targetId}"]`);
-    }
-
-    // Comprobar si actualmente está visible
-    const isCurrentlyVisible = targetMenu.classList.contains('show') && targetMenu.style.display !== 'none';
-
-    if (isCurrentlyVisible) {
-      targetMenu.classList.remove('show');
-      targetMenu.style.setProperty('display', 'none', 'important');
-      if (toggleEl) toggleEl.classList.add('collapsed');
-    } else {
-      targetMenu.classList.add('show');
-      targetMenu.style.setProperty('display', 'flex', 'important');
-      if (toggleEl) toggleEl.classList.remove('collapsed');
-    }
-  };
 
   // Manejo de enlaces del menú con data-view
   const navLinks = document.querySelectorAll('.sidebar .nav-link[data-view]');
@@ -2941,6 +2952,70 @@ function generateRandomBarcode() {
 // ==============================================================================
 // 5. CARGA MASIVA DESDE EXCEL CON FAMILIAS Y LOTES
 // ==============================================================================
+function parseCsvData(content) {
+  const lines = content.split(/\r\n|\n/).filter(l => l.trim().length > 0);
+  if (lines.length < 2) {
+    alert('El archivo no contiene suficientes filas.');
+    return;
+  }
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    if (cols.length >= 6) {
+      const sku = cols[0].toUpperCase();
+      const existing = AppState.products.find(p => p.sku === sku);
+
+      rows.push({
+        sku: sku,
+        name: cols[1],
+        familyName: cols[2] || 'Químicos y Desinfectantes',
+        subfamilyName: cols[3] || 'Desengrasantes Industriales',
+        batchNumber: cols[4] || 'LOT-2026-IMPORT',
+        costPrice: parseFloat(cols[5]) || 0,
+        salePrice: parseFloat(cols[6]) || 0,
+        quantity: parseInt(cols[7], 10) || 0,
+        unit: cols[8] || 'GALON',
+        isExisting: !!existing,
+        currentStock: existing ? existing.stock : 0
+      });
+    }
+  }
+
+  AppState.stagedBulkRows = rows;
+  if (typeof renderBulkPreviewTable === 'function') {
+    renderBulkPreviewTable();
+  }
+}
+window.parseCsvData = parseCsvData;
+
+window.loadDemoExcelFile = function() {
+  const demoData = `SKU,NOMBRE,FAMILIA,SUBFAMILIA,LOTE,COSTO,PRECIO_VENTA,CANTIDAD_AUMENTAR,UNIDAD
+FRAG-DES-001,"Desengrasante Industrial Alcalino Galón","Químicos y Desinfectantes","Desengrasantes Industriales",LOT-2026-089A,4800,6950,50,GALON
+FRAG-CLO-001,"Cloro Concentrado Fragama 5.25% Galón","Químicos y Desinfectantes","Cloros y Blanqueadores",LOT-2026-092C,2100,3250,100,GALON
+FRAG-CER-001,"Cera Polimérica Antideslizante Galón","Químicos y Desinfectantes","Ceras y Tratamiento de Pisos",LOT-2026-CER01,6200,8900,30,GALON
+FRAG-VAS-001,"Vaso Cónico Transparente 7oz (Caja x1000)","Papelería y Desechables","Servilletas y Vasos Desechables",LOT-2026-VAS05,8500,11900,25,CAJA
+FRAG-DIS-001,"Dispensador Jabón Líquido Relleno 1L","Bolsas y Plásticos","Dispensadores Institucionales",LOT-2026-DISP01,4500,6800,40,UNIDAD`;
+
+  parseCsvData(demoData);
+  showNotificationToast('Datos de prueba con Familias y Lotes cargados en la previsualización.', 'info');
+};
+
+window.downloadExcelTemplate = function() {
+  const csvContent = "data:text/csv;charset=utf-8," + 
+    "SKU,NOMBRE,FAMILIA,SUBFAMILIA,LOTE,COSTO,PRECIO_VENTA,CANTIDAD_AUMENTAR,UNIDAD\n" +
+    "FRAG-DES-001,\"Desengrasante Industrial Alcalino Galón\",\"Químicos y Desinfectantes\",\"Desengrasantes Industriales\",LOT-2026-089A,4800,6950,50,GALON\n" +
+    "FRAG-NUE-001,\"Producto Nuevo de Limpieza\",\"Útiles, Fibras y Equipos\",\"Mopas Industriales y Repuestos\",LOT-2026-001X,3500,5200,20,UNIDAD\n";
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "plantilla_bodega_fragama_familias.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 function setupExcelBulkImport() {
   const fileInput = document.getElementById('excelFileInput');
   const dropzone = document.getElementById('excelDropzone');
@@ -2978,67 +3053,6 @@ function setupExcelBulkImport() {
     };
     reader.readAsText(file);
   }
-
-  function parseCsvData(content) {
-    const lines = content.split(/\r\n|\n/).filter(l => l.trim().length > 0);
-    if (lines.length < 2) {
-      alert('El archivo no contiene suficientes filas.');
-      return;
-    }
-
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-      if (cols.length >= 6) {
-        const sku = cols[0].toUpperCase();
-        const existing = AppState.products.find(p => p.sku === sku);
-
-        rows.push({
-          sku: sku,
-          name: cols[1],
-          familyName: cols[2] || 'Químicos y Desinfectantes',
-          subfamilyName: cols[3] || 'Desengrasantes Industriales',
-          batchNumber: cols[4] || 'LOT-2026-IMPORT',
-          costPrice: parseFloat(cols[5]) || 0,
-          salePrice: parseFloat(cols[6]) || 0,
-          quantity: parseInt(cols[7], 10) || 0,
-          unit: cols[8] || 'GALON',
-          isExisting: !!existing,
-          currentStock: existing ? existing.stock : 0
-        });
-      }
-    }
-
-    AppState.stagedBulkRows = rows;
-    renderBulkPreviewTable();
-  }
-
-  window.loadDemoExcelFile = function() {
-    const demoData = `SKU,NOMBRE,FAMILIA,SUBFAMILIA,LOTE,COSTO,PRECIO_VENTA,CANTIDAD_AUMENTAR,UNIDAD
-FRAG-DES-001,"Desengrasante Industrial Alcalino Galón","Químicos y Desinfectantes","Desengrasantes Industriales",LOT-2026-089A,4800,6950,50,GALON
-FRAG-CLO-001,"Cloro Concentrado Fragama 5.25% Galón","Químicos y Desinfectantes","Cloros y Blanqueadores",LOT-2026-092C,2100,3250,100,GALON
-FRAG-CER-001,"Cera Polimérica Antideslizante Galón","Químicos y Desinfectantes","Ceras y Tratamiento de Pisos",LOT-2026-CER01,6200,8900,30,GALON
-FRAG-VAS-001,"Vaso Cónico Transparente 7oz (Caja x1000)","Papelería y Desechables","Servilletas y Vasos Desechables",LOT-2026-VAS05,8500,11900,25,CAJA
-FRAG-DIS-001,"Dispensador Jabón Líquido Relleno 1L","Bolsas y Plásticos","Dispensadores Institucionales",LOT-2026-DISP01,4500,6800,40,UNIDAD`;
-
-    parseCsvData(demoData);
-    showNotificationToast('Datos de prueba con Familias y Lotes cargados en la previsualización.', 'info');
-  };
-
-  window.downloadExcelTemplate = function() {
-    const csvContent = "data:text/csv;charset=utf-8," + 
-      "SKU,NOMBRE,FAMILIA,SUBFAMILIA,LOTE,COSTO,PRECIO_VENTA,CANTIDAD_AUMENTAR,UNIDAD\n" +
-      "FRAG-DES-001,\"Desengrasante Industrial Alcalino Galón\",\"Químicos y Desinfectantes\",\"Desengrasantes Industriales\",LOT-2026-089A,4800,6950,50,GALON\n" +
-      "FRAG-NUE-001,\"Producto Nuevo de Limpieza\",\"Útiles, Fibras y Equipos\",\"Mopas Industriales y Repuestos\",LOT-2026-001X,3500,5200,20,UNIDAD\n";
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "plantilla_bodega_fragama_familias.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   if (processBtn) {
     processBtn.addEventListener('click', () => {
@@ -3172,6 +3186,7 @@ function renderBulkPreviewTable() {
     `;
   }).join('');
 }
+window.renderBulkPreviewTable = renderBulkPreviewTable;
 
 // ==============================================================================
 // 6. CENTRO PROFESIONAL DE REPORTERÍA & AUDITORÍA DE INVENTARIOS
@@ -3657,6 +3672,7 @@ function renderReportsData() {
     renderFamilyBreakdownTable(familiesMap, totalUnits);
   }
 }
+window.renderReportsData = renderReportsData;
 
 function renderPhysicalAuditTable(products) {
   const tbody = document.getElementById('reportPhysicalTableBody');
@@ -4514,31 +4530,43 @@ function setupCustomerOrdersModule() {
   const newCustForm = document.getElementById('newCustomerForm');
 
   if (openNewCustBtn && newCustModal) {
-    openNewCustBtn.addEventListener('click', () => newCustModal.classList.add('active'));
+    openNewCustBtn.addEventListener('click', () => {
+      newCustModal.classList.add('active');
+      newCustModal.style.setProperty('display', 'flex', 'important');
+    });
   }
   if (closeNewCustBtn && newCustModal) {
-    closeNewCustBtn.addEventListener('click', () => newCustModal.classList.remove('active'));
+    closeNewCustBtn.addEventListener('click', () => {
+      newCustModal.classList.remove('active');
+      newCustModal.style.display = 'none';
+    });
   }
   if (cancelNewCustBtn && newCustModal) {
-    cancelNewCustBtn.addEventListener('click', () => newCustModal.classList.remove('active'));
+    cancelNewCustBtn.addEventListener('click', () => {
+      newCustModal.classList.remove('active');
+      newCustModal.style.display = 'none';
+    });
   }
 
   if (newCustForm) {
     newCustForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const taxId = document.getElementById('newCustId').value.trim();
-      const docType = document.getElementById('newCustDocType').value;
-      const name = document.getElementById('newCustName').value.trim();
-      const contact = document.getElementById('newCustContact').value.trim();
-      const phone = document.getElementById('newCustPhone').value.trim();
-      const email = document.getElementById('newCustEmail').value.trim();
-      const terms = document.getElementById('newCustTerms').value;
-      const route = document.getElementById('newCustRoute').value.trim() || 'Cartago Centro';
-      const address = document.getElementById('newCustAddress').value.trim();
+      const taxId = document.getElementById('newCustId')?.value.trim() || '';
+      const docType = document.getElementById('newCustDocType')?.value || '02';
+      const name = document.getElementById('newCustName')?.value.trim() || '';
+      const contact = document.getElementById('newCustContact')?.value.trim() || '';
+      const phone = document.getElementById('newCustPhone')?.value.trim() || '';
+      const email = document.getElementById('newCustEmail')?.value.trim() || '';
+      const terms = document.getElementById('newCustTerms')?.value || 'Contado';
+      const province = document.getElementById('newCustProvince')?.value || 'Cartago';
+      const canton = document.getElementById('newCustCanton')?.value.trim() || 'Central';
+      const route = (document.getElementById('newCustRoute')?.value.trim()) || canton || province || 'Cartago Centro';
+      const address = document.getElementById('newCustAddress')?.value.trim() || '';
 
       const newCustomer = {
         id: AppState.customers.length + 1,
-        taxId, docType, name, contact, phone, email, terms, route, address
+        taxId, docType, name, contact, phone, email, terms, route, address,
+        province, canton, district: 'Central', economicActivity: '466901', paymentMethodDefault: '04'
       };
 
       try {
@@ -4559,9 +4587,16 @@ function setupCustomerOrdersModule() {
       AppState.currentOrder.customerId = newCustomer.id;
 
       newCustForm.reset();
-      closeModalDirectly('newCustomerModal');
+      newCustModal.classList.remove('active');
+      newCustModal.style.display = 'none';
+      if (typeof closeModalDirectly === 'function') {
+        closeModalDirectly('newCustomerModal');
+      }
       renderCustomerSelect();
       updateCustomerCard(newCustomer.id);
+      if (typeof renderCustomerDirectoryTable === 'function') {
+        renderCustomerDirectoryTable();
+      }
       showNotificationToast(`Cliente "${newCustomer.name}" registrado y seleccionado exitosamente.`, 'success');
     });
   }
@@ -6244,6 +6279,7 @@ function setDriverProvinceFilter(province) {
   });
   renderDriverDispatches();
 }
+window.setDriverProvinceFilter = setDriverProvinceFilter;
 
 function renderDriverDispatches() {
   const container = document.getElementById('driverDispatchesList');
@@ -6373,6 +6409,7 @@ function renderDriverDispatches() {
     `;
   }).join('');
 }
+window.renderDriverDispatches = renderDriverDispatches;
 
 // ------------------------------------------------------------------------------
 // VISUALIZADOR DE CÓDIGO QR EN ALTA DEFINICIÓN (MODAL)
@@ -7468,6 +7505,7 @@ function showNotificationToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 400);
   }, 3500);
 }
+window.showNotificationToast = showNotificationToast;
 
 // ==============================================================================
 // 12. MÓDULO DE DASHBOARD MODERNO Y ANALÍTICAS VISUALES
