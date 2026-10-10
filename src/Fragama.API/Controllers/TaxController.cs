@@ -31,6 +31,13 @@ namespace Fragama.API.Controllers
             return Ok(invoice);
         }
 
+        [HttpPost("custom-electronic-invoice")]
+        public async Task<IActionResult> GenerateCustomElectronicInvoice([FromBody] CustomElectronicInvoiceRequestDto request, CancellationToken cancellationToken)
+        {
+            var invoice = await _taxService.GenerateCustomElectronicInvoiceAsync(request, cancellationToken);
+            return Ok(invoice);
+        }
+
         [HttpGet("export-d104-csv")]
         public async Task<IActionResult> ExportD104Csv(CancellationToken cancellationToken)
         {

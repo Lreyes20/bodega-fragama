@@ -1459,12 +1459,16 @@
         </div>
 
         <!-- Visor de Factura Electrónica v4.3 (XML & Clave 50 Dígitos) -->
+        <!-- Visor de Factura Electrónica v4.3 (XML & Clave 50 Dígitos) -->
         <div class="content-card">
           <div class="card-header-custom">
             <div class="card-header-title">
               <i class="bi bi-file-earmark-code text-primary"></i> Comprobante Electrónico v4.3 (Clave Numérica de 50 Dígitos &amp; XML)
             </div>
-            <div style="display:flex; gap:10px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-fragama btn-outline-fragama" onclick="toggleCustomInvoiceBuilder()" id="btnToggleXmlConfig">
+                <i class="bi bi-sliders2-vertical"></i> Personalizar Empresa &amp; Factura
+              </button>
               <button class="btn-fragama btn-outline-fragama" onclick="copyXmlToClipboard()">
                 <i class="bi bi-clipboard-check"></i> Copiar XML
               </button>
@@ -1473,20 +1477,229 @@
               </button>
             </div>
           </div>
+
+          <!-- Barra de Selección Rápida de Pedido y Empresa Emisora -->
+          <div style="padding:14px 18px; background:#F8FAFC; border-bottom:1px solid var(--border-color); display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:280px;">
+              <label style="font-size:0.85rem; font-weight:700; color:var(--text-muted); white-space:nowrap;">
+                <i class="bi bi-receipt"></i> Seleccionar Factura / Pedido:
+              </label>
+              <select id="xmlOrderSelector" class="form-select-fragama" style="font-size:0.88rem; font-weight:600;" onchange="onSelectXmlOrder(this.value)">
+                <option value="0">Cargando pedidos disponibles...</option>
+              </select>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:280px;">
+              <label style="font-size:0.85rem; font-weight:700; color:var(--text-muted); white-space:nowrap;">
+                <i class="bi bi-building"></i> Empresa Emisora:
+              </label>
+              <select id="xmlCompanyPreset" class="form-select-fragama" style="font-size:0.88rem; font-weight:600;" onchange="onSelectXmlCompanyPreset(this.value)">
+                <option value="fragama">🏢 Distribuidora Fragama S.A. (3-101-778899)</option>
+                <option value="valle">🏢 Corporación Logística Del Valle S.A. (3-101-554433)</option>
+                <option value="empaques">🏢 Suministros y Empaques de Cartago S.A. (3-101-889911)</option>
+                <option value="alimentos">🏢 Distribuidora Central de Alimentos S.A. (3-101-442211)</option>
+                <option value="custom">✏️ Empresa Personalizada (A Medida)...</option>
+              </select>
+            </div>
+
+            <button class="btn-fragama btn-primary-fragama" style="white-space:nowrap;" onclick="triggerRegenerateXml()">
+              <i class="bi bi-arrow-clockwise"></i> Regenerar XML
+            </button>
+          </div>
+
+          <!-- Panel de Configuración Personalizada de Empresa, Receptor y Líneas (Expandible) -->
+          <div id="customInvoiceBuilderPanel" style="display:none; padding:18px; background:#F1F5F9; border-bottom:2px solid #CBD5E1;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <h5 style="margin:0; font-size:1rem; font-weight:800; color:#1E293B;">
+                <i class="bi bi-gear-fill text-primary"></i> Generador Dinámico de Comprobantes Oficiales para Cualquier Empresa
+              </h5>
+              <button class="btn-fragama btn-outline-fragama" style="padding:4px 10px; font-size:0.8rem;" onclick="toggleCustomInvoiceBuilder()">
+                <i class="bi bi-x-lg"></i> Cerrar Panel
+              </button>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px;">
+              <!-- Tarjeta Datos del Emisor -->
+              <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size:0.88rem; font-weight:700; color:#0F172A; border-bottom:1px solid #F1F5F9; padding-bottom:8px; margin-bottom:10px;">
+                  <i class="bi bi-building-check text-primary"></i> 1. Empresa Emisora
+                </div>
+                <div class="mb-2">
+                  <label class="form-label-fragama" style="font-size:0.75rem;">Razón Social / Nombre:</label>
+                  <input type="text" id="cfgEmisorNombre" class="form-control-fragama" value="Distribuidora Fragama S.A.">
+                </div>
+                <div class="mb-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Cédula Jurídica / Física:</label>
+                    <input type="text" id="cfgEmisorCedula" class="form-control-fragama" value="3101778899">
+                  </div>
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">CIIU Actividad:</label>
+                    <input type="text" id="cfgEmisorActividad" class="form-control-fragama" value="466901">
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label-fragama" style="font-size:0.75rem;">Nombre Comercial:</label>
+                  <input type="text" id="cfgEmisorComercial" class="form-control-fragama" value="Distribuidora Fragama">
+                </div>
+                <div class="mb-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Correo Emisor:</label>
+                    <input type="email" id="cfgEmisorCorreo" class="form-control-fragama" value="facturacion@fragama.cr">
+                  </div>
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Teléfono:</label>
+                    <input type="text" id="cfgEmisorTelefono" class="form-control-fragama" value="25510000">
+                  </div>
+                </div>
+                <div class="mb-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Provincia:</label>
+                    <select id="cfgEmisorProvincia" class="form-select-fragama">
+                      <option value="1">1 - San José</option>
+                      <option value="2">2 - Alajuela</option>
+                      <option value="3" selected>3 - Cartago</option>
+                      <option value="4">4 - Heredia</option>
+                      <option value="5">5 - Guanacaste</option>
+                      <option value="6">6 - Puntarenas</option>
+                      <option value="7">7 - Limón</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Cantón / Distrito:</label>
+                    <input type="text" id="cfgEmisorCantonDistrito" class="form-control-fragama" value="01 / 01">
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label-fragama" style="font-size:0.75rem;">Otras Señas / Dirección:</label>
+                  <input type="text" id="cfgEmisorDireccion" class="form-control-fragama" value="Parque Industrial y Logístico, Cartago Centro, Costa Rica">
+                </div>
+              </div>
+
+              <!-- Tarjeta Datos del Receptor y Tipo Comprobante -->
+              <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size:0.88rem; font-weight:700; color:#0F172A; border-bottom:1px solid #F1F5F9; padding-bottom:8px; margin-bottom:10px;">
+                  <i class="bi bi-person-badge text-primary"></i> 2. Cliente Receptor &amp; Tipo de Documento
+                </div>
+                <div class="mb-2">
+                  <label class="form-label-fragama" style="font-size:0.75rem;">Cliente / Razón Social Receptor:</label>
+                  <input type="text" id="cfgReceptorNombre" class="form-control-fragama" value="Municpalidad de curridabat">
+                </div>
+                <div class="mb-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Cédula Receptor:</label>
+                    <input type="text" id="cfgReceptorCedula" class="form-control-fragama" value="3014042047">
+                  </div>
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Tipo Documento:</label>
+                    <select id="cfgTipoDocumento" class="form-select-fragama">
+                      <option value="01" selected>01 - Factura Electrónica</option>
+                      <option value="04">04 - Tiquete Electrónico</option>
+                      <option value="03">03 - Nota de Crédito</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label-fragama" style="font-size:0.75rem;">Correo Receptor:</label>
+                  <input type="email" id="cfgReceptorCorreo" class="form-control-fragama" value="proveeduria@curridabat.go.cr">
+                </div>
+                <div class="mb-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Medio de Pago:</label>
+                    <select id="cfgMedioPago" class="form-select-fragama">
+                      <option value="04" selected>04 - Transferencia / SINPE Móvil</option>
+                      <option value="02">02 - Tarjeta Crédito / Débito</option>
+                      <option value="01">01 - Efectivo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Condición Venta:</label>
+                    <select id="cfgCondicionVenta" class="form-select-fragama">
+                      <option value="01" selected>01 - Contado</option>
+                      <option value="02">02 - Crédito (30 Días)</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Moneda:</label>
+                    <select id="cfgMoneda" class="form-select-fragama">
+                      <option value="CRC" selected>CRC - Colones (₡)</option>
+                      <option value="USD">USD - Dólares ($)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label-fragama" style="font-size:0.75rem;">Consecutivo ID:</label>
+                    <input type="number" id="cfgConsecutivoNum" class="form-control-fragama" value="108">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sección Líneas de Detalle / Productos -->
+            <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:14px; margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                <div style="font-size:0.88rem; font-weight:700; color:#0F172A;">
+                  <i class="bi bi-box-seam text-primary"></i> 3. Líneas de Detalle &amp; Códigos CABYS de Hacienda
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="btn-fragama btn-outline-fragama" style="font-size:0.8rem; padding:4px 10px;" onclick="importLinesFromCurrentOrder()">
+                    <i class="bi bi-arrow-repeat"></i> Cargar Productos de la Orden Seleccionada
+                  </button>
+                  <button class="btn-fragama btn-primary-fragama" style="font-size:0.8rem; padding:4px 10px;" onclick="addCustomInvoiceLine()">
+                    <i class="bi bi-plus-circle"></i> + Agregar Línea
+                  </button>
+                </div>
+              </div>
+
+              <div style="overflow-x:auto;">
+                <table class="custom-table" style="font-size:0.82rem; margin:0;" id="customInvoiceLinesTable">
+                  <thead>
+                    <tr>
+                      <th style="width:40px;">#</th>
+                      <th style="min-width:140px;">Código CABYS (13 Díg.)</th>
+                      <th style="min-width:90px;">SKU</th>
+                      <th style="min-width:180px;">Descripción / Detalle</th>
+                      <th style="width:80px;">Cant.</th>
+                      <th style="width:110px;">Precio Unit.</th>
+                      <th style="width:90px;">IVA</th>
+                      <th style="width:110px;">Subtotal</th>
+                      <th style="width:40px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="customInvoiceLinesBody">
+                    <!-- Filas dinámicas -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Botón Grande de Generación -->
+            <div style="display:flex; justify-content:flex-end;">
+              <button class="btn-fragama btn-primary-fragama" style="padding:10px 24px; font-size:0.95rem; font-weight:700; background:linear-gradient(135deg, #2563EB, #1D4ED8); box-shadow:0 4px 14px rgba(37,99,235,0.4);" onclick="generateCustomXmlFromForm()">
+                <i class="bi bi-lightning-charge-fill"></i> Generar Clave (50 Dígitos) y XML Oficial de Esta Empresa
+              </button>
+            </div>
+          </div>
           
+          <!-- Visor de Clave, Consecutivo, Emisor, Receptor y XML -->
           <div style="background:#0F172A; border-radius:10px; padding:16px; color:#E2E8F0; margin-bottom:1rem;">
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:0.85rem; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:12px;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:0.85rem; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:12px;">
               <div>
                 <span style="color:#94A3B8; display:block; font-size:0.75rem;">CLAVE NUMÉRICA (50 DÍGITOS):</span>
-                <strong id="xmlClaveLabel" style="font-family:'JetBrains Mono'; color:#38BDF8; font-size:0.92rem; word-break:break-all;">50600000000000000000000000000000000000000000000000</strong>
+                <strong id="xmlClaveLabel" style="font-family:'JetBrains Mono'; color:#38BDF8; font-size:0.90rem; word-break:break-all;">50600000000000000000000000000000000000000000000000</strong>
               </div>
               <div>
                 <span style="color:#94A3B8; display:block; font-size:0.75rem;">NÚMERO CONSECUTIVO:</span>
                 <strong id="xmlConsecutivoLabel" style="font-family:'JetBrains Mono'; color:#4ADE80;">00100001010000000001</strong>
               </div>
               <div>
+                <span style="color:#94A3B8; display:block; font-size:0.75rem;">EMPRESA EMISORA:</span>
+                <strong id="xmlEmisorLabel" style="color:#38BDF8;">Distribuidora Fragama S.A.</strong>
+              </div>
+              <div>
                 <span style="color:#94A3B8; display:block; font-size:0.75rem;">CLIENTE RECEPTOR:</span>
-                <strong id="xmlReceptorLabel" style="color:#F8FAFC;">Supermercado Cartago</strong>
+                <strong id="xmlReceptorLabel" style="color:#F8FAFC;">Municipalidad de Curridabat</strong>
               </div>
               <div>
                 <span style="color:#94A3B8; display:block; font-size:0.75rem;">TOTAL COMPROBANTE:</span>

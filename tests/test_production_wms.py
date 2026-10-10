@@ -314,4 +314,52 @@ class TestHaciendaTaxCostaRica:
         assert len(p["cabysCode"]) == 13
         assert p["taxRate"] == 13.0
 
+    def test_custom_company_electronic_invoice(self, client):
+        payload = {
+            "orderId": 501,
+            "tipoDocumento": "01",
+            "emisor": {
+                "nombre": "Corporación Logística del Valle S.A.",
+                "cedula": "3101554433",
+                "tipoIdentificacion": "02",
+                "nombreComercial": "Logística del Valle",
+                "actividadEconomica": "466902",
+                "correo": "facturacion@valle.cr",
+                "telefono": "22223344",
+                "provincia": "1",
+                "canton": "01",
+                "distrito": "01",
+                "direccion": "San José Centro, Paseo Colón"
+            },
+            "receptor": {
+                "nombre": "Supermercado El Roble Cartago",
+                "cedula": "3101887766",
+                "tipoIdentificacion": "02",
+                "correo": "compras@elroble.cr"
+            },
+            "lineas": [
+                {
+                    "numeroLinea": 1,
+                    "cabys": "3532200000000",
+                    "sku": "VALLE-QUIM-01",
+                    "detalle": "Desinfectante Químico Multiuso 5L",
+                    "cantidad": 10.0,
+                    "precioUnitario": 3500.0,
+                    "tarifaIva": 13.0
+                }
+            ]
+        }
+        res = client.post("/api/tax/custom-electronic-invoice", json=payload)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert len(data["clave"]) == 50
+        assert "3101554433" in data["clave"]
+        assert len(data["consecutivo"]) == 20
+        assert "Corporación Logística del Valle S.A." in data["xml"]
+        assert "Supermercado El Roble Cartago" in data["xml"]
+        assert "VALLE-QUIM-01" in data["xml"]
+        assert data["totalFactura"] == 39550.0
+
+
 

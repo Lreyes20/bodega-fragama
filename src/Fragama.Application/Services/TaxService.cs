@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Fragama.Application.DTOs;
@@ -232,6 +233,182 @@ namespace Fragama.Application.Services
                 Receptor = "Supermercado Cartago Centro",
                 MontoGravado = subtotalGravado,
                 MontoIva13 = impuesto,
+                TotalFactura = totalFactura,
+                Xml = xml
+            };
+        }
+
+        public async Task<ElectronicInvoiceResponseDto> GenerateCustomElectronicInvoiceAsync(CustomElectronicInvoiceRequestDto request, CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.Now;
+            var fechaEmision = now.ToString("yyyy-MM-ddTHH:mm:ss-06:00");
+            var emisor = request.Emisor ?? new CustomInvoiceEmisorDto();
+            var receptor = request.Receptor ?? new CustomInvoiceReceptorDto();
+
+            var cleanEmisorCed = Regex.Replace(emisor.Cedula ?? "3101778899", @"[^0-9]", "");
+            var emisorCed12 = cleanEmisorCed.PadLeft(12, '0');
+            if (emisorCed12.Length > 12) emisorCed12 = emisorCed12.Substring(emisorCed12.Length - 12);
+
+            var sucursal = (request.Sucursal ?? "001").PadLeft(3, '0');
+            if (sucursal.Length > 3) sucursal = sucursal.Substring(sucursal.Length - 3);
+
+            var terminal = (request.Terminal ?? "00001").PadLeft(5, '0');
+            if (terminal.Length > 5) terminal = terminal.Substring(terminal.Length - 5);
+
+            var tipoDoc = (request.TipoDocumento ?? "01").PadLeft(2, '0');
+            if (tipoDoc.Length > 2) tipoDoc = tipoDoc.Substring(tipoDoc.Length - 2);
+
+            var orderNum = (request.OrderId > 0 ? request.OrderId : 108).ToString().PadLeft(10, '0');
+            if (orderNum.Length > 10) orderNum = orderNum.Substring(orderNum.Length - 10);
+
+            var consecutivo20 = $"{sucursal}{terminal}{tipoDoc}{orderNum}";
+            var codSeguridad = $"{Math.Abs((long)DateTime.UtcNow.Ticks % 100000000):D8}";
+            var clave50 = $"506{now.Day:D2}{now.Month:D2}{now.Year % 100:D2}{emisorCed12}{consecutivo20}1{codSeguridad}";
+
+            var lines = request.Lineas != null && request.Lineas.Count > 0
+                ? request.Lineas
+                : new List<CustomInvoiceLineDto>
+                {
+                    new CustomInvoiceLineDto
+                    {
+                        NumeroLinea = 1,
+                        Cabys = "3532200000000",
+                        Sku = "ITEM-BASE-01",
+                        Detalle = "Producto Comercial",
+                        Cantidad = 1,
+                        PrecioUnitario = 10000,
+                        TarifaIva = 13
+                    }
+                };
+
+            decimal totalGravado = 0;
+            decimal totalImpuesto = 0;
+            var sbDetalles = new StringBuilder();
+
+            int lineIndex = 1;
+            foreach (var line in lines)
+            {
+                var subtotalLinea = Math.Round(line.Cantidad * line.PrecioUnitario, 2);
+                var montoIva = Math.Round(subtotalLinea * (line.TarifaIva / 100m), 2);
+                var montoTotalLinea = subtotalLinea + montoIva;
+
+                totalGravado += subtotalLinea;
+                totalImpuesto += montoIva;
+
+                var cabysClean = (line.Cabys ?? "3532200000000").Trim();
+                if (cabysClean.Length != 13) cabysClean = "3532200000000";
+
+                var codTarifa = line.TarifaIva == 13m ? "08" : (line.TarifaIva == 1m ? "02" : (line.TarifaIva == 2m ? "03" : "01"));
+
+                sbDetalles.AppendLine($@"    <LineaDetalle>
+      <NumeroLinea>{lineIndex}</NumeroLinea>
+      <Codigo>{cabysClean}</Codigo>
+      <CodigoComercial>
+        <Tipo>01</Tipo>
+        <Codigo>{System.Security.SecurityElement.Escape(line.Sku ?? $"ITEM-{lineIndex}")}</Codigo>
+      </CodigoComercial>
+      <Cantidad>{line.Cantidad:F3}</Cantidad>
+      <UnidadMedida>Unid</UnidadMedida>
+      <Detalle>{System.Security.SecurityElement.Escape(line.Detalle ?? "Producto Comercial")}</Detalle>
+      <PrecioUnitario>{line.PrecioUnitario:F2}</PrecioUnitario>
+      <MontoTotal>{subtotalLinea:F2}</MontoTotal>
+      <SubTotal>{subtotalLinea:F2}</SubTotal>
+      <Impuesto>
+        <Codigo>01</Codigo>
+        <CodigoTarifa>{codTarifa}</CodigoTarifa>
+        <Tarifa>{line.TarifaIva:F2}</Tarifa>
+        <Monto>{montoIva:F2}</Monto>
+      </Impuesto>
+      <MontoTotalLinea>{montoTotalLinea:F2}</MontoTotalLinea>
+    </LineaDetalle>");
+                lineIndex++;
+            }
+
+            var totalFactura = totalGravado + totalImpuesto;
+
+            var recCed = Regex.Replace(receptor.Cedula ?? "3014042047", @"[^0-9]", "");
+            if (recCed.Length < 9) recCed = recCed.PadLeft(9, '0');
+            var recTipoId = !string.IsNullOrEmpty(receptor.TipoIdentificacion) ? receptor.TipoIdentificacion : (recCed.Length >= 10 ? "02" : "01");
+
+            var tagRaiz = tipoDoc == "04" ? "TiqueteElectronico" : (tipoDoc == "03" ? "NotaCreditoElectronica" : "FacturaElectronica");
+            var schemaUrl = tipoDoc == "04" ? "tiqueteElectronico" : (tipoDoc == "03" ? "notaCreditoElectronica" : "facturaElectronica");
+
+            var xml = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<{tagRaiz} xmlns=""https://cdn.comprobanteselectronicos.go.cr/xml-esquema/v4.3/{schemaUrl}""
+                    xmlns:ds=""http://www.w3.org/2000/09/xmldsig#""
+                    xmlns:xsd=""http://www.w3.org/2001/XMLSchema""
+                    xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"">
+  <Clave>{clave50}</Clave>
+  <CodigoActividad>{System.Security.SecurityElement.Escape(emisor.ActividadEconomica ?? "466901")}</CodigoActividad>
+  <NumeroConsecutivo>{consecutivo20}</NumeroConsecutivo>
+  <FechaEmision>{fechaEmision}</FechaEmision>
+  <Emisor>
+    <Nombre>{System.Security.SecurityElement.Escape(emisor.Nombre ?? "Distribuidora Fragama S.A.")}</Nombre>
+    <Identificacion>
+      <Tipo>{emisor.TipoIdentificacion ?? "02"}</Tipo>
+      <Numero>{cleanEmisorCed}</Numero>
+    </Identificacion>
+    <NombreComercial>{System.Security.SecurityElement.Escape(emisor.NombreComercial ?? emisor.Nombre ?? "Distribuidora Fragama")}</NombreComercial>
+    <Ubicacion>
+      <Provincia>{emisor.Provincia ?? "3"}</Provincia>
+      <Canton>{(emisor.Canton ?? "01").PadLeft(2, '0')}</Canton>
+      <Distrito>{(emisor.Distrito ?? "01").PadLeft(2, '0')}</Distrito>
+      <OtrasSenas>{System.Security.SecurityElement.Escape(emisor.Direccion ?? "Cartago, Costa Rica")}</OtrasSenas>
+    </Ubicacion>
+    <Telefono>
+      <CodigoPais>506</CodigoPais>
+      <NumTelefono>{Regex.Replace(emisor.Telefono ?? "25510000", @"[^0-9]", "")}</NumTelefono>
+    </Telefono>
+    <CorreoElectronico>{System.Security.SecurityElement.Escape(emisor.Correo ?? "facturacion@fragama.cr")}</CorreoElectronico>
+  </Emisor>
+  <Receptor>
+    <Nombre>{System.Security.SecurityElement.Escape(receptor.Nombre ?? "Cliente General")}</Nombre>
+    <Identificacion>
+      <Tipo>{recTipoId}</Tipo>
+      <Numero>{recCed}</Numero>
+    </Identificacion>
+    <CorreoElectronico>{System.Security.SecurityElement.Escape(receptor.Correo ?? "facturacion@cliente.cr")}</CorreoElectronico>
+  </Receptor>
+  <CondicionVenta>{request.CondicionVenta ?? "01"}</CondicionVenta>
+  <PlazoCredito>0</PlazoCredito>
+  <MedioPago>{request.MedioPago ?? "04"}</MedioPago>
+  <DetalleServicio>
+{sbDetalles}  </DetalleServicio>
+  <ResumenFactura>
+    <CodigoTipoMoneda>
+      <CodigoMoneda>{request.Moneda ?? "CRC"}</CodigoMoneda>
+      <TipoCambio>1.0</TipoCambio>
+    </CodigoTipoMoneda>
+    <TotalServGravados>0.00</TotalServGravados>
+    <TotalServExentos>0.00</TotalServExentos>
+    <TotalMercanciasGravadas>{totalGravado:F2}</TotalMercanciasGravadas>
+    <TotalMercanciasExentas>0.00</TotalMercanciasExentas>
+    <TotalGravado>{totalGravado:F2}</TotalGravado>
+    <TotalExento>0.00</TotalExento>
+    <TotalVenta>{totalGravado:F2}</TotalVenta>
+    <TotalDescuentos>0.00</TotalDescuentos>
+    <TotalVentaNeta>{totalGravado:F2}</TotalVentaNeta>
+    <TotalImpuesto>{totalImpuesto:F2}</TotalImpuesto>
+    <TotalComprobante>{totalFactura:F2}</TotalComprobante>
+  </ResumenFactura>
+</{tagRaiz}>";
+
+            await Task.Yield();
+            return new ElectronicInvoiceResponseDto
+            {
+                Success = true,
+                Clave = clave50,
+                Consecutivo = consecutivo20,
+                TipoDocumento = tipoDoc,
+                Moneda = request.Moneda ?? "CRC",
+                FechaEmision = fechaEmision,
+                Emisor = $"{emisor.Nombre} ({cleanEmisorCed})",
+                EmisorNombre = emisor.Nombre ?? string.Empty,
+                EmisorCedula = cleanEmisorCed,
+                Receptor = receptor.Nombre ?? string.Empty,
+                ReceptorCedula = recCed,
+                MontoGravado = totalGravado,
+                MontoIva13 = totalImpuesto,
                 TotalFactura = totalFactura,
                 Xml = xml
             };

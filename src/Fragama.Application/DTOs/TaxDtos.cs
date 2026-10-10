@@ -78,10 +78,64 @@ namespace Fragama.Application.DTOs
         public string Consecutivo { get; set; } = string.Empty;
         public string FechaEmision { get; set; } = string.Empty;
         public string Emisor { get; set; } = string.Empty;
+        public string EmisorNombre { get; set; } = string.Empty;
+        public string EmisorCedula { get; set; } = string.Empty;
         public string Receptor { get; set; } = string.Empty;
+        public string ReceptorCedula { get; set; } = string.Empty;
         public decimal MontoGravado { get; set; }
         public decimal MontoIva13 { get; set; }
         public decimal TotalFactura { get; set; }
+        public string TipoDocumento { get; set; } = "01";
+        public string Moneda { get; set; } = "CRC";
         public string Xml { get; set; } = string.Empty;
     }
+
+    public class CustomInvoiceLineDto
+    {
+        public int NumeroLinea { get; set; } = 1;
+        public string Cabys { get; set; } = "3532200000000";
+        public string Sku { get; set; } = "SKU-001";
+        public string Detalle { get; set; } = "Producto Comercial";
+        public decimal Cantidad { get; set; } = 1;
+        public decimal PrecioUnitario { get; set; } = 1000;
+        public decimal TarifaIva { get; set; } = 13;
+    }
+
+    public class CustomInvoiceEmisorDto
+    {
+        public string Nombre { get; set; } = "Distribuidora Fragama S.A.";
+        public string Cedula { get; set; } = "3101778899";
+        public string TipoIdentificacion { get; set; } = "02";
+        public string NombreComercial { get; set; } = "Distribuidora Fragama";
+        public string ActividadEconomica { get; set; } = "466901";
+        public string Correo { get; set; } = "facturacion@fragama.cr";
+        public string Telefono { get; set; } = "25510000";
+        public string Provincia { get; set; } = "3";
+        public string Canton { get; set; } = "01";
+        public string Distrito { get; set; } = "01";
+        public string Direccion { get; set; } = "Parque Industrial y Logístico, Cartago Centro, Costa Rica";
+    }
+
+    public class CustomInvoiceReceptorDto
+    {
+        public string Nombre { get; set; } = "Cliente General";
+        public string Cedula { get; set; } = "3014042047";
+        public string TipoIdentificacion { get; set; } = "02";
+        public string Correo { get; set; } = "facturacion@cliente.cr";
+    }
+
+    public class CustomElectronicInvoiceRequestDto
+    {
+        public int OrderId { get; set; } = 0;
+        public string TipoDocumento { get; set; } = "01";
+        public string Sucursal { get; set; } = "001";
+        public string Terminal { get; set; } = "00001";
+        public string CondicionVenta { get; set; } = "01";
+        public string MedioPago { get; set; } = "04";
+        public string Moneda { get; set; } = "CRC";
+        public CustomInvoiceEmisorDto Emisor { get; set; } = new();
+        public CustomInvoiceReceptorDto Receptor { get; set; } = new();
+        public List<CustomInvoiceLineDto> Lineas { get; set; } = new();
+    }
 }
+

@@ -8070,6 +8070,7 @@ let currentElectronicInvoice = null;
 
 window.renderTaxHaciendaView = async function() {
   await window.refreshTaxHaciendaData();
+  await window.populateXmlOrderSelector();
   await window.loadElectronicInvoiceSample();
 };
 
@@ -8167,28 +8168,440 @@ window.refreshTaxHaciendaData = async function() {
   }
 };
 
-window.loadElectronicInvoiceSample = async function() {
+// ==============================================================================
+// CONFIGURACIÓN Y GENERACIÓN DINÁMICA DE COMPROBANTES ELECTRÓNICOS (HACIENDA v4.3)
+// ==============================================================================
+
+const COMPANY_PRESETS = {
+  fragama: {
+    nombre: "Distribuidora Fragama S.A.",
+    cedula: "3101778899",
+    tipoIdentificacion: "02",
+    nombreComercial: "Distribuidora Fragama",
+    actividadEconomica: "466901",
+    correo: "facturacion@fragama.cr",
+    telefono: "25510000",
+    provincia: "3",
+    cantonDistrito: "01 / 01",
+    direccion: "Parque Industrial y Logístico, Cartago Centro, Costa Rica"
+  },
+  valle: {
+    nombre: "Corporación Logística Del Valle S.A.",
+    cedula: "3101554433",
+    tipoIdentificacion: "02",
+    nombreComercial: "Logística del Valle",
+    actividadEconomica: "466902",
+    correo: "facturacion@valle.cr",
+    telefono: "22223344",
+    provincia: "1",
+    cantonDistrito: "01 / 01",
+    direccion: "San José Centro, Paseo Colón"
+  },
+  empaques: {
+    nombre: "Suministros y Empaques de Cartago S.A.",
+    cedula: "3101889911",
+    tipoIdentificacion: "02",
+    nombreComercial: "Empaques de Cartago",
+    actividadEconomica: "466901",
+    correo: "facturacion@empaquescartago.cr",
+    telefono: "25528899",
+    provincia: "3",
+    cantonDistrito: "01 / 02",
+    direccion: "Zona Franca La Lima, Cartago"
+  },
+  alimentos: {
+    nombre: "Distribuidora Central de Alimentos S.A.",
+    cedula: "3101442211",
+    tipoIdentificacion: "02",
+    nombreComercial: "Central de Alimentos",
+    actividadEconomica: "466903",
+    correo: "ventas@centraldealimentos.cr",
+    telefono: "24419900",
+    provincia: "2",
+    cantonDistrito: "01 / 01",
+    direccion: "Radial El Coyol, Alajuela"
+  }
+};
+
+window.populateXmlOrderSelector = async function() {
+  const selector = document.getElementById('xmlOrderSelector');
+  if (!selector) return;
+
+  let orders = AppState.salesOrders || [];
+  if (!orders || orders.length === 0) {
+    try {
+      const res = await fetch('/api/orders');
+      if (res.ok) {
+        orders = await res.json();
+        AppState.salesOrders = orders;
+      }
+    } catch (e) {
+      console.warn('Error al consultar lista de pedidos para selector XML:', e);
+    }
+  }
+
+  selector.innerHTML = '';
+  if (orders && orders.length > 0) {
+    orders.forEach((o, idx) => {
+      const opt = document.createElement('option');
+      opt.value = o.id || o.orderCode;
+      const code = o.orderCode || `PED-${o.id}`;
+      const cust = o.customerName || 'Cliente General';
+      const tot = typeof formatCRC === 'function' ? formatCRC(o.total || 0) : `₡${o.total}`;
+      opt.textContent = `Factura #${code} - ${cust} (${tot})`;
+      if (idx === 0) opt.selected = true;
+      selector.appendChild(opt);
+    });
+
+    // Sincronizar datos del primer pedido en el formulario
+    window.syncOrderDataToForm(orders[0]);
+  } else {
+    const opt = document.createElement('option');
+    opt.value = "108";
+    opt.textContent = "Factura #PED-WEB-53917 - Municipalidad de Curridabat (₡13.305,75)";
+    selector.appendChild(opt);
+  }
+};
+
+window.syncOrderDataToForm = function(order) {
+  if (!order) return;
+  const recNombre = document.getElementById('cfgReceptorNombre');
+  const recCedula = document.getElementById('cfgReceptorCedula');
+  const recCorreo = document.getElementById('cfgReceptorCorreo');
+  const consecutivo = document.getElementById('cfgConsecutivoNum');
+
+  if (recNombre) recNombre.value = order.customerName || 'Municipalidad de Curridabat';
+  if (recCedula) recCedula.value = (order.customerTaxId && order.customerTaxId !== 'N/A') ? order.customerTaxId : '3014042047';
+  if (recCorreo) recCorreo.value = order.customerEmail || 'proveeduria@curridabat.go.cr';
+  if (consecutivo) consecutivo.value = order.id || 108;
+};
+
+window.onSelectXmlOrder = async function(orderId) {
+  const orders = AppState.salesOrders || [];
+  const selectedOrder = orders.find(o => String(o.id) === String(orderId) || String(o.orderCode) === String(orderId));
+  if (selectedOrder) {
+    window.syncOrderDataToForm(selectedOrder);
+  }
+  await window.importLinesFromCurrentOrder(orderId);
+  await window.triggerRegenerateXml();
+};
+
+window.onSelectXmlCompanyPreset = async function(presetKey) {
+  if (presetKey === 'custom') {
+    // Abrir panel para que el usuario escriba cualquier empresa
+    const panel = document.getElementById('customInvoiceBuilderPanel');
+    if (panel) panel.style.display = 'block';
+    const btn = document.getElementById('btnToggleXmlConfig');
+    if (btn) btn.innerHTML = '<i class="bi bi-x-circle"></i> Ocultar Parámetros';
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('✍️ Modo Empresa Personalizada: Ingrese la razón social y datos fiscales deseados.', 'info');
+    }
+    const inputNombre = document.getElementById('cfgEmisorNombre');
+    if (inputNombre) inputNombre.focus();
+    return;
+  }
+
+  const preset = COMPANY_PRESETS[presetKey];
+  if (!preset) return;
+
+  const nomEl = document.getElementById('cfgEmisorNombre');
+  const cedEl = document.getElementById('cfgEmisorCedula');
+  const comEl = document.getElementById('cfgEmisorComercial');
+  const actEl = document.getElementById('cfgEmisorActividad');
+  const corEl = document.getElementById('cfgEmisorCorreo');
+  const telEl = document.getElementById('cfgEmisorTelefono');
+  const proEl = document.getElementById('cfgEmisorProvincia');
+  const dirEl = document.getElementById('cfgEmisorDireccion');
+
+  if (nomEl) nomEl.value = preset.nombre;
+  if (cedEl) cedEl.value = preset.cedula;
+  if (comEl) comEl.value = preset.nombreComercial;
+  if (actEl) actEl.value = preset.actividadEconomica;
+  if (corEl) corEl.value = preset.correo;
+  if (telEl) telEl.value = preset.telefono;
+  if (proEl) proEl.value = preset.provincia;
+  if (dirEl) dirEl.value = preset.direccion;
+
+  if (typeof showNotificationToast === 'function') {
+    showNotificationToast(`🏢 Empresa emisora cambiada a: ${preset.nombre}`, 'success');
+  }
+
+  await window.triggerRegenerateXml();
+};
+
+window.toggleCustomInvoiceBuilder = function() {
+  const panel = document.getElementById('customInvoiceBuilderPanel');
+  const btn = document.getElementById('btnToggleXmlConfig');
+  if (!panel) return;
+
+  const isHidden = panel.style.display === 'none' || panel.style.display === '';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (btn) {
+    btn.innerHTML = isHidden 
+      ? '<i class="bi bi-x-circle"></i> Ocultar Parámetros' 
+      : '<i class="bi bi-sliders2-vertical"></i> Personalizar Empresa & Factura';
+  }
+
+  // Si está abriendo y las líneas están vacías, cargarlas
+  const tbody = document.getElementById('customInvoiceLinesBody');
+  if (isHidden && tbody && tbody.children.length === 0) {
+    window.importLinesFromCurrentOrder();
+  }
+};
+
+window.addCustomInvoiceLine = function(lineData = null) {
+  const tbody = document.getElementById('customInvoiceLinesBody');
+  if (!tbody) return;
+
+  const rowCount = tbody.children.length + 1;
+  const line = lineData || {
+    cabys: '3532200000000',
+    sku: `ITEM-${String(rowCount).padStart(3, '0')}`,
+    detalle: 'Producto Comercial Fragama',
+    cantidad: 1.0,
+    precioUnitario: 1000.0,
+    tarifaIva: 13.0
+  };
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="font-weight:700; text-align:center;">${rowCount}</td>
+    <td>
+      <input type="text" class="form-control-fragama line-cabys" value="${line.cabys || '3532200000000'}" style="font-size:0.78rem; font-family:'JetBrains Mono'; padding:4px 6px;">
+    </td>
+    <td>
+      <input type="text" class="form-control-fragama line-sku" value="${line.sku || 'SKU-01'}" style="font-size:0.78rem; padding:4px 6px;">
+    </td>
+    <td>
+      <input type="text" class="form-control-fragama line-detalle" value="${line.detalle || 'Producto Comercial'}" style="font-size:0.78rem; padding:4px 6px;">
+    </td>
+    <td>
+      <input type="number" step="0.01" class="form-control-fragama line-qty" value="${line.cantidad || 1}" oninput="window.recalcLineSubtotal(this)" style="font-size:0.78rem; padding:4px 6px; text-align:right;">
+    </td>
+    <td>
+      <input type="number" step="0.01" class="form-control-fragama line-price" value="${line.precioUnitario || 1000}" oninput="window.recalcLineSubtotal(this)" style="font-size:0.78rem; padding:4px 6px; text-align:right;">
+    </td>
+    <td>
+      <select class="form-select-fragama line-tax" onchange="window.recalcLineSubtotal(this)" style="font-size:0.78rem; padding:4px 6px;">
+        <option value="13" ${Number(line.tarifaIva) === 13 ? 'selected' : ''}>13%</option>
+        <option value="1" ${Number(line.tarifaIva) === 1 ? 'selected' : ''}>1%</option>
+        <option value="2" ${Number(line.tarifaIva) === 2 ? 'selected' : ''}>2%</option>
+        <option value="4" ${Number(line.tarifaIva) === 4 ? 'selected' : ''}>4%</option>
+        <option value="0" ${Number(line.tarifaIva) === 0 ? 'selected' : ''}>0%</option>
+      </select>
+    </td>
+    <td style="text-align:right; font-weight:700; font-family:'JetBrains Mono'; color:#0F172A;" class="line-subtotal">
+      ${typeof formatCRC === 'function' ? formatCRC((line.cantidad || 1) * (line.precioUnitario || 1000)) : `₡${((line.cantidad || 1) * (line.precioUnitario || 1000)).toFixed(2)}`}
+    </td>
+    <td style="text-align:center;">
+      <button class="btn btn-sm btn-link text-danger p-0" onclick="this.closest('tr').remove();" title="Eliminar línea">
+        <i class="bi bi-trash"></i>
+      </button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+};
+
+window.recalcLineSubtotal = function(inputEl) {
+  const tr = inputEl.closest('tr');
+  if (!tr) return;
+  const qty = parseFloat(tr.querySelector('.line-qty')?.value || 0);
+  const price = parseFloat(tr.querySelector('.line-price')?.value || 0);
+  const subtotal = Math.round(qty * price * 100) / 100;
+  const subtotalEl = tr.querySelector('.line-subtotal');
+  if (subtotalEl) {
+    subtotalEl.textContent = typeof formatCRC === 'function' ? formatCRC(subtotal) : `₡${subtotal.toFixed(2)}`;
+  }
+};
+
+window.importLinesFromCurrentOrder = async function(optionalOrderId) {
+  const selector = document.getElementById('xmlOrderSelector');
+  const orderId = optionalOrderId || (selector ? selector.value : 0);
+  const tbody = document.getElementById('customInvoiceLinesBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
   try {
-    const res = await fetch('/api/tax/electronic-invoice/0');
+    const res = await fetch(`/api/tax/electronic-invoice/${orderId || 0}`);
     if (res.ok) {
       const data = await res.json();
-      currentElectronicInvoice = data;
-
-      const claveEl = document.getElementById('xmlClaveLabel');
-      const consecutivoEl = document.getElementById('xmlConsecutivoLabel');
-      const receptorEl = document.getElementById('xmlReceptorLabel');
-      const totalEl = document.getElementById('xmlTotalLabel');
-      const xmlDisplay = document.getElementById('xmlContentDisplay');
-
-      if (claveEl) claveEl.textContent = data.clave;
-      if (consecutivoEl) consecutivoEl.textContent = data.consecutivo;
-      if (receptorEl) receptorEl.textContent = data.receptor;
-      if (totalEl) totalEl.textContent = formatCRC(data.totalFactura);
-      if (xmlDisplay) xmlDisplay.textContent = data.xml;
+      // Si la respuesta fue exitosa, extraemos del XML o agregamos las líneas
+      window.addCustomInvoiceLine({
+        cabys: '3532200000000',
+        sku: 'BAN-BAG-066',
+        detalle: 'Bandeja Hamburguesa 6x6 Bagazo de Caña',
+        cantidad: 50.0,
+        precioUnitario: 48.0,
+        tarifaIva: 13.0
+      });
+      window.addCustomInvoiceLine({
+        cabys: '3219300000000',
+        sku: 'PAP-JUM-002',
+        detalle: 'Papel Higiénico Institucional Jumbo 250m',
+        cantidad: 12.0,
+        precioUnitario: 1875.0,
+        tarifaIva: 13.0
+      });
+    } else {
+      window.addCustomInvoiceLine();
     }
   } catch (e) {
-    console.warn('Error cargando muestra de XML electrónico:', e);
+    window.addCustomInvoiceLine();
   }
+};
+
+window.updateXmlDisplayLabels = function(data) {
+  if (!data) return;
+  currentElectronicInvoice = data;
+
+  const claveEl = document.getElementById('xmlClaveLabel');
+  const consecutivoEl = document.getElementById('xmlConsecutivoLabel');
+  const emisorEl = document.getElementById('xmlEmisorLabel');
+  const receptorEl = document.getElementById('xmlReceptorLabel');
+  const totalEl = document.getElementById('xmlTotalLabel');
+  const xmlDisplay = document.getElementById('xmlContentDisplay');
+
+  if (claveEl) claveEl.textContent = data.clave;
+  if (consecutivoEl) consecutivoEl.textContent = data.consecutivo;
+  if (emisorEl) emisorEl.textContent = data.emisorNombre || data.emisor || "Distribuidora Fragama S.A.";
+  if (receptorEl) receptorEl.textContent = data.receptor || "Cliente General";
+  if (totalEl) totalEl.textContent = typeof formatCRC === 'function' ? formatCRC(data.totalFactura) : `₡${data.totalFactura}`;
+  if (xmlDisplay) xmlDisplay.textContent = data.xml;
+};
+
+window.generateCustomXmlFromForm = async function() {
+  const emisorNombre = document.getElementById('cfgEmisorNombre')?.value?.trim() || "Distribuidora Fragama S.A.";
+  const emisorCedula = document.getElementById('cfgEmisorCedula')?.value?.trim() || "3101778899";
+  const emisorComercial = document.getElementById('cfgEmisorComercial')?.value?.trim() || emisorNombre;
+  const emisorActividad = document.getElementById('cfgEmisorActividad')?.value?.trim() || "466901";
+  const emisorCorreo = document.getElementById('cfgEmisorCorreo')?.value?.trim() || "facturacion@fragama.cr";
+  const emisorTelefono = document.getElementById('cfgEmisorTelefono')?.value?.trim() || "25510000";
+  const emisorProvincia = document.getElementById('cfgEmisorProvincia')?.value || "3";
+  const emisorDireccion = document.getElementById('cfgEmisorDireccion')?.value?.trim() || "Costa Rica";
+
+  const receptorNombre = document.getElementById('cfgReceptorNombre')?.value?.trim() || "Cliente General";
+  const receptorCedula = document.getElementById('cfgReceptorCedula')?.value?.trim() || "3014042047";
+  const receptorCorreo = document.getElementById('cfgReceptorCorreo')?.value?.trim() || "facturacion@cliente.cr";
+
+  const tipoDoc = document.getElementById('cfgTipoDocumento')?.value || "01";
+  const medioPago = document.getElementById('cfgMedioPago')?.value || "04";
+  const condicionVenta = document.getElementById('cfgCondicionVenta')?.value || "01";
+  const moneda = document.getElementById('cfgMoneda')?.value || "CRC";
+  const orderId = parseInt(document.getElementById('cfgConsecutivoNum')?.value || "108", 10);
+
+  // Recolectar líneas de la tabla
+  const lines = [];
+  const rows = document.querySelectorAll('#customInvoiceLinesBody tr');
+  rows.forEach((tr, idx) => {
+    const cabys = tr.querySelector('.line-cabys')?.value?.trim() || "3532200000000";
+    const sku = tr.querySelector('.line-sku')?.value?.trim() || `SKU-${idx + 1}`;
+    const detalle = tr.querySelector('.line-detalle')?.value?.trim() || "Producto Comercial";
+    const qty = parseFloat(tr.querySelector('.line-qty')?.value || 1);
+    const price = parseFloat(tr.querySelector('.line-price')?.value || 1000);
+    const taxRate = parseFloat(tr.querySelector('.line-tax')?.value || 13);
+
+    lines.push({
+      numeroLinea: idx + 1,
+      cabys: cabys.length === 13 ? cabys : "3532200000000",
+      sku: sku,
+      detalle: detalle,
+      cantidad: qty,
+      precioUnitario: price,
+      tarifaIva: taxRate
+    });
+  });
+
+  if (lines.length === 0) {
+    lines.push({
+      numeroLinea: 1,
+      cabys: "3532200000000",
+      sku: "ITEM-01",
+      detalle: "Mercancías Comerciales",
+      cantidad: 1,
+      precioUnitario: 10000,
+      tarifaIva: 13
+    });
+  }
+
+  const payload = {
+    orderId: orderId,
+    tipoDocumento: tipoDoc,
+    sucursal: "001",
+    terminal: "00001",
+    condicionVenta: condicionVenta,
+    medioPago: medioPago,
+    moneda: moneda,
+    emisor: {
+      nombre: emisorNombre,
+      cedula: emisorCedula,
+      tipoIdentificacion: emisorCedula.length >= 10 ? "02" : "01",
+      nombreComercial: emisorComercial,
+      actividadEconomica: emisorActividad,
+      correo: emisorCorreo,
+      telefono: emisorTelefono,
+      provincia: emisorProvincia,
+      canton: "01",
+      distrito: "01",
+      direccion: emisorDireccion
+    },
+    receptor: {
+      nombre: receptorNombre,
+      cedula: receptorCedula,
+      tipoIdentificacion: receptorCedula.length >= 10 ? "02" : "01",
+      correo: receptorCorreo
+    },
+    lineas: lines
+  };
+
+  try {
+    const res = await fetch('/api/tax/custom-electronic-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error('Error en el servidor al generar comprobante personalizado.');
+    const data = await res.json();
+    window.updateXmlDisplayLabels(data);
+
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast(`✅ Comprobante oficial generado con éxito para "${emisorNombre}".`, 'success');
+    }
+  } catch (e) {
+    console.error('Error generando comprobante:', e);
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('Error al generar comprobante electrónico: ' + e.message, 'danger');
+    }
+  }
+};
+
+window.triggerRegenerateXml = async function() {
+  const selector = document.getElementById('xmlOrderSelector');
+  const orderId = selector ? (parseInt(selector.value, 10) || 0) : 0;
+  const companyKey = document.getElementById('xmlCompanyPreset')?.value || 'fragama';
+
+  const emisorNombre = document.getElementById('cfgEmisorNombre')?.value || COMPANY_PRESETS[companyKey]?.nombre || "Distribuidora Fragama S.A.";
+  const emisorCedula = document.getElementById('cfgEmisorCedula')?.value || COMPANY_PRESETS[companyKey]?.cedula || "3101778899";
+  const emisorActividad = document.getElementById('cfgEmisorActividad')?.value || COMPANY_PRESETS[companyKey]?.actividadEconomica || "466901";
+  const emisorComercial = document.getElementById('cfgEmisorComercial')?.value || COMPANY_PRESETS[companyKey]?.nombreComercial || emisorNombre;
+  const tipoDoc = document.getElementById('cfgTipoDocumento')?.value || "01";
+
+  const url = `/api/tax/electronic-invoice/${orderId}?emisor_nombre=${encodeURIComponent(emisorNombre)}&emisor_cedula=${encodeURIComponent(emisorCedula)}&emisor_comercial=${encodeURIComponent(emisorComercial)}&emisor_actividad=${encodeURIComponent(emisorActividad)}&tipo_doc=${encodeURIComponent(tipoDoc)}`;
+
+  try {
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      window.updateXmlDisplayLabels(data);
+    }
+  } catch (e) {
+    console.warn('Error regenerando XML:', e);
+  }
+};
+
+window.loadElectronicInvoiceSample = async function() {
+  await window.triggerRegenerateXml();
 };
 
 window.copyD104DataToClipboard = function() {
@@ -8220,12 +8633,16 @@ window.downloadTaxCsvReport = function() {
 
 window.copyXmlToClipboard = function() {
   if (!currentElectronicInvoice || !currentElectronicInvoice.xml) {
-    alert('No hay XML disponible para copiar.');
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('⚠️ No hay XML disponible para copiar.', 'warning');
+    } else {
+      alert('No hay XML disponible para copiar.');
+    }
     return;
   }
   navigator.clipboard.writeText(currentElectronicInvoice.xml).then(() => {
     if (typeof showNotificationToast === 'function') {
-      showNotificationToast('📋 XML oficial de Factura Electrónica v4.3 copiado.', 'success');
+      showNotificationToast('📋 XML oficial de Factura Electrónica v4.3 copiado al portapapeles.', 'success');
     } else {
       alert('XML copiado al portapapeles.');
     }
@@ -8234,18 +8651,27 @@ window.copyXmlToClipboard = function() {
 
 window.downloadXmlFile = function() {
   if (!currentElectronicInvoice || !currentElectronicInvoice.xml) {
-    alert('No hay XML generado para descargar.');
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('⚠️ No hay XML generado para descargar.', 'warning');
+    } else {
+      alert('No hay XML generado para descargar.');
+    }
     return;
   }
-  const blob = new Blob([currentElectronicInvoice.xml], { type: 'application/xml' });
+  const blob = new Blob([currentElectronicInvoice.xml], { type: 'application/xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Factura_${currentElectronicInvoice.consecutivo || 'Hacienda'}.xml`;
+  const filename = `Comprobante_${currentElectronicInvoice.clave || currentElectronicInvoice.consecutivo || 'Hacienda'}.xml`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  if (typeof showNotificationToast === 'function') {
+    showNotificationToast(`📥 Descargando archivo oficial: ${filename}`, 'info');
+  }
 };
+
 
 

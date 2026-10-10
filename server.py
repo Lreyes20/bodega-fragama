@@ -3077,11 +3077,254 @@ def get_tax_d104_summary():
         }
     }
 
+class CustomInvoiceItem(BaseModel):
+    numeroLinea: Optional[int] = 1
+    cabys: Optional[str] = "3532200000000"
+    sku: Optional[str] = "SKU-001"
+    detalle: Optional[str] = "Producto Comercial"
+    cantidad: float = 1.0
+    precioUnitario: float = 1000.0
+    tarifaIva: Optional[float] = 13.0
+
+class CustomInvoiceEmisor(BaseModel):
+    nombre: Optional[str] = "Distribuidora Fragama S.A."
+    cedula: Optional[str] = "3101778899"
+    tipoIdentificacion: Optional[str] = "02"
+    nombreComercial: Optional[str] = "Distribuidora Fragama"
+    actividadEconomica: Optional[str] = "466901"
+    correo: Optional[str] = "facturacion@fragama.cr"
+    telefono: Optional[str] = "25510000"
+    codigoPais: Optional[str] = "506"
+    provincia: Optional[str] = "3"
+    canton: Optional[str] = "01"
+    distrito: Optional[str] = "01"
+    direccion: Optional[str] = "Parque Industrial y Logístico, Cartago Centro, Costa Rica"
+
+class CustomInvoiceReceptor(BaseModel):
+    nombre: Optional[str] = "Cliente General"
+    cedula: Optional[str] = "3014042047"
+    tipoIdentificacion: Optional[str] = "02"
+    correo: Optional[str] = "facturacion@cliente.cr"
+
+class CustomInvoicePayload(BaseModel):
+    orderId: Optional[int] = 0
+    tipoDocumento: Optional[str] = "01"
+    sucursal: Optional[str] = "001"
+    terminal: Optional[str] = "00001"
+    condicionVenta: Optional[str] = "01"
+    medioPago: Optional[str] = "04"
+    moneda: Optional[str] = "CRC"
+    emisor: Optional[CustomInvoiceEmisor] = None
+    receptor: Optional[CustomInvoiceReceptor] = None
+    lineas: Optional[List[CustomInvoiceItem]] = None
+
+def generate_hacienda_clave_and_xml_core(
+    order_id: int,
+    tipo_doc: str,
+    sucursal: str,
+    terminal: str,
+    emisor: dict,
+    receptor: dict,
+    condicion_venta: str,
+    medio_pago: str,
+    moneda: str,
+    items: list
+):
+    now = datetime.now()
+    fecha_emision = now.strftime("%Y-%m-%dT%H:%M:%S-06:00")
+    
+    raw_emisor_ced = re.sub(r'[^0-9]', '', str(emisor.get('cedula', '3101778899')))
+    cedula_emisor_12 = raw_emisor_ced.zfill(12)[-12:]
+    
+    dia = str(now.day).zfill(2)
+    mes = str(now.month).zfill(2)
+    anio = str(now.year)[2:]
+    
+    sucursal_clean = str(sucursal or "001").zfill(3)[-3:]
+    terminal_clean = str(terminal or "00001").zfill(5)[-5:]
+    tipo_doc_clean = str(tipo_doc or "01").zfill(2)[-2:]
+    order_num_clean = str(order_id if order_id > 0 else 108).zfill(10)[-10:]
+    consecutivo_20 = f"{sucursal_clean}{terminal_clean}{tipo_doc_clean}{order_num_clean}"
+    
+    situacion = "1"
+    cod_seguridad = f"{int(time.time()) % 100000000:08d}"
+    clave_50 = f"506{dia}{mes}{anio}{cedula_emisor_12}{consecutivo_20}{situacion}{cod_seguridad}"
+    
+    lineas_xml = []
+    line_idx = 1
+    total_mercancias_gravadas = 0.0
+    total_impuestos = 0.0
+    
+    for item in items:
+        qty = float(item.get('cantidad', 1.0))
+        price = float(item.get('precioUnitario', 0.0))
+        tax_rate = float(item.get('tarifaIva', 13.0))
+        
+        monto_total = round(qty * price, 2)
+        subtotal_linea = monto_total
+        monto_iva = round(subtotal_linea * (tax_rate / 100.0), 2)
+        monto_total_linea = round(subtotal_linea + monto_iva, 2)
+        
+        total_mercancias_gravadas += subtotal_linea
+        total_impuestos += monto_iva
+        
+        cabys = str(item.get('cabys', '3532200000000')).strip()
+        if len(cabys) != 13:
+            cabys = "3532200000000"
+        sku = str(item.get('sku', f'ITEM-{line_idx:03d}')).strip()
+        desc = str(item.get('detalle', 'Producto Comercial')).replace('&', '&amp;').replace('<', '&lt;')
+        
+        codigo_tarifa = "08" if tax_rate == 13.0 else ("02" if tax_rate == 1.0 else ("03" if tax_rate == 2.0 else "01"))
+        
+        lineas_xml.append(f"""    <LineaDetalle>
+      <NumeroLinea>{line_idx}</NumeroLinea>
+      <Codigo>{cabys}</Codigo>
+      <CodigoComercial>
+        <Tipo>01</Tipo>
+        <Codigo>{sku}</Codigo>
+      </CodigoComercial>
+      <Cantidad>{qty:.3f}</Cantidad>
+      <UnidadMedida>Unid</UnidadMedida>
+      <Detalle>{desc}</Detalle>
+      <PrecioUnitario>{price:.2f}</PrecioUnitario>
+      <MontoTotal>{monto_total:.2f}</MontoTotal>
+      <SubTotal>{subtotal_linea:.2f}</SubTotal>
+      <Impuesto>
+        <Codigo>01</Codigo>
+        <CodigoTarifa>{codigo_tarifa}</CodigoTarifa>
+        <Tarifa>{tax_rate:.2f}</Tarifa>
+        <Monto>{monto_iva:.2f}</Monto>
+      </Impuesto>
+      <MontoTotalLinea>{monto_total_linea:.2f}</MontoTotalLinea>
+    </LineaDetalle>""")
+        line_idx += 1
+        
+    total_mercancias_gravadas = round(total_mercancias_gravadas, 2)
+    total_impuestos = round(total_impuestos, 2)
+    total_factura = round(total_mercancias_gravadas + total_impuestos, 2)
+    
+    detalles_str = "\n".join(lineas_xml)
+    
+    emisor_nombre = str(emisor.get('nombre', 'Distribuidora Fragama S.A.')).replace('&', '&amp;').replace('<', '&lt;')
+    emisor_tipo_id = str(emisor.get('tipoIdentificacion', '02'))
+    emisor_ced_clean = re.sub(r'[^0-9]', '', str(emisor.get('cedula', '3101778899')))
+    emisor_comercial = str(emisor.get('nombreComercial', emisor_nombre)).replace('&', '&amp;').replace('<', '&lt;')
+    emisor_actividad = str(emisor.get('actividadEconomica', '466901')).strip()
+    emisor_prov = str(emisor.get('provincia', '3'))
+    emisor_canton = str(emisor.get('canton', '01')).zfill(2)
+    emisor_distrito = str(emisor.get('distrito', '01')).zfill(2)
+    emisor_direccion = str(emisor.get('direccion', 'Costa Rica')).replace('&', '&amp;').replace('<', '&lt;')
+    emisor_tel = re.sub(r'[^0-9]', '', str(emisor.get('telefono', '25510000'))) or '25510000'
+    emisor_email = str(emisor.get('correo', 'facturacion@fragama.cr'))
+    
+    rec_nombre = str(receptor.get('nombre', 'Cliente General')).replace('&', '&amp;').replace('<', '&lt;')
+    rec_ced_raw = re.sub(r'[^0-9]', '', str(receptor.get('cedula', '3014042047')))
+    if len(rec_ced_raw) < 9:
+        rec_ced_raw = rec_ced_raw.zfill(9)
+    rec_tipo_id = str(receptor.get('tipoIdentificacion', '02' if len(rec_ced_raw) >= 10 else '01'))
+    rec_email = str(receptor.get('correo', 'facturacion@cliente.cr'))
+    
+    tag_raiz = "FacturaElectronica"
+    schema_url = "facturaElectronica"
+    if tipo_doc_clean == "04":
+        tag_raiz = "TiqueteElectronico"
+        schema_url = "tiqueteElectronico"
+    elif tipo_doc_clean == "03":
+        tag_raiz = "NotaCreditoElectronica"
+        schema_url = "notaCreditoElectronica"
+        
+    xml_content = f"""<?xml version="1.0" encoding="utf-8"?>
+<{tag_raiz} xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-esquema/v4.3/{schema_url}"
+                    xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Clave>{clave_50}</Clave>
+  <CodigoActividad>{emisor_actividad}</CodigoActividad>
+  <NumeroConsecutivo>{consecutivo_20}</NumeroConsecutivo>
+  <FechaEmision>{fecha_emision}</FechaEmision>
+  <Emisor>
+    <Nombre>{emisor_nombre}</Nombre>
+    <Identificacion>
+      <Tipo>{emisor_tipo_id}</Tipo>
+      <Numero>{emisor_ced_clean}</Numero>
+    </Identificacion>
+    <NombreComercial>{emisor_comercial}</NombreComercial>
+    <Ubicacion>
+      <Provincia>{emisor_prov}</Provincia>
+      <Canton>{emisor_canton}</Canton>
+      <Distrito>{emisor_distrito}</Distrito>
+      <OtrasSenas>{emisor_direccion}</OtrasSenas>
+    </Ubicacion>
+    <Telefono>
+      <CodigoPais>506</CodigoPais>
+      <NumTelefono>{emisor_tel}</NumTelefono>
+    </Telefono>
+    <CorreoElectronico>{emisor_email}</CorreoElectronico>
+  </Emisor>
+  <Receptor>
+    <Nombre>{rec_nombre}</Nombre>
+    <Identificacion>
+      <Tipo>{rec_tipo_id}</Tipo>
+      <Numero>{rec_ced_raw}</Numero>
+    </Identificacion>
+    <CorreoElectronico>{rec_email}</CorreoElectronico>
+  </Receptor>
+  <CondicionVenta>{condicion_venta or '01'}</CondicionVenta>
+  <PlazoCredito>0</PlazoCredito>
+  <MedioPago>{medio_pago or '04'}</MedioPago>
+  <DetalleServicio>
+{detalles_str}
+  </DetalleServicio>
+  <ResumenFactura>
+    <CodigoTipoMoneda>
+      <CodigoMoneda>{moneda or 'CRC'}</CodigoMoneda>
+      <TipoCambio>1.0</TipoCambio>
+    </CodigoTipoMoneda>
+    <TotalServGravados>0.00</TotalServGravados>
+    <TotalServExentos>0.00</TotalServExentos>
+    <TotalMercanciasGravadas>{total_mercancias_gravadas:.2f}</TotalMercanciasGravadas>
+    <TotalMercanciasExentas>0.00</TotalMercanciasExentas>
+    <TotalGravado>{total_mercancias_gravadas:.2f}</TotalGravado>
+    <TotalExento>0.00</TotalExento>
+    <TotalVenta>{total_mercancias_gravadas:.2f}</TotalVenta>
+    <TotalDescuentos>0.00</TotalDescuentos>
+    <TotalVentaNeta>{total_mercancias_gravadas:.2f}</TotalVentaNeta>
+    <TotalImpuesto>{total_impuestos:.2f}</TotalImpuesto>
+    <TotalComprobante>{total_factura:.2f}</TotalComprobante>
+  </ResumenFactura>
+</{tag_raiz}>"""
+
+    return {
+        "success": True,
+        "clave": clave_50,
+        "consecutivo": consecutivo_20,
+        "tipoDocumento": tipo_doc_clean,
+        "fechaEmision": fecha_emision,
+        "emisor": f"{emisor_nombre} ({emisor_ced_clean})",
+        "emisorNombre": emisor_nombre,
+        "emisorCedula": emisor_ced_clean,
+        "receptor": rec_nombre,
+        "receptorCedula": rec_ced_raw,
+        "montoGravado": total_mercancias_gravadas,
+        "montoIva13": total_impuestos,
+        "totalFactura": total_factura,
+        "moneda": moneda or "CRC",
+        "xml": xml_content
+    }
+
 @app.get("/api/tax/electronic-invoice/{order_id}")
-def generate_electronic_invoice_xml(order_id: int):
+def generate_electronic_invoice_xml(
+    order_id: int,
+    emisor_nombre: Optional[str] = None,
+    emisor_cedula: Optional[str] = None,
+    emisor_comercial: Optional[str] = None,
+    emisor_actividad: Optional[str] = None,
+    emisor_correo: Optional[str] = None,
+    tipo_doc: Optional[str] = "01"
+):
     """
     Genera el Comprobante Electrónico (Factura Electrónica versión 4.3 oficial de Hacienda CR)
-    con Clave Numérica de 50 dígitos, consecutivos oficiales, código CABYS por línea y XML estructurado.
+    para cualquier pedido registrado o empresa seleccionada.
     """
     conn = get_sqlite_conn()
     cur = conn.cursor()
@@ -3113,7 +3356,7 @@ def generate_electronic_invoice_xml(order_id: int):
         raise HTTPException(status_code=404, detail="Orden no encontrada")
         
     ord_dict = dict(order_row)
-    order_id = ord_dict["SalesOrderId"]
+    actual_order_id = ord_dict["SalesOrderId"]
     
     cur.execute("""
         SELECT d.DetailId, d.ProductId, d.Sku, d.ProductName, d.Quantity, d.UnitPrice, d.Subtotal,
@@ -3122,158 +3365,131 @@ def generate_electronic_invoice_xml(order_id: int):
         FROM SalesOrderDetails d
         LEFT JOIN Products p ON d.ProductId = p.ProductId
         WHERE d.SalesOrderId = ?
-    """, (order_id,))
+    """, (actual_order_id,))
     details = [dict(r) for r in cur.fetchall()]
     conn.close()
     
-    now = datetime.now()
-    fecha_emision = now.strftime("%Y-%m-%dT%H:%M:%S-06:00")
-    
-    # Clave de 50 dígitos estándar de Hacienda:
-    # 506 (País) + DD + MM + YY + Cedula Emisor (12 digitos) + Consecutivo (20 digitos) + Situacion (1=Normal) + CodSeguridad (8 digitos)
-    dia = str(now.day).zfill(2)
-    mes = str(now.month).zfill(2)
-    anio = str(now.year)[2:]
-    cedula_emisor = "003101778899"
-    sucursal = "001"
-    terminal = "00001"
-    tipo_doc = "01" # 01 = Factura Electrónica, 04 = Tiquete Electrónico
-    consecutivo_num = str(order_id).zfill(10)
-    consecutivo_20 = f"{sucursal}{terminal}{tipo_doc}{consecutivo_num}"
-    situacion = "1"
-    cod_seguridad = f"{int(time.time()) % 100000000:08d}"
-    clave_50 = f"506{dia}{mes}{anio}{cedula_emisor}{consecutivo_20}{situacion}{cod_seguridad}"
-    
-    # Construcción de líneas XML
-    lineas_xml = []
+    items = []
     line_num = 1
-    total_mercancias_gravadas = 0.0
-    total_impuestos = 0.0
-    
-    for item in details:
-        qty = float(item['Quantity'])
-        price = float(item['UnitPrice'])
-        monto_total = round(qty * price, 2)
-        subtotal_linea = monto_total
-        tax_rate = float(item.get('taxRate', 13.0))
-        monto_iva = round(subtotal_linea * (tax_rate / 100.0), 2)
-        monto_total_linea = round(subtotal_linea + monto_iva, 2)
-        
-        total_mercancias_gravadas += subtotal_linea
-        total_impuestos += monto_iva
-        
-        cabys = item.get('cabysCode', '3532200000000')
-        sku = item.get('Sku', 'SKU-00')
-        desc = item.get('ProductName', 'Producto Fragama').replace('&', '&amp;').replace('<', '&lt;')
-        
-        lineas_xml.append(f"""    <LineaDetalle>
-      <NumeroLinea>{line_num}</NumeroLinea>
-      <Codigo>{cabys}</Codigo>
-      <CodigoComercial>
-        <Tipo>01</Tipo>
-        <Codigo>{sku}</Codigo>
-      </CodigoComercial>
-      <Cantidad>{qty:.3f}</Cantidad>
-      <UnidadMedida>Unid</UnidadMedida>
-      <Detalle>{desc}</Detalle>
-      <PrecioUnitario>{price:.2f}</PrecioUnitario>
-      <MontoTotal>{monto_total:.2f}</MontoTotal>
-      <SubTotal>{subtotal_linea:.2f}</SubTotal>
-      <Impuesto>
-        <Codigo>01</Codigo>
-        <CodigoTarifa>08</CodigoTarifa>
-        <Tarifa>{tax_rate:.2f}</Tarifa>
-        <Monto>{monto_iva:.2f}</Monto>
-      </Impuesto>
-      <MontoTotalLinea>{monto_total_linea:.2f}</MontoTotalLinea>
-    </LineaDetalle>""")
+    for d in details:
+        items.append({
+            "numeroLinea": line_num,
+            "cabys": d.get("cabysCode") or "3532200000000",
+            "sku": d.get("Sku") or f"SKU-{line_num:02d}",
+            "detalle": d.get("ProductName") or "Producto Comercial",
+            "cantidad": float(d.get("Quantity") or 1.0),
+            "precioUnitario": float(d.get("UnitPrice") or 0.0),
+            "tarifaIva": float(d.get("taxRate") or 13.0)
+        })
         line_num += 1
         
-    total_mercancias_gravadas = round(total_mercancias_gravadas, 2)
-    total_impuestos = round(total_impuestos, 2)
-    total_factura = round(total_mercancias_gravadas + total_impuestos, 2)
-    
-    detalles_str = "\n".join(lineas_xml)
-    cust_name = (ord_dict.get('customerName') or 'Cliente General').replace('&', '&amp;').replace('<', '&lt;')
-    cust_tax_id = re.sub(r'[^0-9]', '', str(ord_dict.get('customerTaxId') or '3101000000'))
-    if len(cust_tax_id) < 9:
-        cust_tax_id = cust_tax_id.zfill(9)
-    tipo_id_receptor = "02" if len(cust_tax_id) >= 10 else "01"
-    cust_email = ord_dict.get('customerEmail') or 'facturacion@cliente.cr'
-    
-    xml_content = f"""<?xml version="1.0" encoding="utf-8"?>
-<FacturaElectronica xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-esquema/v4.3/facturaElectronica"
-                    xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
-                    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Clave>{clave_50}</Clave>
-  <CodigoActividad>466901</CodigoActividad>
-  <NumeroConsecutivo>{consecutivo_20}</NumeroConsecutivo>
-  <FechaEmision>{fecha_emision}</FechaEmision>
-  <Emisor>
-    <Nombre>Distribuidora Fragama S.A.</Nombre>
-    <Identificacion>
-      <Tipo>02</Tipo>
-      <Numero>3101778899</Numero>
-    </Identificacion>
-    <NombreComercial>Distribuidora Fragama</NombreComercial>
-    <Ubicacion>
-      <Provincia>3</Provincia>
-      <Canton>01</Canton>
-      <Distrito>01</Distrito>
-      <OtrasSenas>Parque Industrial y Logístico, Cartago Centro, Costa Rica</OtrasSenas>
-    </Ubicacion>
-    <Telefono>
-      <CodigoPais>506</CodigoPais>
-      <NumTelefono>25510000</NumTelefono>
-    </Telefono>
-    <CorreoElectronico>facturacion@fragama.cr</CorreoElectronico>
-  </Emisor>
-  <Receptor>
-    <Nombre>{cust_name}</Nombre>
-    <Identificacion>
-      <Tipo>{tipo_id_receptor}</Tipo>
-      <Numero>{cust_tax_id}</Numero>
-    </Identificacion>
-    <CorreoElectronico>{cust_email}</CorreoElectronico>
-  </Receptor>
-  <CondicionVenta>01</CondicionVenta>
-  <PlazoCredito>0</PlazoCredito>
-  <MedioPago>04</MedioPago>
-  <DetalleServicio>
-{detalles_str}
-  </DetalleServicio>
-  <ResumenFactura>
-    <CodigoTipoMoneda>
-      <CodigoMoneda>CRC</CodigoMoneda>
-      <TipoCambio>1.0</TipoCambio>
-    </CodigoTipoMoneda>
-    <TotalServGravados>0.00</TotalServGravados>
-    <TotalServExentos>0.00</TotalServExentos>
-    <TotalMercanciasGravadas>{total_mercancias_gravadas:.2f}</TotalMercanciasGravadas>
-    <TotalMercanciasExentas>0.00</TotalMercanciasExentas>
-    <TotalGravado>{total_mercancias_gravadas:.2f}</TotalGravado>
-    <TotalExento>0.00</TotalExento>
-    <TotalVenta>{total_mercancias_gravadas:.2f}</TotalVenta>
-    <TotalDescuentos>0.00</TotalDescuentos>
-    <TotalVentaNeta>{total_mercancias_gravadas:.2f}</TotalVentaNeta>
-    <TotalImpuesto>{total_impuestos:.2f}</TotalImpuesto>
-    <TotalComprobante>{total_factura:.2f}</TotalComprobante>
-  </ResumenFactura>
-</FacturaElectronica>"""
+    if not items:
+        items.append({
+            "numeroLinea": 1,
+            "cabys": "3532200000000",
+            "sku": "ITEM-BASE",
+            "detalle": "Servicios / Mercancías Comerciales",
+            "cantidad": 1.0,
+            "precioUnitario": float(ord_dict.get("SubTotal") or 1000.0),
+            "tarifaIva": 13.0
+        })
 
-    return {
-        "success": True,
-        "clave": clave_50,
-        "consecutivo": consecutivo_20,
-        "fechaEmision": fecha_emision,
-        "emisor": "Distribuidora Fragama S.A. (3-101-778899)",
-        "receptor": cust_name,
-        "montoGravado": total_mercancias_gravadas,
-        "montoIva13": total_impuestos,
-        "totalFactura": total_factura,
-        "xml": xml_content
+    emisor = {
+        "nombre": emisor_nombre or "Distribuidora Fragama S.A.",
+        "cedula": emisor_cedula or "3101778899",
+        "tipoIdentificacion": "02",
+        "nombreComercial": emisor_comercial or (emisor_nombre or "Distribuidora Fragama"),
+        "actividadEconomica": emisor_actividad or "466901",
+        "correo": emisor_correo or "facturacion@fragama.cr",
+        "telefono": "25510000",
+        "provincia": "3",
+        "canton": "01",
+        "distrito": "01",
+        "direccion": "Parque Industrial y Logístico, Cartago Centro, Costa Rica"
     }
+    
+    receptor = {
+        "nombre": ord_dict.get("customerName") or "Cliente General",
+        "cedula": ord_dict.get("customerTaxId") or "3014042047",
+        "tipoIdentificacion": "02" if len(re.sub(r'[^0-9]', '', str(ord_dict.get("customerTaxId") or ''))) >= 10 else "01",
+        "correo": ord_dict.get("customerEmail") or "facturacion@cliente.cr"
+    }
+    
+    return generate_hacienda_clave_and_xml_core(
+        order_id=actual_order_id,
+        tipo_doc=tipo_doc or "01",
+        sucursal="001",
+        terminal="00001",
+        emisor=emisor,
+        receptor=receptor,
+        condicion_venta="01",
+        medio_pago="04",
+        moneda="CRC",
+        items=items
+    )
+
+@app.post("/api/tax/custom-electronic-invoice")
+def generate_custom_electronic_invoice(payload: CustomInvoicePayload):
+    """
+    Genera un Comprobante Electrónico (Clave 50 dígitos + Consecutivo + XML v4.3 oficial)
+    a la medida: permite ingresar CUALQUIER empresa emisora, cliente receptor, y líneas CABYS.
+    """
+    emisor_dict = (payload.emisor.model_dump() if hasattr(payload.emisor, 'model_dump') else payload.emisor.dict()) if payload.emisor else {
+        "nombre": "Distribuidora Fragama S.A.",
+        "cedula": "3101778899",
+        "tipoIdentificacion": "02",
+        "nombreComercial": "Distribuidora Fragama",
+        "actividadEconomica": "466901",
+        "correo": "facturacion@fragama.cr",
+        "telefono": "25510000",
+        "provincia": "3",
+        "canton": "01",
+        "distrito": "01",
+        "direccion": "Parque Industrial y Logístico, Cartago Centro, Costa Rica"
+    }
+    
+    receptor_dict = (payload.receptor.model_dump() if hasattr(payload.receptor, 'model_dump') else payload.receptor.dict()) if payload.receptor else {
+        "nombre": "Cliente General",
+        "cedula": "3014042047",
+        "tipoIdentificacion": "02",
+        "correo": "facturacion@cliente.cr"
+    }
+    
+    items_list = []
+    if payload.lineas and len(payload.lineas) > 0:
+        for idx, it in enumerate(payload.lineas, 1):
+            items_list.append({
+                "numeroLinea": it.numeroLinea or idx,
+                "cabys": it.cabys or "3532200000000",
+                "sku": it.sku or f"SKU-{idx:02d}",
+                "detalle": it.detalle or "Producto Comercial",
+                "cantidad": it.cantidad,
+                "precioUnitario": it.precioUnitario,
+                "tarifaIva": it.tarifaIva if it.tarifaIva is not None else 13.0
+            })
+    else:
+        items_list.append({
+            "numeroLinea": 1,
+            "cabys": "3532200000000",
+            "sku": "LINEA-01",
+            "detalle": "Producto o Servicio Comercial",
+            "cantidad": 1.0,
+            "precioUnitario": 10000.0,
+            "tarifaIva": 13.0
+        })
+        
+    return generate_hacienda_clave_and_xml_core(
+        order_id=payload.orderId or int(time.time() % 10000),
+        tipo_doc=payload.tipoDocumento or "01",
+        sucursal=payload.sucursal or "001",
+        terminal=payload.terminal or "00001",
+        emisor=emisor_dict,
+        receptor=receptor_dict,
+        condicion_venta=payload.condicionVenta or "01",
+        medio_pago=payload.medioPago or "04",
+        moneda=payload.moneda or "CRC",
+        items=items_list
+    )
 
 @app.get("/api/tax/export-d104-csv")
 def export_tax_d104_csv():
