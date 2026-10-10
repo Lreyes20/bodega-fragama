@@ -954,27 +954,8 @@ window.switchOrderTabDirectly = function(tabName) {
 };
 
 // ==============================================================================
-// INICIALIZACIÓN
+// FUNCIONES GENERALES DE RENDERIZADO Y UTILITARIOS
 // ==============================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  setupLoginModule();
-  setupNavigationAndSidebar();
-  setupRoleSwitcher();
-  setupDriverActions();
-  setupBarcodeGenerator();
-  setupQuickMovementModal();
-  setupProductMaintenance();
-  setupExcelBulkImport();
-  setupReports();
-  setupFamiliesModule();
-  setupPosModule();
-  setupCustomerOrdersModule();
-  setupSuppliersModule();
-  setupDashboardControls();
-
-  renderAllViews();
-  loadInitialDataFromSql();
-});
 
 function renderAllViews() {
   renderDashboardAnalytics();
@@ -1515,35 +1496,42 @@ function setupNavigationAndSidebar() {
     }
   });
 
-  // Manejo de enlaces del menú con data-view
-  const navLinks = document.querySelectorAll('.sidebar .nav-link[data-view]');
-  navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
+  // Manejo de enlaces del menú con data-view (Click individual + Delegación global robusta)
+  document.addEventListener('click', (e) => {
+    if (!e || !e.target) return;
+    const link = e.target.closest('.sidebar .nav-link[data-view]');
+    if (link) {
       e.preventDefault();
       const targetView = link.getAttribute('data-view');
       if (targetView) {
-        navLinks.forEach(l => l.classList.remove('active'));
+        document.querySelectorAll('.sidebar .nav-link[data-view]').forEach(l => l.classList.remove('active'));
         link.classList.add('active');
-        switchViewDirectly(targetView);
+        if (typeof window.switchViewDirectly === 'function') {
+          window.switchViewDirectly(targetView);
+        }
       }
-      if (window.innerWidth <= 991) {
+      if (window.innerWidth <= 991 && typeof closeSidebar === 'function') {
         closeSidebar();
       }
-    });
-  });
+      return;
+    }
 
-  // Manejo de Salir
-  const logoutBtn = document.getElementById('sidebarLogoutBtn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', (e) => {
+    const logoutBtn = e.target.closest('#sidebarLogoutBtn');
+    if (logoutBtn) {
       e.preventDefault();
       AppState.isAuthenticated = false;
       const loginWrapper = document.getElementById('loginScreenWrapper');
-      if (loginWrapper) loginWrapper.classList.remove('hidden');
-      if (window.innerWidth <= 991) closeSidebar();
+      if (loginWrapper) {
+        loginWrapper.classList.remove('hidden');
+        loginWrapper.style.display = 'flex';
+      }
+      if (window.innerWidth <= 991 && typeof closeSidebar === 'function') {
+        closeSidebar();
+      }
       showNotificationToast('Sesión cerrada correctamente.', 'info');
-    });
-  }
+      return;
+    }
+  });
 }
 
 // ==============================================================================
@@ -8820,7 +8808,9 @@ window.downloadXmlFile = function() {
   const filename = `Comprobante_${currentElectronicInvoice.clave || currentElectronicInvoice.consecutivo || 'Hacienda'}.xml`;
   a.download = filename;
   document.body.appendChild(a);
-  }
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
 // ==============================================================================
@@ -9115,3 +9105,42 @@ window.closeRealTaxWorkflowGuideModal = function() {
   const modal = document.getElementById('realTaxWorkflowGuideModal');
   if (modal) modal.style.display = 'none';
 };
+
+// ==============================================================================
+// INICIALIZACIÓN GENERAL DEL SISTEMA (EJECUTADA TRAS EVALUAR TODO EL CÓDIGO)
+// ==============================================================================
+function initApp() {
+  const steps = [
+    ['setupLoginModule', setupLoginModule],
+    ['setupNavigationAndSidebar', setupNavigationAndSidebar],
+    ['setupRoleSwitcher', setupRoleSwitcher],
+    ['setupDriverActions', setupDriverActions],
+    ['setupBarcodeGenerator', setupBarcodeGenerator],
+    ['setupQuickMovementModal', setupQuickMovementModal],
+    ['setupProductMaintenance', setupProductMaintenance],
+    ['setupExcelBulkImport', setupExcelBulkImport],
+    ['setupReports', setupReports],
+    ['setupFamiliesModule', setupFamiliesModule],
+    ['setupPosModule', setupPosModule],
+    ['setupCustomerOrdersModule', setupCustomerOrdersModule],
+    ['setupSuppliersModule', setupSuppliersModule],
+    ['setupDashboardControls', setupDashboardControls]
+  ];
+
+  for (const [name, fn] of steps) {
+    try {
+      if (typeof fn === 'function') fn();
+    } catch (e) {
+      console.warn(`Error inicializando módulo ${name}:`, e);
+    }
+  }
+
+  try { renderAllViews(); } catch (e) { console.warn('Error en renderAllViews:', e); }
+  try { loadInitialDataFromSql(); } catch (e) { console.warn('Error en loadInitialDataFromSql:', e); }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
