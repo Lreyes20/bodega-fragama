@@ -384,6 +384,11 @@
           <i class="bi bi-receipt"></i>
           <span>Venta Rápida (Caja POS)</span>
         </a>
+        <a class="nav-link" data-view="view-customers-management" data-roles="Administrador,Cajero,Vendedor">
+          <i class="bi bi-people-fill" style="color:#0284C7;"></i>
+          <span>Directorio de Clientes</span>
+          <span class="badge-count" id="customersBadgeCount" style="background:rgba(2,132,199,0.18); color:#0284C7;">10</span>
+        </a>
       </div>
 
       <!-- LOGÍSTICA & RUTAS (Tree-toggle) -->
@@ -1327,6 +1332,9 @@
               </div>
             </div>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-fragama" onclick="openRealTaxWorkflowGuideModal()" style="background:#059669; color:#FFF; border:none; font-weight:700;">
+                <i class="bi bi-book-fill"></i> ¿Cómo Funciona en Realidad? (Ciclo DGT &amp; D-104)
+              </button>
               <button class="btn-fragama" onclick="refreshTaxHaciendaData()" style="background:rgba(255,255,255,0.15); color:#FFF; border:1px solid rgba(255,255,255,0.25);">
                 <i class="bi bi-arrow-clockwise"></i> Recalcular En Vivo
               </button>
@@ -2297,6 +2305,103 @@
           </div>
         </div>
 
+      <!-- ====================================================================
+           VISTA: DIRECTORIO PROFESIONAL DE CLIENTES & PERFIL TRIBUTARIO DGT
+           ==================================================================== -->
+      <section class="role-view" id="view-customers-management">
+        <!-- Barra de Encabezado y Estadísticas -->
+        <div class="content-card" style="margin-bottom:1.5rem; background:linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color:#FFF; border:none; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1); border-radius:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                <div style="width:42px; height:42px; border-radius:10px; background:rgba(2,132,199,0.25); border:1px solid #38BDF8; display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:1.4rem;">
+                  <i class="bi bi-person-lines-fill"></i>
+                </div>
+                <div>
+                  <h2 style="font-size:1.35rem; font-weight:800; margin:0; letter-spacing:-0.4px; color:#F8FAFC;">
+                    Directorio Oficial de Clientes &amp; Perfil Tributario DGT
+                  </h2>
+                  <div style="font-size:0.8rem; color:#94A3B8; margin-top:2px;">
+                    Registro fiscal costarricense (Cédulas Jurídicas/Físicas), correos para comprobantes electrónicos v4.3 y condiciones comerciales
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-fragama" onclick="openNewCustomerTaxModal()" style="background:#0284C7; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px;">
+                <i class="bi bi-person-plus-fill"></i> + Registrar Nuevo Cliente Tributario
+              </button>
+            </div>
+          </div>
+
+          <!-- Mini KPIs de Clientes -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:1.2rem;">
+            <div style="background:rgba(255,255,255,0.06); padding:12px 16px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="font-size:0.72rem; color:#94A3B8; text-transform:uppercase; font-weight:600;">Total Clientes Activos</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#38BDF8;" id="kpiCustTotal">10</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06); padding:12px 16px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="font-size:0.72rem; color:#94A3B8; text-transform:uppercase; font-weight:600;">Cédulas Jurídicas (02)</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#34D399;" id="kpiCustJuridicas">9</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06); padding:12px 16px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="font-size:0.72rem; color:#94A3B8; text-transform:uppercase; font-weight:600;">Crédito Comercial (15/30d)</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#FBBF24;" id="kpiCustCredito">5</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06); padding:12px 16px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="font-size:0.72rem; color:#94A3B8; text-transform:uppercase; font-weight:600;">Contado / Transferencia</div>
+              <div style="font-size:1.5rem; font-weight:800; color:#A78BFA;" id="kpiCustContado">5</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Búsqueda y Filtros -->
+        <div class="content-card" style="margin-bottom:1.2rem; border-radius:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:280px;">
+              <div style="position:relative; width:100%;">
+                <i class="bi bi-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#94A3B8;"></i>
+                <input type="text" id="custSearchInput" oninput="filterCustomerDirectoryTable()" placeholder="Buscar por razón social, cédula, nombre comercial, correo o teléfono..." style="width:100%; padding:9px 12px 9px 36px; border:1px solid #CBD5E1; border-radius:8px; font-size:0.85rem; font-family:inherit;">
+              </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <select id="custCantonFilter" onchange="filterCustomerDirectoryTable()" style="border:1px solid #CBD5E1; border-radius:8px; padding:8px 12px; font-size:0.82rem; font-family:inherit; background:#FFF;">
+                <option value="ALL">📍 Todos los Cantones</option>
+                <option value="Cartago">Cartago</option>
+                <option value="Paraíso">Paraíso</option>
+                <option value="La Unión">La Unión</option>
+                <option value="Curridabat">Curridabat</option>
+                <option value="Montes de Oca">Montes de Oca</option>
+                <option value="Liberia">Liberia</option>
+              </select>
+              <select id="custTermsFilter" onchange="filterCustomerDirectoryTable()" style="border:1px solid #CBD5E1; border-radius:8px; padding:8px 12px; font-size:0.82rem; font-family:inherit; background:#FFF;">
+                <option value="ALL">💳 Todas las Condiciones</option>
+                <option value="Contado">Solo Contado</option>
+                <option value="Crédito">Solo Crédito</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla Profesional de Clientes -->
+        <div class="content-card" style="padding:0; overflow:hidden; border-radius:12px; border:1px solid #E2E8F0;">
+          <div class="table-responsive">
+            <table class="table-fragama" id="customerDirectoryTable" style="margin:0; width:100%;">
+              <thead style="background:#F1F5F9;">
+                <tr>
+                  <th style="padding:12px 16px; font-size:0.82rem; color:#475569;">Cliente / Razón Social</th>
+                  <th style="padding:12px 16px; font-size:0.82rem; color:#475569;">Contacto &amp; Notificación FE</th>
+                  <th style="padding:12px 16px; font-size:0.82rem; color:#475569;">Ubicación DGT</th>
+                  <th style="padding:12px 16px; font-size:0.82rem; color:#475569;">Condición &amp; Actividad</th>
+                  <th style="padding:12px 16px; font-size:0.82rem; color:#475569; text-align:right;">Acciones Tributarias</th>
+                </tr>
+              </thead>
+              <tbody id="customerDirectoryTableBody">
+                <!-- Inyectado dinámicamente vía JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- ====================================================================
@@ -4111,6 +4216,280 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: REGISTRO / EDICIÓN DE CLIENTE TRIBUTARIO (DGT COSTA RICA)
+       ========================================================================== -->
+  <div class="modal-overlay" id="customerTaxModal" style="display:none; align-items:center; justify-content:center; z-index:10000;">
+    <div class="modal-card" style="max-width:760px; width:95%; max-height:90vh; overflow-y:auto; border-radius:14px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+      <div class="modal-header-custom" style="background:linear-gradient(135deg, #0F172A, #1E293B); color:#FFF; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:36px; height:36px; border-radius:8px; background:rgba(2,132,199,0.25); border:1px solid #38BDF8; display:flex; align-items:center; justify-content:center; color:#38BDF8;">
+            <i class="bi bi-person-vcard-fill" style="font-size:1.2rem;"></i>
+          </div>
+          <div>
+            <h5 style="margin:0; font-size:1.1rem; font-weight:800; color:#F8FAFC;" id="customerTaxModalTitle">Ficha de Cliente Tributario (DGT Costa Rica)</h5>
+            <small style="color:#94A3B8; font-size:0.75rem;">Información oficial para Facturación Electrónica v4.3 y control comercial</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" onclick="closeCustomerTaxModal()" style="color:#94A3B8; background:transparent; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="customerTaxForm" onsubmit="saveCustomerTaxForm(event)" style="padding:20px;">
+        <input type="hidden" id="custModalId" value="">
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Tipo de Identificación *</label>
+            <select id="custModalDocType" required style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+              <option value="02">02 - Cédula Jurídica (10 dígitos)</option>
+              <option value="01">01 - Cédula Física (9 dígitos)</option>
+              <option value="03">03 - DIMEX (11 o 12 dígitos)</option>
+              <option value="04">04 - NITE (10 dígitos)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Número de Cédula *</label>
+            <input type="text" id="custModalTaxId" required placeholder="Ej: 3-101-445566 o 1-1122-0334" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Nombre o Razón Social (Oficial ATV) *</label>
+            <input type="text" id="custModalName" required placeholder="Nombre registrado en Tributación" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Nombre Comercial / Fantasía</label>
+            <input type="text" id="custModalTradeName" placeholder="Nombre comercial de la empresa" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:14px;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
+              <i class="bi bi-envelope-at text-primary"></i> Correo para Facturación Electrónica (XML + PDF) *
+            </label>
+            <input type="email" id="custModalEmail" required placeholder="facturacion@empresa.cr" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">
+              <i class="bi bi-telephone text-success"></i> Teléfono / WhatsApp *
+            </label>
+            <input type="text" id="custModalPhone" required placeholder="2551-8899 / 8888-9999" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+          </div>
+        </div>
+
+        <!-- Ubicación DGT -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:0.78rem; font-weight:800; color:#0F172A; text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+            <i class="bi bi-geo-alt-fill text-danger"></i> Ubicación Geográfica Oficial (DGT)
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:0.75rem; font-weight:600; color:#64748B; display:block; margin-bottom:2px;">Provincia</label>
+              <select id="custModalProvince" style="width:100%; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.82rem; font-family:inherit;">
+                <option value="Cartago" selected>3 - Cartago</option>
+                <option value="San José">1 - San José</option>
+                <option value="Alajuela">2 - Alajuela</option>
+                <option value="Heredia">4 - Heredia</option>
+                <option value="Guanacaste">5 - Guanacaste</option>
+                <option value="Puntarenas">6 - Puntarenas</option>
+                <option value="Limón">7 - Limón</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.75rem; font-weight:600; color:#64748B; display:block; margin-bottom:2px;">Cantón</label>
+              <input type="text" id="custModalCanton" value="Cartago" placeholder="Cantón" style="width:100%; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.82rem; font-family:inherit;">
+            </div>
+            <div>
+              <label style="font-size:0.75rem; font-weight:600; color:#64748B; display:block; margin-bottom:2px;">Distrito</label>
+              <input type="text" id="custModalDistrict" value="Oriental" placeholder="Distrito" style="width:100%; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.82rem; font-family:inherit;">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; font-weight:600; color:#64748B; display:block; margin-bottom:2px;">Dirección Exacta / Otras Señas</label>
+            <input type="text" id="custModalAddress" placeholder="200m Este del Parque Central..." style="width:100%; padding:6px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.82rem; font-family:inherit;">
+          </div>
+        </div>
+
+        <!-- Condiciones Comerciales -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:14px;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Condición de Venta</label>
+            <select id="custModalTerms" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+              <option value="Contado">01 - Contado</option>
+              <option value="Crédito 15 días">02 - Crédito 15 días</option>
+              <option value="Crédito 30 días">02 - Crédito 30 días</option>
+              <option value="Crédito 60 días">02 - Crédito 60 días</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Medio de Pago Habitual</label>
+            <select id="custModalPaymentMethod" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+              <option value="04">04 - Transferencia / Depósito / SINPE Móvil</option>
+              <option value="01">01 - Efectivo</option>
+              <option value="02">02 - Tarjeta Débito / Crédito</option>
+              <option value="03">03 - Cheque</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:4px;">Actividad Económica (CIUU DGT)</label>
+            <input type="text" id="custModalActivity" value="466901" placeholder="Ej: 561001, 471101" style="width:100%; padding:8px 10px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.85rem; font-family:inherit;">
+          </div>
+        </div>
+
+        <div class="modal-footer-custom" style="padding-top:14px; border-top:1px solid #E2E8F0; display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeCustomerTaxModal()">Cancelar</button>
+          <button type="submit" class="btn-fragama btn-primary-fragama" style="background:#0284C7; color:#FFF; font-weight:700;">
+            <i class="bi bi-check-circle-fill"></i> Guardar Ficha de Cliente
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CICLO REAL DE FACTURACIÓN ELECTRÓNICA & DECLARACIÓN D-104 (DGT CR)
+       ========================================================================== -->
+  <div class="modal-overlay" id="realTaxWorkflowGuideModal" style="display:none; align-items:center; justify-content:center; z-index:10000;">
+    <div class="modal-card" style="max-width:880px; width:95%; max-height:90vh; overflow-y:auto; border-radius:14px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.3);">
+      <div class="modal-header-custom" style="background:linear-gradient(135deg, #0B192C, #1E3E62); color:#FFF; padding:18px 24px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(16,185,129,0.25); border:1px solid #10B981; display:flex; align-items:center; justify-content:center; color:#34D399; font-size:1.4rem;">
+            🇨🇷
+          </div>
+          <div>
+            <h5 style="margin:0; font-size:1.2rem; font-weight:800; color:#F8FAFC;">
+              ¿Cómo Funciona en la Realidad la Facturación y la Declaración D-104?
+            </h5>
+            <small style="color:#94A3B8; font-size:0.78rem;">
+              Normativa Oficial de la Dirección General de Tributación (Resolución DGT-R-48 v4.3 / v4.4) &amp; Ley 9635
+            </small>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" onclick="closeRealTaxWorkflowGuideModal()" style="color:#94A3B8; background:transparent; border:none; font-size:1.4rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div style="padding:24px; background:#F8FAFC;">
+        
+        <!-- Alerta Informativa -->
+        <div style="background:#EFF6FF; border-left:4px solid #3B82F6; padding:12px 16px; border-radius:6px; margin-bottom:20px; font-size:0.85rem; color:#1E3A8A;">
+          <strong>Marco Legal Costarricense:</strong> Toda empresa formal debe operar bajo un ciclo obligatorio de 5 fases para que sus facturas tengan validez legal y el IVA pueda ser debitado y acreditado sin sanciones del Art. 81-83 del Código de Normas y Procedimientos Tributarios.
+        </div>
+
+        <!-- Las 5 Fases Reales -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          
+          <!-- FASE 1 -->
+          <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <span class="badge" style="background:#0284C7; color:#FFF; font-weight:800; padding:4px 8px; border-radius:6px;">FASE 1</span>
+              <h6 style="margin:0; font-size:1rem; font-weight:800; color:#0F172A;">
+                Generación del Comprobante Electrónico (XML Estructurado v4.3 / v4.4)
+              </h6>
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.83rem; color:#475569;">
+              Al procesar una venta o factura pagada, el sistema genera automáticamente un archivo XML que cumple estrictamente con el esquema oficial de Hacienda.
+            </p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:8px; font-size:0.78rem; color:#334155;">
+              <div style="background:#F1F5F9; padding:6px 10px; border-radius:6px;">
+                🔑 <strong>Clave de 50 Dígitos:</strong> Cód. País (506) + Fecha (6d) + Cédula Emisor (12d) + Consecutivo (20d) + Situación (1d) + Código Seguridad (8d).
+              </div>
+              <div style="background:#F1F5F9; padding:6px 10px; border-radius:6px;">
+                📦 <strong>Códigos CABYS (13 Dígitos):</strong> Clasificación del Banco Central y tarifa de IVA (13%, 8%, 4%, 2%, 1%, 0%).
+              </div>
+            </div>
+          </div>
+
+          <!-- FASE 2 -->
+          <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <span class="badge" style="background:#7C3AED; color:#FFF; font-weight:800; padding:4px 8px; border-radius:6px;">FASE 2</span>
+              <h6 style="margin:0; font-size:1rem; font-weight:800; color:#0F172A;">
+                Firma Digital Criptográfica (XAdES-BES / Enveloped)
+              </h6>
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.83rem; color:#475569;">
+              El XML generado no es válido ante Hacienda si no está firmado digitalmente.
+            </p>
+            <div style="font-size:0.78rem; color:#334155; background:#F3E8FF; padding:8px 12px; border-radius:6px;">
+              🔐 Se utiliza la <strong>llave criptográfica (.p12)</strong> generada en el portal ATV de Hacienda y el PIN de 4 dígitos. El algoritmo es <strong>RSA-SHA256</strong> con Digest SHA256 insertado en la etiqueta <code>&lt;ds:Signature&gt;</code>.
+            </div>
+          </div>
+
+          <!-- FASE 3 -->
+          <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <span class="badge" style="background:#D97706; color:#FFF; font-weight:800; padding:4px 8px; border-radius:6px;">FASE 3</span>
+              <h6 style="margin:0; font-size:1rem; font-weight:800; color:#0F172A;">
+                Transmisión y Validación en el API de Hacienda (OAuth 2.0 Asíncrono)
+              </h6>
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.83rem; color:#475569;">
+              El sistema se comunica por API REST con los servidores del Ministerio de Hacienda.
+            </p>
+            <ul style="margin:0; padding-left:18px; font-size:0.78rem; color:#334155; line-height:1.6;">
+              <li><strong>OAuth 2.0:</strong> Obtención de token Bearer en <code>idp.comprobanteselectronicos.go.cr</code> (vigencia 30 min).</li>
+              <li><strong>Envío:</strong> Petición POST a <code>/recepcion/v1/recepcion</code> enviando el XML en Base64. Hacienda responde <strong>HTTP 202 Aceptado</strong>.</li>
+              <li><strong>Recepción del MensajeHacienda:</strong> Consulta vía <code>GET /recepcion/v1/recepcion/{clave}</code> hasta recibir la confirmación:
+                <strong style="color:#059669;">Código 1 = ACEPTADO</strong> o <strong style="color:#DC2626;">Código 3 = RECHAZADO</strong>.
+              </li>
+            </ul>
+          </div>
+
+          <!-- FASE 4 -->
+          <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <span class="badge" style="background:#059669; color:#FFF; font-weight:800; padding:4px 8px; border-radius:6px;">FASE 4</span>
+              <h6 style="margin:0; font-size:1rem; font-weight:800; color:#0F172A;">
+                Notificación Legal al Cliente (El Triplete Tributario)
+              </h6>
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.83rem; color:#475569;">
+              La ley exige al emisor notificar de inmediato al correo del cliente con 3 archivos adjuntos indispensables:
+            </p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:0.78rem;">
+              <span class="badge" style="background:#E2E8F0; color:#1E293B; padding:5px 8px;">1. FacturaElectronica_Firmada.xml</span>
+              <span class="badge" style="background:#D1FAE5; color:#065F46; padding:5px 8px;">2. MensajeHacienda_Aceptacion.xml</span>
+              <span class="badge" style="background:#E0F2FE; color:#0369A1; padding:5px 8px;">3. RepresentacionGrafica.pdf (con QR)</span>
+            </div>
+          </div>
+
+          <!-- FASE 5 -->
+          <div style="background:#FFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+              <span class="badge" style="background:#DC2626; color:#FFF; font-weight:800; padding:4px 8px; border-radius:6px;">FASE 5</span>
+              <h6 style="margin:0; font-size:1rem; font-weight:800; color:#0F172A;">
+                Declaración y Liquidación Mensual del IVA (Formulario D-104-2 en el ATV)
+              </h6>
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.83rem; color:#475569;">
+              A más tardar el <strong>día 15 del mes calendario siguiente</strong>, se debe presentar en el portal ATV el formulario D-104-2:
+            </p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; font-size:0.78rem;">
+              <div style="background:#FEF2F2; border:1px solid #FECACA; padding:8px 12px; border-radius:6px;">
+                <strong style="color:#991B1B;">Débito Fiscal (IVA Ventas):</strong> Total de IVA cobrado en las facturas electrónicas emitidas y aceptadas.
+              </div>
+              <div style="background:#F0FDF4; border:1px solid #BBF7D0; padding:8px 12px; border-radius:6px;">
+                <strong style="color:#166534;">Crédito Fiscal (IVA Compras):</strong> Total de IVA soportado en compras a proveedores respaldadas con FE aceptadas.
+              </div>
+            </div>
+            <div style="margin-top:8px; font-size:0.8rem; color:#1E293B; font-weight:700;">
+              💵 Impuesto a Pagar = Débito Fiscal − Crédito Fiscal (Se cancela por Débito en Tiempo Real o SINPE).
+            </div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:20px; text-align:right;">
+          <button type="button" class="btn-fragama btn-primary-fragama" onclick="closeRealTaxWorkflowGuideModal()" style="background:#0F172A; color:#FFF; font-weight:700;">
+            Entendido, Cerrar Guía
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

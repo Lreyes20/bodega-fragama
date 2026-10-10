@@ -155,13 +155,19 @@ namespace Fragama.Domain.Entities
 
     public class Customer : BaseEntity
     {
-        public string TaxId { get; set; } = string.Empty; // Cédula Jurídica
+        public string TaxId { get; set; } = string.Empty; // Cédula Física / Jurídica DGT
+        public string DocType { get; set; } = "02"; // 01 Física, 02 Jurídica, 03 DIMEX, 04 NITE
         public string BusinessName { get; set; } = string.Empty;
+        public string? TradeName { get; set; }
         public string? Email { get; set; }
         public string? Phone { get; set; }
         public string Address { get; set; } = string.Empty;
         public string Canton { get; set; } = "Cartago";
         public string Province { get; set; } = "Cartago";
+        public string District { get; set; } = "Oriental";
+        public string PaymentTerms { get; set; } = "Contado";
+        public string PaymentMethodDefault { get; set; } = "04";
+        public string EconomicActivity { get; set; } = "466901";
         public bool IsActive { get; set; } = true;
     }
 

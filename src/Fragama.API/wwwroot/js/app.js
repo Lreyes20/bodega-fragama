@@ -1552,6 +1552,7 @@ const RolePermissions = {
       'view-cajero-pos',
       'view-chofer-mobile',
       'view-suppliers-management',
+      'view-customers-management',
       'view-reports',
       'view-roles-management',
       'view-tax-hacienda'
@@ -1572,6 +1573,7 @@ const RolePermissions = {
     homeView: 'view-cajero-pos',
     allowedViews: [
       'view-cajero-pos',
+      'view-customers-management',
       'view-product-maintenance',
       'view-tax-hacienda'
     ]
@@ -1588,6 +1590,7 @@ const RolePermissions = {
     allowedViews: [
       'view-alistado-web',
       'view-customer-orders',
+      'view-customers-management',
       'view-product-maintenance'
     ]
   }
@@ -1775,6 +1778,11 @@ window.switchViewDirectly = function(viewId) {
       if (pageTitle) pageTitle.textContent = 'Gestión y Asignación de Roles (RBAC)';
       if (pageSubtitle) pageSubtitle.textContent = 'Seguridad Corporativa | Políticas de acceso y segregación de funciones';
       renderUsersRolesTable();
+      break;
+    case 'view-customers-management':
+      if (pageTitle) pageTitle.textContent = 'Directorio Oficial de Clientes & Perfil Tributario DGT';
+      if (pageSubtitle) pageSubtitle.textContent = 'Base de datos oficial de clientes costarricenses | Cédulas, correos para FE v4.3 y condiciones comerciales';
+      renderCustomerDirectoryTable();
       break;
     case 'view-tax-hacienda':
       if (pageTitle) pageTitle.textContent = 'Módulo Tributario Oficial & Liquidación IVA (Hacienda CR)';
@@ -8774,14 +8782,298 @@ window.downloadXmlFile = function() {
   const filename = `Comprobante_${currentElectronicInvoice.clave || currentElectronicInvoice.consecutivo || 'Hacienda'}.xml`;
   a.download = filename;
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  if (typeof showNotificationToast === 'function') {
-    showNotificationToast(`📥 Descargando archivo oficial: ${filename}`, 'info');
   }
 };
 
+// ==============================================================================
+// DIRECTORIO OFICIAL DE CLIENTES & PERFIL TRIBUTARIO DGT (COSTA RICA)
+// ==============================================================================
 
+window.renderCustomerDirectoryTable = async function() {
+  const tbody = document.getElementById('customerDirectoryTableBody');
+  if (!tbody) return;
 
+  // Cargar clientes desde API
+  try {
+    const res = await fetch('/api/customers');
+    if (res.ok) {
+      AppState.customers = await res.json();
+    }
+  } catch (e) {
+    console.warn('Error cargando clientes desde API:', e);
+  }
 
+  // Actualizar contador del sidebar
+  const badgeNav = document.getElementById('customersBadgeCount');
+  if (badgeNav) badgeNav.textContent = AppState.customers.length;
+
+  // Actualizar KPIs
+  updateCustomerKpiCards();
+
+  // Renderizar filas
+  filterCustomerDirectoryTable();
+};
+
+function updateCustomerKpiCards() {
+  const totalEl = document.getElementById('kpiCustTotal');
+  const jurEl = document.getElementById('kpiCustJuridicas');
+  const credEl = document.getElementById('kpiCustCredito');
+  const contEl = document.getElementById('kpiCustContado');
+
+  const total = AppState.customers.length;
+  const juridicas = AppState.customers.filter(c => (c.docType === '02' || (c.taxId && c.taxId.startsWith('3-')))).length;
+  const credito = AppState.customers.filter(c => (c.terms && c.terms.toLowerCase().includes('crédito'))).length;
+  const contado = total - credito;
+
+  if (totalEl) totalEl.textContent = total;
+  if (jurEl) jurEl.textContent = juridicas;
+  if (credEl) credEl.textContent = credito;
+  if (contEl) contEl.textContent = contado;
+}
+
+window.filterCustomerDirectoryTable = function() {
+  const tbody = document.getElementById('customerDirectoryTableBody');
+  if (!tbody) return;
+
+  const searchInput = document.getElementById('custSearchInput');
+  const cantonFilter = document.getElementById('custCantonFilter');
+  const termsFilter = document.getElementById('custTermsFilter');
+
+  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const selectedCanton = cantonFilter ? cantonFilter.value : 'ALL';
+  const selectedTerms = termsFilter ? termsFilter.value : 'ALL';
+
+  const filtered = AppState.customers.filter(c => {
+    const matchSearch = !searchTerm || 
+      (c.name && c.name.toLowerCase().includes(searchTerm)) ||
+      (c.taxId && c.taxId.toLowerCase().includes(searchTerm)) ||
+      (c.tradeName && c.tradeName.toLowerCase().includes(searchTerm)) ||
+      (c.email && c.email.toLowerCase().includes(searchTerm)) ||
+      (c.phone && c.phone.includes(searchTerm));
+
+    const matchCanton = (selectedCanton === 'ALL') || (c.canton === selectedCanton);
+
+    const matchTerms = (selectedTerms === 'ALL') || 
+      (selectedTerms === 'Contado' && (!c.terms || c.terms.toLowerCase().includes('contado'))) ||
+      (selectedTerms === 'Crédito' && (c.terms && c.terms.toLowerCase().includes('crédito')));
+
+    return matchSearch && matchCanton && matchTerms;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align:center; padding:30px; color:#64748B;">
+          <i class="bi bi-person-x" style="font-size:2rem; display:block; margin-bottom:8px; color:#CBD5E1;"></i>
+          No se encontraron clientes que coincidan con los filtros aplicados.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(c => {
+    const isJuridica = (c.docType === '02' || (c.taxId && c.taxId.startsWith('3-')));
+    const docLabel = isJuridica ? 'Céd. Jurídica' : 'Céd. Física';
+    const docBadgeStyle = isJuridica ? 'background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;' : 'background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0;';
+    const isCredit = (c.terms && c.terms.toLowerCase().includes('crédito'));
+    const termsBadge = isCredit ? 'background:#FEF3C7; color:#92400E;' : 'background:#F1F5F9; color:#475569;';
+
+    const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
+    const waLink = cleanPhone ? `https://wa.me/506${cleanPhone}` : '#';
+
+    return `
+      <tr style="border-bottom:1px solid #F1F5F9; transition:background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+        <td style="padding:14px 16px;">
+          <div style="font-weight:800; color:#0F172A; font-size:0.9rem;">${escapeHtml(c.name)}</div>
+          ${c.tradeName ? `<div style="font-size:0.75rem; color:#64748B; margin-top:1px;"><i class="bi bi-shop"></i> ${escapeHtml(c.tradeName)}</div>` : ''}
+          <div style="margin-top:4px;">
+            <span class="badge" style="${docBadgeStyle} font-size:0.72rem; padding:2px 7px; border-radius:4px; font-family:'JetBrains Mono';">
+              ${docLabel}: ${escapeHtml(c.taxId)}
+            </span>
+          </div>
+        </td>
+
+        <td style="padding:14px 16px;">
+          <div style="font-size:0.82rem; color:#334155;">
+            <i class="bi bi-envelope text-primary" style="margin-right:4px;"></i>
+            <a href="mailto:${escapeHtml(c.email || '')}" style="color:#0284C7; text-decoration:none;">${escapeHtml(c.email || 'Sin correo registrado')}</a>
+          </div>
+          <div style="font-size:0.82rem; color:#475569; margin-top:4px; display:flex; align-items:center; gap:8px;">
+            <span><i class="bi bi-telephone text-secondary" style="margin-right:4px;"></i>${escapeHtml(c.phone || 'N/A')}</span>
+            ${cleanPhone ? `<a href="${waLink}" target="_blank" class="badge" style="background:#25D366; color:#FFF; text-decoration:none; padding:2px 6px; font-size:0.7rem; border-radius:4px;"><i class="bi bi-whatsapp"></i> Chat</a>` : ''}
+          </div>
+        </td>
+
+        <td style="padding:14px 16px;">
+          <div style="font-size:0.82rem; font-weight:700; color:#1E293B;">
+            <i class="bi bi-geo-alt-fill text-danger" style="margin-right:3px;"></i>${escapeHtml(c.canton || 'Cartago')}, ${escapeHtml(c.province || 'Cartago')}
+          </div>
+          <div style="font-size:0.75rem; color:#64748B; margin-top:2px;">
+            ${c.district ? `<span style="font-weight:600;">Dist. ${escapeHtml(c.district)}:</span> ` : ''}${escapeHtml(c.address || '')}
+          </div>
+        </td>
+
+        <td style="padding:14px 16px;">
+          <div>
+            <span class="badge" style="${termsBadge} font-size:0.74rem; padding:3px 8px; border-radius:6px; font-weight:700;">
+              💳 ${escapeHtml(c.terms || 'Contado')}
+            </span>
+          </div>
+          <div style="font-size:0.72rem; color:#64748B; margin-top:4px;">
+            CIUU DGT: <code style="color:#0284C7;">${escapeHtml(c.economicActivity || '466901')}</code>
+          </div>
+        </td>
+
+        <td style="padding:14px 16px; text-align:right;">
+          <div style="display:inline-flex; gap:6px; flex-wrap:nowrap;">
+            <button class="btn-fragama btn-primary-fragama" onclick="emitInvoiceForCustomer(${c.id})" style="padding:5px 10px; font-size:0.76rem; background:#0284C7; border:none; border-radius:6px;" title="Emitir Factura Electrónica v4.3">
+              <i class="bi bi-receipt"></i> Emitir FE v4.3
+            </button>
+            <button class="btn-fragama btn-outline-fragama" onclick="openEditCustomerTaxModal(${c.id})" style="padding:5px 9px; font-size:0.76rem; border-radius:6px;" title="Editar Ficha">
+              <i class="bi bi-pencil-square"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.openNewCustomerTaxModal = function() {
+  const modal = document.getElementById('customerTaxModal');
+  const form = document.getElementById('customerTaxForm');
+  const title = document.getElementById('customerTaxModalTitle');
+  if (!modal || !form) return;
+
+  form.reset();
+  document.getElementById('custModalId').value = '';
+  if (title) title.textContent = 'Registrar Nuevo Cliente Tributario (DGT Costa Rica)';
+  modal.style.display = 'flex';
+};
+
+window.openEditCustomerTaxModal = function(id) {
+  const customer = AppState.customers.find(c => c.id === id);
+  if (!customer) return;
+
+  const modal = document.getElementById('customerTaxModal');
+  const title = document.getElementById('customerTaxModalTitle');
+  if (!modal) return;
+
+  document.getElementById('custModalId').value = customer.id;
+  document.getElementById('custModalDocType').value = customer.docType || '02';
+  document.getElementById('custModalTaxId').value = customer.taxId || '';
+  document.getElementById('custModalName').value = customer.name || '';
+  document.getElementById('custModalTradeName').value = customer.tradeName || '';
+  document.getElementById('custModalEmail').value = customer.email || '';
+  document.getElementById('custModalPhone').value = customer.phone || '';
+  document.getElementById('custModalProvince').value = customer.province || 'Cartago';
+  document.getElementById('custModalCanton').value = customer.canton || 'Cartago';
+  document.getElementById('custModalDistrict').value = customer.district || 'Oriental';
+  document.getElementById('custModalAddress').value = customer.address || '';
+  document.getElementById('custModalTerms').value = customer.terms || 'Contado';
+  document.getElementById('custModalPaymentMethod').value = customer.paymentMethodDefault || '04';
+  document.getElementById('custModalActivity').value = customer.economicActivity || '466901';
+
+  if (title) title.textContent = `Editar Ficha Tributaria: ${customer.name}`;
+  modal.style.display = 'flex';
+};
+
+window.closeCustomerTaxModal = function() {
+  const modal = document.getElementById('customerTaxModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.saveCustomerTaxForm = async function(event) {
+  event.preventDefault();
+  const idVal = document.getElementById('custModalId').value;
+  const isEdit = Boolean(idVal);
+
+  const payload = {
+    taxId: document.getElementById('custModalTaxId').value.trim(),
+    docType: document.getElementById('custModalDocType').value,
+    name: document.getElementById('custModalName').value.trim(),
+    tradeName: document.getElementById('custModalTradeName').value.trim(),
+    email: document.getElementById('custModalEmail').value.trim(),
+    phone: document.getElementById('custModalPhone').value.trim(),
+    province: document.getElementById('custModalProvince').value,
+    canton: document.getElementById('custModalCanton').value.trim(),
+    district: document.getElementById('custModalDistrict').value.trim(),
+    address: document.getElementById('custModalAddress').value.trim(),
+    terms: document.getElementById('custModalTerms').value,
+    paymentMethodDefault: document.getElementById('custModalPaymentMethod').value,
+    economicActivity: document.getElementById('custModalActivity').value.trim()
+  };
+
+  try {
+    const url = isEdit ? `/api/customers/${idVal}` : '/api/customers';
+    const method = isEdit ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Error procesando solicitud');
+    }
+
+    closeCustomerTaxModal();
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast(isEdit ? `✅ Ficha del cliente '${payload.name}' actualizada con éxito.` : `✅ Cliente '${payload.name}' registrado exitosamente en la base de datos.`, 'success');
+    } else {
+      alert('Operación exitosa');
+    }
+
+    // Recargar tabla y selectores en tiempo real
+    await renderCustomerDirectoryTable();
+    if (typeof populateXmlCustomerSelector === 'function') {
+      populateXmlCustomerSelector();
+    }
+  } catch (e) {
+    alert(`❌ Error al guardar cliente: ${e.message}`);
+  }
+};
+
+window.emitInvoiceForCustomer = function(customerId) {
+  // Cambiar a la vista de Hacienda
+  window.switchViewDirectly('view-tax-hacienda');
+
+  // Seleccionar cliente en el selector de comprobante electrónico
+  const sel = document.getElementById('xmlCustomerSelector');
+  if (sel) {
+    sel.value = String(customerId);
+    if (typeof onSelectCustomerFromDb === 'function') {
+      onSelectCustomerFromDb();
+    }
+  }
+
+  // Scroll a la sección del visor
+  setTimeout(() => {
+    const card = document.getElementById('xmlContentDisplay') || document.getElementById('xmlCustomerSelector');
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 200);
+
+  const cust = AppState.customers.find(c => c.id === customerId);
+  const name = cust ? cust.name : `ID ${customerId}`;
+  if (typeof showNotificationToast === 'function') {
+    showNotificationToast(`🧾 Cliente '${name}' precargado en el generador de Factura Electrónica v4.3.`, 'info');
+  }
+};
+
+// ==============================================================================
+// MODAL: GUÍA REAL DE FACTURACIÓN Y DECLARACIÓN D-104 (DGT CR)
+// ==============================================================================
+
+window.openRealTaxWorkflowGuideModal = function() {
+  const modal = document.getElementById('realTaxWorkflowGuideModal');
+  if (modal) modal.style.display = 'flex';
+};
+
+window.closeRealTaxWorkflowGuideModal = function() {
+  const modal = document.getElementById('realTaxWorkflowGuideModal');
+  if (modal) modal.style.display = 'none';
+};

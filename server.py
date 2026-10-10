@@ -497,12 +497,18 @@ class OrderStatusUpdateRequest(BaseModel):
 
 class CustomerCreateRequest(BaseModel):
     taxId: str = Field(..., min_length=5, max_length=30)
-    docType: Optional[str] = "Juridica"
+    docType: Optional[str] = "02" # 01 Física, 02 Jurídica, 03 DIMEX, 04 NITE
     name: str = Field(..., min_length=2, max_length=180)
+    tradeName: Optional[str] = ""
     contact: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     terms: Optional[str] = "Contado"
+    paymentMethodDefault: Optional[str] = "04" # 01 Efectivo, 02 Tarjeta, 04 Transferencia/SINPE
+    economicActivity: Optional[str] = "466901"
+    province: Optional[str] = "Cartago"
+    canton: Optional[str] = "Cartago"
+    district: Optional[str] = "Oriental"
     route: Optional[str] = "Cartago Centro"
     address: Optional[str] = None
 
@@ -556,11 +562,18 @@ class ProductCreateRequest(BaseModel):
 
 class CustomerUpdateRequest(BaseModel):
     taxId: Optional[str] = None
+    docType: Optional[str] = None
     name: Optional[str] = None
+    tradeName: Optional[str] = None
     contact: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     terms: Optional[str] = None
+    paymentMethodDefault: Optional[str] = None
+    economicActivity: Optional[str] = None
+    province: Optional[str] = None
+    canton: Optional[str] = None
+    district: Optional[str] = None
     route: Optional[str] = None
     address: Optional[str] = None
     isActive: Optional[bool] = None
@@ -1822,19 +1835,45 @@ async def upload_product_image(product_id: int, file: UploadFile = File(...)):
     return {"success": True, "message": "Imagen de producto actualizada correctamente.", "image": img_rel_path}
 
 @app.get("/api/customers")
-def get_customers(search: Optional[str] = None):
-    """Consulta clientes registrados desde la base de datos relacional SQLite."""
+def get_customers(search: Optional[str] = None, canton: Optional[str] = None, terms: Optional[str] = None):
+    """Consulta clientes registrados desde la base de datos relacional SQLite con perfil tributario completo DGT."""
     if os.path.exists(SQLITE_DB_PATH):
         try:
             conn = get_sqlite_conn()
             cur = conn.cursor()
-            query = "SELECT CustomerId as id, TaxId as taxId, BusinessName as name, Email as email, Phone as phone, Address as address, Canton as canton, Province as province, PaymentTerms as terms, IsActive as isActive FROM Customers"
+            query = """
+                SELECT 
+                    CustomerId as id, 
+                    TaxId as taxId, 
+                    COALESCE(DocType, '02') as docType, 
+                    BusinessName as name, 
+                    COALESCE(TradeName, '') as tradeName,
+                    Email as email, 
+                    Phone as phone, 
+                    Address as address, 
+                    COALESCE(Province, 'Cartago') as province,
+                    COALESCE(Canton, 'Cartago') as canton, 
+                    COALESCE(District, 'Oriental') as district,
+                    COALESCE(PaymentTerms, 'Contado') as terms, 
+                    COALESCE(PaymentMethodDefault, '04') as paymentMethodDefault,
+                    COALESCE(EconomicActivity, '466901') as economicActivity,
+                    IsActive as isActive,
+                    CreatedAt as createdAt
+                FROM Customers
+                WHERE IsActive = 1
+            """
             params = []
             if search:
-                query += " WHERE BusinessName LIKE ? OR TaxId LIKE ? OR Phone LIKE ?"
+                query += " AND (BusinessName LIKE ? OR TaxId LIKE ? OR Phone LIKE ? OR Email LIKE ? OR TradeName LIKE ?)"
                 term = f"%{search.strip()}%"
-                params.extend([term, term, term])
-            query += " ORDER BY CustomerId DESC"
+                params.extend([term, term, term, term, term])
+            if canton and canton != "ALL":
+                query += " AND Canton = ?"
+                params.append(canton)
+            if terms and terms != "ALL":
+                query += " AND PaymentTerms LIKE ?"
+                params.append(f"%{terms}%")
+            query += " ORDER BY CustomerId ASC"
             cur.execute(query, params)
             custs = [dict(r) for r in cur.fetchall()]
             conn.close()
@@ -1844,40 +1883,80 @@ def get_customers(search: Optional[str] = None):
             logger.warning(f"Aviso leyendo clientes de SQLite: {e}")
 
     fallback = [
-        { "id": 1, "taxId": "3-101-582910", "name": "Restaurante El Fogón Tico S.A.", "contact": "Don Esteban Brenes", "phone": "2551-3344", "email": "compras@fogontico.cr", "terms": "Crédito 30 días", "route": "Cartago Centro", "address": "200m Sur de la Basílica de Los Ángeles" },
-        { "id": 2, "taxId": "3-102-449102", "name": "Panadería & Repostería La Espiga de Oro", "contact": "Doña Marta Chinchilla", "phone": "2552-1920", "email": "gerencia@laespiga.com", "terms": "Contado", "route": "Paraíso - Cervantes", "address": "Costado Norte del Parque Central de Paraíso" },
-        { "id": 3, "taxId": "3-002-045921", "name": "Municipalidad de Cartago (Depto. Suministros)", "contact": "Lic. Rodrigo Navarro", "phone": "2550-4400", "email": "proveeduria@muni-cartago.go.cr", "terms": "Crédito 60 días", "route": "Cartago Centro", "address": "Edificio Municipal, 2do piso, Cartago" },
-        { "id": 4, "taxId": "3014042047", "name": "Municipalidad de Curridabat", "contact": "Recepción de Pedidos", "phone": "88378662", "email": "suministros@curridabat.go.cr", "terms": "Contado / Contra Entrega", "route": "Cartago (Lunes y Jueves)", "address": "Costado norte del estadio lito monge de Curridabat" }
+        { "id": 1, "taxId": "3-014-042047", "docType": "02", "name": "Municipalidad de Curridabat", "tradeName": "Gobierno Local", "contact": "Proveeduría", "phone": "2272-0000", "email": "proveeduria@curridabat.go.cr", "terms": "Contado", "paymentMethodDefault": "04", "economicActivity": "841101", "province": "San José", "canton": "Curridabat", "district": "Curridabat", "address": "Costado norte del Estadio Lito Monge", "isActive": 1 },
+        { "id": 2, "taxId": "3-101-445566", "docType": "02", "name": "Soda El Manantial S.A.", "tradeName": "Soda El Manantial", "contact": "Administración", "phone": "2574-8899", "email": "facturacion@elmanantial.cr", "terms": "Contado", "paymentMethodDefault": "04", "economicActivity": "561001", "province": "Cartago", "canton": "Paraíso", "district": "Paraíso", "address": "200m Este del Parque Central de Paraíso", "isActive": 1 }
     ]
     return fallback
 
+@app.get("/api/customers/{customer_id}")
+def get_customer_detail(customer_id: int):
+    """Consulta ficha completa de un cliente junto a sus pedidos y facturas emitidas."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT 
+            CustomerId as id, TaxId as taxId, COALESCE(DocType, '02') as docType,
+            BusinessName as name, COALESCE(TradeName, '') as tradeName,
+            Email as email, Phone as phone, Address as address,
+            COALESCE(Province, 'Cartago') as province, COALESCE(Canton, 'Cartago') as canton,
+            COALESCE(District, 'Oriental') as district, COALESCE(PaymentTerms, 'Contado') as terms,
+            COALESCE(PaymentMethodDefault, '04') as paymentMethodDefault,
+            COALESCE(EconomicActivity, '466901') as economicActivity,
+            IsActive as isActive, CreatedAt as createdAt
+        FROM Customers WHERE CustomerId = ?
+    """, (customer_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    
+    cust = dict(row)
+    cur.execute("""
+        SELECT SalesOrderId as orderId, OrderNumber as orderNumber, TotalAmount as total, Status as status, CreatedAt as date
+        FROM SalesOrders WHERE CustomerId = ? ORDER BY SalesOrderId DESC LIMIT 10
+    """, (customer_id,))
+    cust["recentOrders"] = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return cust
+
 @app.post("/api/customers")
 def create_customer(req: CustomerCreateRequest):
-    """Registra un nuevo cliente en base de datos."""
+    """Registra un nuevo cliente con perfil fiscal en base de datos."""
     tax_id = sanitize_text(req.taxId)
     name = sanitize_text(req.name)
+    trade_name = sanitize_text(req.tradeName or "")
     phone = sanitize_text(req.phone or "")
+    email = sanitize_text(req.email or "")
     address = sanitize_text(req.address or "")
-    route = sanitize_text(req.route or "Cartago Centro")
+    doc_type = sanitize_text(req.docType or "02")
+    province = sanitize_text(req.province or "Cartago")
+    canton = sanitize_text(req.canton or "Cartago")
+    district = sanitize_text(req.district or "Oriental")
+    terms = sanitize_text(req.terms or "Contado")
+    pmethod = sanitize_text(req.paymentMethodDefault or "04")
+    activity = sanitize_text(req.economicActivity or "466901")
     
     try:
         conn = get_sqlite_conn()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO Customers (TaxId, BusinessName, Email, Phone, Address, Canton, Province, PaymentTerms)
-            VALUES (?, ?, ?, ?, ?, ?, 'Cartago', ?)
-        """, (tax_id, name, req.email or "", phone, address, route, req.terms or "Contado"))
+            INSERT INTO Customers (
+                TaxId, DocType, BusinessName, TradeName, Email, Phone, Address,
+                Province, Canton, District, PaymentTerms, PaymentMethodDefault, EconomicActivity, IsActive
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (tax_id, doc_type, name, trade_name, email, phone, address, province, canton, district, terms, pmethod, activity))
         cust_id = cur.lastrowid
         conn.commit()
         conn.close()
-        return {"success": True, "customerId": cust_id, "message": "Cliente registrado exitosamente."}
+        return {"success": True, "customerId": cust_id, "message": f"Cliente '{name}' registrado exitosamente en la base de datos."}
     except Exception as e:
         logger.error(f"Error registrando cliente: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/customers/{customer_id}")
 def update_customer(customer_id: int, req: CustomerUpdateRequest):
-    """Actualiza los datos de un cliente comercial en base de datos."""
+    """Actualiza la ficha tributaria y comercial de un cliente."""
     conn = get_sqlite_conn()
     cur = conn.cursor()
     cur.execute("SELECT * FROM Customers WHERE CustomerId = ?", (customer_id,))
@@ -1888,32 +1967,113 @@ def update_customer(customer_id: int, req: CustomerUpdateRequest):
         
     curr = dict(row)
     new_tax = req.taxId if req.taxId is not None else curr['TaxId']
+    new_doctype = req.docType if req.docType is not None else curr.get('DocType', '02')
     new_name = req.name if req.name is not None else curr['BusinessName']
+    new_tradename = req.tradeName if req.tradeName is not None else curr.get('TradeName', '')
     new_phone = req.phone if req.phone is not None else curr.get('Phone', '')
     new_email = req.email if req.email is not None else curr.get('Email', '')
     new_addr = req.address if req.address is not None else curr.get('Address', '')
+    new_province = req.province if req.province is not None else curr.get('Province', 'Cartago')
+    new_canton = req.canton if req.canton is not None else curr.get('Canton', 'Cartago')
+    new_district = req.district if req.district is not None else curr.get('District', 'Oriental')
     new_terms = req.terms if req.terms is not None else curr.get('PaymentTerms', 'Contado')
-    new_route = req.route if req.route is not None else curr.get('Canton', 'Cartago')
+    new_pmethod = req.paymentMethodDefault if req.paymentMethodDefault is not None else curr.get('PaymentMethodDefault', '04')
+    new_activity = req.economicActivity if req.economicActivity is not None else curr.get('EconomicActivity', '466901')
     new_active = 1 if (req.isActive is None or req.isActive) else 0
 
     cur.execute("""
         UPDATE Customers
-        SET TaxId = ?, BusinessName = ?, Phone = ?, Email = ?, Address = ?, Canton = ?, PaymentTerms = ?, IsActive = ?
+        SET TaxId = ?, DocType = ?, BusinessName = ?, TradeName = ?, Phone = ?, Email = ?,
+            Address = ?, Province = ?, Canton = ?, District = ?, PaymentTerms = ?,
+            PaymentMethodDefault = ?, EconomicActivity = ?, IsActive = ?
         WHERE CustomerId = ?
-    """, (new_tax, new_name, new_phone, new_email, new_addr, new_route, new_terms, new_active, customer_id))
+    """, (new_tax, new_doctype, new_name, new_tradename, new_phone, new_email, new_addr,
+          new_province, new_canton, new_district, new_terms, new_pmethod, new_activity, new_active, customer_id))
     conn.commit()
     conn.close()
-    return {"success": True, "message": f"Cliente '{new_name}' actualizado correctamente."}
+    return {"success": True, "message": f"Ficha de cliente '{new_name}' actualizada correctamente."}
 
 @app.delete("/api/customers/{customer_id}")
 def delete_customer(customer_id: int):
-    """Desactiva o da de baja un cliente."""
+    """Desactiva un cliente en base de datos."""
     conn = get_sqlite_conn()
     cur = conn.cursor()
     cur.execute("UPDATE Customers SET IsActive = 0 WHERE CustomerId = ?", (customer_id,))
     conn.commit()
     conn.close()
     return {"success": True, "message": f"Cliente ID {customer_id} desactivado correctamente."}
+
+@app.get("/api/tax/real-workflow-guide")
+def get_real_tax_workflow_guide():
+    """Retorna la especificación técnica oficial del flujo real de Facturación Electrónica y Declaración D-104 en Costa Rica (DGT)."""
+    return {
+        "normativa": {
+            "resolucion": "Resolución General DGT-R-48-2016 y reformas v4.3 / v4.4",
+            "entidad": "Dirección General de Tributación - Ministerio de Hacienda de Costa Rica",
+            "leyIVA": "Ley de Fortalecimiento de las Finanzas Públicas N° 9635",
+            "codigoNormasTributarias": "Código de Normas y Procedimientos Tributarios (Art. 81 - 83)"
+        },
+        "fasesReales": [
+            {
+                "fase": 1,
+                "titulo": "Generación del Comprobante Electrónico (XML)",
+                "descripcion": "El sistema ERP/WMS genera el documento XML con estructura estándar (FacturaElectronica_V4.3.xsd).",
+                "requisitos": [
+                    "Clave Numérica de 50 Dígitos: [506][DDMMAA][Cédula 12d][Consecutivo 20d][Situación 1d][Código Seguridad 8d]",
+                    "Consecutivo de 20 Dígitos: Casa Matriz (3) + Terminal (5) + Tipo Doc (2) + Secuencia (10)",
+                    "Clasificación CABYS (13 dígitos) obligatoria en cada línea de producto/servicio",
+                    "Desglose de IVA según tarifa oficial (13% general, 8%, 4%, 2%, 1% canasta básica, 0% exento)"
+                ]
+            },
+            {
+                "fase": 2,
+                "titulo": "Firma Digital Criptográfica (XAdES-BES / Enveloped)",
+                "descripcion": "El XML se firma digitalmente con el certificado de la empresa sin intervención humana.",
+                "requisitos": [
+                    "Certificado criptográfico en formato PKCS#12 (.p12) descargado desde el portal ATV",
+                    "PIN criptográfico de 4 dígitos configurado en ATV",
+                    "Algoritmo de firma RSA-SHA256 con Digest SHA256",
+                    "Inserción de la firma en el elemento <ds:Signature> del XML"
+                ]
+            },
+            {
+                "fase": 3,
+                "titulo": "Envío y Validación en el API de Hacienda (OAuth 2.0)",
+                "descripcion": "Transmisión asíncrona mediante HTTPS al servicio web REST de Hacienda.",
+                "requisitos": [
+                    "Autenticación OAuth 2.0 (flujo client_credentials) en el IdP de Hacienda para obtener Bearer Token (vigencia 30 min)",
+                    "Sandbox: https://api-sandbox.comprobanteselectronicos.go.cr/recepcion/v1/recepcion",
+                    "Producción: https://api.comprobanteselectronicos.go.cr/recepcion/v1/recepcion",
+                    "Payload JSON con clave, emisor, receptor y comprobanteXml en Base64",
+                    "Recepción asíncrona: Hacienda responde HTTP 202 Aceptado para procesamiento",
+                    "Consulta vía GET /recepcion/v1/recepcion/{clave} hasta obtener MensajeHacienda (1 = Aceptado, 3 = Rechazado)"
+                ]
+            },
+            {
+                "fase": 4,
+                "titulo": "Notificación Legal al Cliente Receptor",
+                "descripcion": "Por mandato tributario, una vez aceptado el comprobante, el emisor debe notificar al cliente.",
+                "requisitos": [
+                    "Envío por correo electrónico del triplete oficial:",
+                    "1) Archivo XML de la Factura Electrónica firmada",
+                    "2) Archivo XML del Mensaje de Hacienda (Aceptación oficial con firma del Ministerio)",
+                    "3) Representación gráfica en PDF con Código QR de verificación"
+                ]
+            },
+            {
+                "fase": 5,
+                "titulo": "Declaración Jurada Mensual de IVA (Formulario D-104-2)",
+                "descripcion": "Presentación y liquidación obligatoria ante el ATV antes del día 15 del mes siguiente.",
+                "requisitos": [
+                    "Período fiscal: Mensual (ej. del 1 al 15 de noviembre para el mes de octubre)",
+                    "Débito Fiscal (IVA Ventas): Total de IVA cobrado en facturas electrónicas aceptadas",
+                    "Crédito Fiscal (IVA Compras): Total de IVA pagado a proveedores con comprobantes aceptados y sujetos a prorrata",
+                    "Cálculo del Impuesto a Pagar: Débito Fiscal - Crédito Fiscal (o Saldo a Favor transferible)",
+                    "Pago electrónico en ventanilla bancaria (SINPE / Débito en Tiempo Real DTR)"
+                ]
+            }
+        ]
+    }
 
 ROLE_MAP = {
     "Administrador": 1,

@@ -151,4 +151,59 @@ namespace Fragama.Application.DTOs
         public int ProductId { get; set; }
         public int QuantityDelivered { get; set; }
     }
+
+    // ================== CUSTOMER DTOs ==================
+    public class CustomerDto
+    {
+        public int Id { get; set; }
+        public string TaxId { get; set; } = string.Empty;
+        public string DocType { get; set; } = "02";
+        public string Name { get; set; } = string.Empty;
+        public string? TradeName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string Address { get; set; } = string.Empty;
+        public string Province { get; set; } = "Cartago";
+        public string Canton { get; set; } = "Cartago";
+        public string District { get; set; } = "Oriental";
+        public string Terms { get; set; } = "Contado";
+        public string PaymentMethodDefault { get; set; } = "04";
+        public string EconomicActivity { get; set; } = "466901";
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class CreateCustomerDto
+    {
+        public string TaxId { get; set; } = string.Empty;
+        public string DocType { get; set; } = "02";
+        public string Name { get; set; } = string.Empty;
+        public string? TradeName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string Address { get; set; } = string.Empty;
+        public string Province { get; set; } = "Cartago";
+        public string Canton { get; set; } = "Cartago";
+        public string District { get; set; } = "Oriental";
+        public string Terms { get; set; } = "Contado";
+        public string PaymentMethodDefault { get; set; } = "04";
+        public string EconomicActivity { get; set; } = "466901";
+    }
+
+    public class UpdateCustomerDto
+    {
+        public string? TaxId { get; set; }
+        public string? DocType { get; set; }
+        public string? Name { get; set; }
+        public string? TradeName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? Province { get; set; }
+        public string? Canton { get; set; }
+        public string? District { get; set; }
+        public string? Terms { get; set; }
+        public string? PaymentMethodDefault { get; set; }
+        public string? EconomicActivity { get; set; }
+        public bool? IsActive { get; set; }
+    }
 }
