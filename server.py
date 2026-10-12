@@ -3699,7 +3699,7 @@ def kubernetes_health():
 # ==============================================================================
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-DEFAULT_PAGE = os.environ.get("DEFAULT_PAGE", "bodega").strip().lower()
+DEFAULT_PAGE = os.environ.get("DEFAULT_PAGE", "tienda").strip().lower()
 
 @app.get("/")
 def serve_home():
