@@ -334,7 +334,7 @@
       </div>
 
       <!-- DIRECTORIO DE CLIENTES TRIBUTARIOS DGT (Tree-toggle Dedicado) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-clientes" onclick="toggleSidebarAccordion('menu-clientes', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="background:rgba(2,132,199,0.08); border-left:3px solid #0284C7;">
+      <a class="nav-link tree-toggle" data-collapse="menu-clientes" data-view="view-customers-management" onclick="switchViewDirectly('view-customers-management'); toggleSidebarAccordion('menu-clientes', this);" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor" style="background:rgba(2,132,199,0.08); border-left:3px solid #0284C7;">
         <i class="bi bi-people-fill" style="color:#0284C7;"></i>
         <span style="font-weight:800; color:#0284C7;">Directorio de Clientes</span>
         <span class="badge-count" id="customersBadgeCount" style="background:#0284C7; color:#FFF; font-weight:800;">10</span>
@@ -351,9 +351,17 @@
           <span>+ Registrar Nuevo Cliente</span>
           <span class="badge-count" style="background:var(--fragama-orange-main); color:#FFF;">Nuevo</span>
         </a>
-        <a class="nav-link" onclick="exportCustomersToCsv()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
-          <i class="bi bi-file-earmark-arrow-down"></i>
-          <span>Exportar a Excel / CSV</span>
+        <a class="nav-link" onclick="exportCustomersToExcel()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+          <i class="bi bi-file-earmark-excel" style="color:#107C41;"></i>
+          <span>Exportar a Excel (.xlsx)</span>
+        </a>
+        <a class="nav-link" onclick="exportCustomersToPdf()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+          <i class="bi bi-file-earmark-pdf" style="color:#DC2626;"></i>
+          <span>Exportar a PDF (Oficial)</span>
+        </a>
+        <a class="nav-link" onclick="exportCustomersToWord()" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero,Vendedor">
+          <i class="bi bi-file-earmark-word" style="color:#185ABD;"></i>
+          <span>Exportar a Word (.doc)</span>
         </a>
       </div>
 
@@ -379,8 +387,9 @@
           <span class="badge-count" style="background:#0284C7; color:#FFF;">Lector</span>
         </a>
 
-        <a class="nav-link" onclick="showBarcodeForProduct(1)" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
-          Etiquetas EAN-13
+        <a class="nav-link" onclick="openBarcodeLabelsModal()" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
+          <i class="bi bi-upc-scan" style="margin-right:4px;"></i>
+          <span>Etiquetas EAN-13</span>
         </a>
       </div>
 
@@ -404,14 +413,14 @@
           <i class="bi bi-journal-text"></i>
           <span>Historial General de Pedidos</span>
         </a>
-        <a class="nav-link" data-view="view-cajero-pos" onclick="switchViewDirectly('view-cajero-pos')" href="javascript:void(0)" data-roles="Administrador,Cajero">
+        <a class="nav-link" data-view="view-cajero-pos" onclick="switchViewDirectly('view-cajero-pos')" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Cajero">
           <i class="bi bi-receipt"></i>
           <span>Venta Rápida (Caja POS)</span>
         </a>
       </div>
 
       <!-- LOGÍSTICA & RUTAS (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-despachos" onclick="toggleSidebarAccordion('menu-despachos', this)" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Chofer">
+      <a class="nav-link tree-toggle" data-collapse="menu-despachos" data-view="view-chofer-mobile" onclick="switchViewDirectly('view-chofer-mobile'); toggleSidebarAccordion('menu-despachos', this);" href="javascript:void(0)" data-roles="Administrador,Bodeguero,Chofer">
         <i class="bi bi-truck"></i>
         <span>Logística &amp; Reparto</span>
       </a>
@@ -424,13 +433,13 @@
       </div>
 
       <!-- PROVEEDORES & COMPRAS (Tree-toggle) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-proveedores" onclick="toggleSidebarAccordion('menu-proveedores', this)" href="javascript:void(0)" data-roles="Administrador">
+      <a class="nav-link tree-toggle" data-collapse="menu-proveedores" data-view="view-suppliers-management" onclick="switchViewDirectly('view-suppliers-management'); toggleSidebarAccordion('menu-proveedores', this);" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
         <i class="bi bi-building-up"></i>
         <span>Proveedores &amp; Compras</span>
       </a>
 
-      <div class="collapse-menu show" id="menu-proveedores" data-roles="Administrador">
-        <a class="nav-link" data-view="view-suppliers-management" onclick="switchViewDirectly('view-suppliers-management')" href="javascript:void(0)" data-roles="Administrador">
+      <div class="collapse-menu show" id="menu-proveedores" data-roles="Administrador,Bodeguero">
+        <a class="nav-link" data-view="view-suppliers-management" onclick="switchViewDirectly('view-suppliers-management')" href="javascript:void(0)" data-roles="Administrador,Bodeguero">
           Directorio de Proveedores
           <span class="badge-count" id="suppliersBadgeCount" style="background:rgba(255,130,0,0.25); color:var(--fragama-orange-main);">5</span>
         </a>
@@ -475,7 +484,7 @@
       </div>
 
       <!-- SEGURIDAD & ASIGNACIÓN DE ROLES (RBAC) -->
-      <a class="nav-link tree-toggle" data-collapse="menu-seguridad" onclick="toggleSidebarAccordion('menu-seguridad', this)" href="javascript:void(0)" data-roles="Administrador">
+      <a class="nav-link tree-toggle" data-collapse="menu-seguridad" data-view="view-roles-management" onclick="switchViewDirectly('view-roles-management'); toggleSidebarAccordion('menu-seguridad', this);" href="javascript:void(0)" data-roles="Administrador">
         <i class="bi bi-shield-lock-fill"></i>
         <span>Seguridad &amp; Roles</span>
       </a>
@@ -2323,6 +2332,7 @@
             </div>
           </div>
         </div>
+      </section>
 
       <!-- ====================================================================
            VISTA: DIRECTORIO PROFESIONAL DE CLIENTES & PERFIL TRIBUTARIO DGT
@@ -2346,11 +2356,17 @@
                 </div>
               </div>
             </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button class="btn-fragama btn-outline-fragama" onclick="exportCustomersToCsv()" style="background:rgba(255,255,255,0.12); color:#FFF; border:1px solid rgba(255,255,255,0.25); font-weight:700; border-radius:8px; padding:8px 14px;">
-                <i class="bi bi-file-earmark-arrow-down"></i> Exportar a Excel / CSV
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <button class="btn-fragama" onclick="exportCustomersToExcel()" style="background:#107C41; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(16,124,65,0.3);">
+                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Excel
               </button>
-              <button class="btn-fragama" onclick="openNewCustomerTaxModal()" style="background:#0284C7; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px;">
+              <button class="btn-fragama" onclick="exportCustomersToPdf()" style="background:#DC2626; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(220,38,38,0.3);">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
+              </button>
+              <button class="btn-fragama" onclick="exportCustomersToWord()" style="background:#185ABD; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(24,90,189,0.3);">
+                <i class="bi bi-file-earmark-word-fill"></i> Exportar Word
+              </button>
+              <button class="btn-fragama" onclick="openNewCustomerTaxModal()" style="background:#0284C7; color:#FFF; border:none; font-weight:700; border-radius:8px; padding:8px 14px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(2,132,199,0.3);">
                 <i class="bi bi-person-plus-fill"></i> + Registrar Nuevo Cliente
               </button>
             </div>
@@ -3439,40 +3455,62 @@
 
   <!-- MODAL: ETIQUETA Y CÓDIGO DE BARRAS EAN-13 / CODE 128 -->
   <div class="modal-overlay" id="barcodeModal">
-    <div class="modal-box" style="max-width:460px; border-radius:16px;">
+    <div class="modal-box" style="max-width:500px; border-radius:16px;">
       <div class="modal-header-custom" style="background:#0B192C; color:#FFFFFF;">
         <h3 style="font-size:1.05rem; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:8px;">
-          <i class="bi bi-upc-scan text-warning"></i> Etiqueta Térmica &amp; Código de Barras
+          <i class="bi bi-upc-scan text-warning"></i> Etiqueta Térmica &amp; Código de Barras EAN-13
         </h3>
-        <button id="closeBarcodeModal" style="background:none; border:none; font-size:1.3rem; color:#FFF; cursor:pointer;">&times;</button>
+        <button id="closeBarcodeModal" onclick="closeBarcodeModal()" style="background:none; border:none; font-size:1.3rem; color:#FFF; cursor:pointer;">&times;</button>
       </div>
 
-      <div class="modal-body-custom" style="text-align:center; padding:1.25rem;">
-        <h4 id="barcodeProductTitle" style="font-size:1.05rem; margin-bottom:4px; color:#1E3E62; font-weight:800;">Producto Fragama</h4>
-        <div id="barcodeProductSku" style="font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:#64748B; margin-bottom:1rem;">SKU: FRAG-DES-001</div>
-
-        <!-- Contenedor del código de barras SVG estándar de alta resolución -->
-        <div id="barcodeSvgContainer" style="display:flex; justify-content:center; margin-bottom:1rem; background:#FFF; padding:10px; border:2px dashed #CBD5E1; border-radius:10px;">
-          <svg id="barcodeCanvas"></svg>
+      <div class="modal-body-custom" style="padding:1.25rem;">
+        <!-- Selector de Producto para Etiquetas -->
+        <div style="margin-bottom:1.1rem; text-align:left;">
+          <label style="font-size:0.8rem; font-weight:700; color:#334155; display:block; margin-bottom:5px;">
+            <i class="bi bi-box-seam text-primary"></i> Seleccionar Producto de Bodega:
+          </label>
+          <select id="barcodeProductSelector" onchange="onBarcodeProductSelectChange(this.value)" style="width:100%; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:0.84rem; background:#FFF; font-family:inherit;">
+            <!-- Opciones inyectadas dinámicamente vía JS -->
+          </select>
         </div>
 
-        <div style="display:flex; justify-content:center; gap:8px; margin-bottom:1rem;">
-          <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:4px 10px;" onclick="copyCurrentBarcodeText()">
-            <i class="bi bi-clipboard"></i> Copiar Código
-          </button>
-          <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:4px 10px;" onclick="testScanCurrentModalBarcode()">
-            <i class="bi bi-lightning-charge-fill text-warning"></i> Simular Lectura
-          </button>
-        </div>
+        <div style="text-align:center;">
+          <h4 id="barcodeProductTitle" style="font-size:1.05rem; margin-bottom:4px; color:#1E3E62; font-weight:800;">Producto Fragama</h4>
+          <div id="barcodeProductSku" style="font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:#64748B; margin-bottom:1rem;">SKU: FRAG-DES-001</div>
 
-        <p style="font-size:0.76rem; color:#64748B; margin:0;">
-          Código de barras estándar compatible con pistolas láser USB/Bluetooth, terminales móviles Zebra/Honeywell y cámaras de smartphone.
-        </p>
+          <!-- Contenedor del código de barras SVG estándar de alta resolución -->
+          <div id="barcodeSvgContainer" style="display:flex; justify-content:center; margin-bottom:1rem; background:#FFF; padding:12px; border:2px dashed #CBD5E1; border-radius:10px;">
+            <svg id="barcodeCanvas"></svg>
+          </div>
+
+          <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:1rem; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="font-size:0.78rem; font-weight:600; color:#475569;">Cantidad:</label>
+              <select id="barcodeLabelCopies" style="padding:4px 8px; border:1px solid #CBD5E1; border-radius:6px; font-size:0.8rem; background:#FFF;">
+                <option value="1">1 etiqueta (Térmica)</option>
+                <option value="4">4 etiquetas</option>
+                <option value="8">8 etiquetas</option>
+                <option value="12">12 etiquetas (Hoja A4)</option>
+                <option value="24">24 etiquetas (Rollo)</option>
+              </select>
+            </div>
+            <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:4px 10px;" onclick="copyCurrentBarcodeText()">
+              <i class="bi bi-clipboard"></i> Copiar Código
+            </button>
+            <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:4px 10px;" onclick="testScanCurrentModalBarcode()">
+              <i class="bi bi-lightning-charge-fill text-warning"></i> Simular Lectura
+            </button>
+          </div>
+
+          <p style="font-size:0.76rem; color:#64748B; margin:0;">
+            Código de barras estándar compatible con pistolas láser USB/Bluetooth, terminales móviles Zebra/Honeywell y despacho.
+          </p>
+        </div>
       </div>
 
       <div class="modal-footer-custom" style="justify-content:center; gap:10px;">
-        <button class="btn-fragama btn-primary-fragama" onclick="window.print()">
-          <i class="bi bi-printer"></i> Imprimir Etiqueta Térmica
+        <button class="btn-fragama btn-primary-fragama" onclick="printBarcodeLabels()">
+          <i class="bi bi-printer"></i> Imprimir Etiquetas Térmicas
         </button>
       </div>
     </div>
@@ -4551,6 +4589,6 @@
   <script src="js/qrcode.min.js"></script>
   <script src="js/html5-qrcode.min.js"></script>
   <script src="js/catalog-data.js?v=20261001_4"></script>
-  <script src="js/app.js?v=20261010_directorio_clientes_v6"></script>
+  <script src="js/app.js?v=20261012_buttons_export_v1"></script>
 </body>
 </html>

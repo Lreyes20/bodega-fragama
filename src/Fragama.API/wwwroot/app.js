@@ -95,6 +95,7 @@ const AppState = {
   systemUsers: loadFragamaSystemUsers(),
   sidebarCollapsed: false,
   invoiceCounter: 2140,
+  customers: [],
   posCart: [
     { productId: 1, sku: 'FRAG-DES-001', name: 'Desengrasante Industrial Alcalino Galón (3.8L)', price: 6950, qty: 4, stock: 185 },
     { productId: 3, sku: 'FRAG-PAP-001', name: 'Papel Higiénico Jumbo Roll 250m (Caja x6)', price: 13850, qty: 2, stock: 95 }
@@ -1566,6 +1567,8 @@ const RolePermissions = {
       'view-bodega-kardex',
       'view-customer-orders',
       'view-customers-management',
+      'view-suppliers-management',
+      'view-cajero-pos',
       'view-chofer-mobile'
     ]
   },
@@ -1708,6 +1711,13 @@ window.switchViewDirectly = function(viewId) {
   document.querySelectorAll('.sidebar .nav-link').forEach(link => {
     if (link.getAttribute('data-view') === viewId) {
       link.classList.add('active');
+      const parentMenu = link.closest('.collapse-menu');
+      if (parentMenu) {
+        parentMenu.classList.add('show');
+        parentMenu.style.setProperty('display', 'flex', 'important');
+        const treeToggle = document.querySelector(`.sidebar .tree-toggle[data-collapse="${parentMenu.id}"]`);
+        if (treeToggle) treeToggle.classList.remove('collapsed');
+      }
     } else if (link.getAttribute('data-view')) {
       link.classList.remove('active');
     }
@@ -7322,22 +7332,67 @@ window.openDriverModal = function(dispatchId, preselectedStatus) {
 function setupBarcodeGenerator() {
   const barcodeModal = document.getElementById('barcodeModal');
   const closeBarcodeModal = document.getElementById('closeBarcodeModal');
-  if (closeBarcodeModal) {
+  if (closeBarcodeModal && barcodeModal) {
     closeBarcodeModal.addEventListener('click', () => barcodeModal.classList.remove('active'));
   }
 }
 
+window.closeBarcodeModal = function() {
+  const modal = document.getElementById('barcodeModal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.onBarcodeProductSelectChange = function(val) {
+  const prodId = parseInt(val, 10);
+  if (!isNaN(prodId)) {
+    window.showBarcodeForProduct(prodId);
+  }
+};
+
+window.openBarcodeLabelsModal = function(productId) {
+  const modal = document.getElementById('barcodeModal');
+  if (!modal) return;
+
+  const selector = document.getElementById('barcodeProductSelector');
+  if (selector && AppState.products && AppState.products.length > 0) {
+    selector.innerHTML = AppState.products.map(p => `
+      <option value="${p.id}" ${productId && p.id === productId ? 'selected' : ''}>
+        [${p.sku}] ${p.name} (${p.categoryLabel || 'Bodega'}) - Stock: ${p.stock}
+      </option>
+    `).join('');
+  }
+
+  const targetId = productId || (AppState.products && AppState.products[0] ? AppState.products[0].id : 101);
+  if (selector && !productId) {
+    selector.value = String(targetId);
+  }
+
+  window.showBarcodeForProduct(targetId);
+  modal.classList.add('active');
+};
+
 window.showBarcodeForProduct = function(productId) {
-  const product = AppState.products.find(p => p.id === productId);
-  if (!product) return;
+  let product = AppState.products.find(p => p.id === productId);
+  if (!product && AppState.products && AppState.products.length > 0) {
+    product = AppState.products[0];
+  }
+  if (!product) {
+    showNotificationToast('No se encontró el producto para generar el código.', 'warning');
+    return;
+  }
 
   currentBarcodeCode = product.barcode;
   const modal = document.getElementById('barcodeModal');
   const title = document.getElementById('barcodeProductTitle');
   const skuText = document.getElementById('barcodeProductSku');
+  const selector = document.getElementById('barcodeProductSelector');
+
+  if (selector && selector.value != String(product.id)) {
+    selector.value = String(product.id);
+  }
 
   if (title) title.textContent = product.name;
-  if (skuText) skuText.textContent = `SKU: ${product.sku} | Barcode: ${product.barcode} | Lote: ${product.batchNumber || 'N/A'}`;
+  if (skuText) skuText.textContent = `SKU: ${product.sku} | Barcode: ${product.barcode} | Lote: ${product.batchNumber || 'LOTE-STD'} | Venc: ${product.expiryDate || 'N/A'}`;
 
   // Renderizar código de barras con JsBarcode en el elemento SVG
   try {
@@ -7359,6 +7414,68 @@ window.showBarcodeForProduct = function(productId) {
   }
 
   if (modal) modal.classList.add('active');
+};
+
+window.printBarcodeLabels = function() {
+  const copiesEl = document.getElementById('barcodeLabelCopies');
+  const copies = copiesEl ? parseInt(copiesEl.value, 10) : 1;
+  const svgEl = document.getElementById('barcodeCanvas');
+  const svgHtml = svgEl ? svgEl.outerHTML : '';
+  const title = document.getElementById('barcodeProductTitle')?.textContent || 'Producto Fragama';
+  const sku = document.getElementById('barcodeProductSku')?.textContent || '';
+
+  const printWindow = window.open('', '_blank', 'width=850,height=650');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  let labelsHtml = '';
+  for (let i = 0; i < copies; i++) {
+    labelsHtml += `
+      <div style="width:230px; border:1px dashed #334155; padding:10px 8px; margin:6px; display:inline-block; text-align:center; page-break-inside:avoid; font-family:'Segoe UI',sans-serif; vertical-align:top; border-radius:6px; background:#FFF;">
+        <div style="font-size:11px; font-weight:800; color:#0B192C; height:28px; overflow:hidden; line-height:1.2;">${title}</div>
+        <div style="font-size:9px; color:#64748B; margin:3px 0 6px 0; font-family:'Courier New',monospace;">${sku}</div>
+        <div style="margin:4px 0;">${svgHtml}</div>
+        <div style="font-size:8px; font-weight:bold; color:#0284C7; margin-top:4px;">DISTRIBUIDORA FRAGAMA • CARTAGO, CR</div>
+      </div>
+    `;
+  }
+
+  printWindow.document.write(\`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <title>Impresión Etiquetas EAN-13 - Fragama WMS</title>
+      <style>
+        @page { margin: 8mm; size: auto; }
+        body { margin: 0; padding: 15px; font-family: sans-serif; background: #F8FAFC; }
+        .no-print { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #0B192C; color: #FFF; border-radius: 8px; margin-bottom: 15px; }
+        .btn-p { background: #0284C7; color: #FFF; border: none; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        @media print {
+          body { background: #FFF; padding: 0; }
+          .no-print { display: none !important; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print">
+        <div><strong>Etiquetas Térmicas EAN-13 (${copies} copias)</strong> — Distribuidora Fragama</div>
+        <button class="btn-p" onclick="window.print()">🖨️ Mandar a Imprimir</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; justify-content:flex-start;">
+        \${labelsHtml}
+      </div>
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 300);
+        };
+      </script>
+    </body>
+    </html>
+  \`);
+  printWindow.document.close();
 };
 
 window.copyCurrentBarcodeText = function() {
@@ -9064,6 +9181,338 @@ window.deleteCustomer = async function(id) {
   } catch (err) {
     alert(`❌ Error al eliminar cliente: ${err.message}`);
   }
+};
+
+window.exportCustomersToExcel = function() {
+  if (!AppState.customers || AppState.customers.length === 0) {
+    showNotificationToast('No hay clientes registrados para exportar.', 'warning');
+    return;
+  }
+
+  const dateStr = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const total = AppState.customers.length;
+  const juridicas = AppState.customers.filter(c => (c.docType === '02' || (c.taxId && c.taxId.startsWith('3-')))).length;
+  const credito = AppState.customers.filter(c => (c.terms && c.terms.toLowerCase().includes('crédito'))).length;
+  const contado = total - credito;
+
+  const rowsHtml = AppState.customers.map((c, idx) => {
+    const isJur = (c.docType === '02' || (c.taxId && c.taxId.startsWith('3-')));
+    const docLabel = isJur ? 'Cédula Jurídica (02)' : 'Cédula Física (01)';
+    const rowBg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+    const isCred = (c.terms && c.terms.toLowerCase().includes('crédito'));
+    return `
+      <tr style="background-color:${rowBg};">
+        <td style="border:1px solid #CBD5E1; padding:7px; text-align:center; font-weight:bold;">${c.id}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; text-align:center;">${docLabel}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; font-weight:bold; color:#1D4ED8; mso-number-format:'\\@'; text-align:center;">${escapeHtml(c.taxId || '')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; font-weight:bold; color:#0F172A;">${escapeHtml(c.name || '')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; color:#475569;">${escapeHtml(c.tradeName || '-')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; color:#0284C7; mso-number-format:'\\@';">${escapeHtml(c.email || '')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; mso-number-format:'\\@'; text-align:center;">${escapeHtml(c.phone || '')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px;">${escapeHtml(c.province || 'Cartago')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px;">${escapeHtml(c.canton || 'Cartago')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px;">${escapeHtml(c.district || '')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px;">${escapeHtml(c.address || '')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; text-align:center; font-weight:bold; color:${isCred ? '#B45309' : '#15803D'};">${escapeHtml(c.terms || 'Contado')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; text-align:center; mso-number-format:'\\@'; font-family:monospace;">${escapeHtml(c.economicActivity || '466901')}</td>
+        <td style="border:1px solid #CBD5E1; padding:7px; text-align:center; font-weight:bold; color:#16A34A;">ACTIVO</td>
+      </tr>
+    `;
+  }).join('');
+
+  const excelTemplate = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>Directorio Clientes DGT</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+                <x:Selected/>
+              </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      <style>
+        body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; }
+        table { border-collapse: collapse; width: 100%; }
+        th { background-color: #0F172A; color: #FFFFFF; font-weight: bold; border: 1px solid #334155; padding: 10px 8px; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <tr>
+          <td colspan="14" style="background-color:#0B192C; color:#FFFFFF; padding:16px; font-size:16pt; font-weight:bold; text-align:left;">
+            DISTRIBUIDORA FRAGAMA S.A. | BODEGA CENTRAL TARAS, CARTAGO
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" style="background-color:#0284C7; color:#FFFFFF; padding:8px; font-size:11pt; font-weight:bold;">
+            DIRECTORIO OFICIAL DE CLIENTES INSTITUCIONALES &amp; PERFIL TRIBUTARIO DGT (HACIENDA COSTA RICA)
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" style="padding:10px 0; color:#475569; font-size:9pt;">
+            <strong>Fecha de Emisión:</strong> ${dateStr} &nbsp;|&nbsp; 
+            <strong>Total Clientes:</strong> ${total} &nbsp;|&nbsp; 
+            <strong>Cédulas Jurídicas:</strong> ${juridicas} &nbsp;|&nbsp; 
+            <strong>Cuentas de Crédito:</strong> ${credito} &nbsp;|&nbsp; 
+            <strong>Contado:</strong> ${contado}
+          </td>
+        </tr>
+        <thead>
+          <tr>
+            <th>N° ID</th>
+            <th>Tipo Identificación</th>
+            <th>Cédula Fiscal</th>
+            <th>Razón Social Oficial</th>
+            <th>Nombre Comercial</th>
+            <th>Correo Factura Electrónica v4.3</th>
+            <th>Teléfono</th>
+            <th>Provincia</th>
+            <th>Cantón</th>
+            <th>Distrito</th>
+            <th>Dirección Comercial</th>
+            <th>Condición de Pago</th>
+            <th>Actividad CIUU</th>
+            <th>Estado Fiscal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(['\uFEFF' + excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `directorio_clientes_fragama_dgt_${new Date().toISOString().slice(0, 10)}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showNotificationToast('📊 Directorio de clientes exportado exitosamente en Excel profesional (.xls).', 'success');
+};
+
+window.exportCustomersToPdf = function() {
+  if (!AppState.customers || AppState.customers.length === 0) {
+    showNotificationToast('No hay clientes registrados para exportar.', 'warning');
+    return;
+  }
+
+  const dateStr = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const total = AppState.customers.length;
+  const juridicas = AppState.customers.filter(c => (c.docType === '02' || (c.taxId && c.taxId.startsWith('3-')))).length;
+  const credito = AppState.customers.filter(c => (c.terms && c.terms.toLowerCase().includes('crédito'))).length;
+  const contado = total - credito;
+
+  const printWindow = window.open('', '_blank', 'width=1100,height=800');
+  if (!printWindow) {
+    showNotificationToast('Por favor permita ventanas emergentes para generar el PDF.', 'warning');
+    return;
+  }
+
+  const rowsHtml = AppState.customers.map((c, i) => {
+    const isJur = (c.docType === '02' || (c.taxId && c.taxId.startsWith('3-')));
+    const docLabel = isJur ? 'Jurídica' : 'Física';
+    return `
+      <tr style="border-bottom:1px solid #E2E8F0; ${i % 2 === 1 ? 'background:#F8FAFC;' : ''}">
+        <td style="padding:7px 8px; font-weight:bold; text-align:center;">${c.id}</td>
+        <td style="padding:7px 8px;">
+          <div style="font-weight:bold; color:#0F172A; font-size:11.5px;">${escapeHtml(c.name)}</div>
+          ${c.tradeName ? `<div style="font-size:10px; color:#64748B;">${escapeHtml(c.tradeName)}</div>` : ''}
+        </td>
+        <td style="padding:7px 8px; font-family:'Courier New',monospace; font-size:11px; white-space:nowrap;">
+          <span style="font-size:9px; background:#EFF6FF; color:#1D4ED8; padding:2px 5px; border-radius:3px; font-weight:bold;">${docLabel}</span>
+          ${escapeHtml(c.taxId)}
+        </td>
+        <td style="padding:7px 8px; font-size:11px;">
+          <div><a href="mailto:${escapeHtml(c.email)}" style="color:#0284C7; text-decoration:none;">${escapeHtml(c.email || '-')}</a></div>
+          <div style="color:#475569; font-size:10px;">${escapeHtml(c.phone || '-')}</div>
+        </td>
+        <td style="padding:7px 8px; font-size:11px; color:#334155;">
+          <strong>${escapeHtml(c.canton || 'Cartago')}</strong>, ${escapeHtml(c.province || 'Cartago')}
+          <div style="font-size:10px; color:#64748B;">${escapeHtml(c.address || '')}</div>
+        </td>
+        <td style="padding:7px 8px; text-align:center; font-size:11px;">
+          <span style="padding:3px 8px; border-radius:12px; font-weight:bold; font-size:10px; ${(c.terms && c.terms.toLowerCase().includes('crédito')) ? 'background:#FEF3C7; color:#92400E;' : 'background:#F1F5F9; color:#334155;'}">
+            ${escapeHtml(c.terms || 'Contado')}
+          </span>
+        </td>
+        <td style="padding:7px 8px; text-align:center; font-family:monospace; font-size:10px;">
+          ${escapeHtml(c.economicActivity || '466901')}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <title>Reporte Oficial DGT - Clientes Fragama</title>
+      <style>
+        @page { size: landscape; margin: 10mm; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; color: #1E293B; margin: 0; padding: 15px; }
+        .no-print { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #0F172A; color: #FFF; border-radius: 8px; margin-bottom: 20px; }
+        .btn-print { background: #0284C7; color: #FFF; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .header-table { width: 100%; border-bottom: 2px solid #0284C7; padding-bottom: 12px; margin-bottom: 14px; }
+        .kpi-container { display: flex; gap: 12px; margin-bottom: 16px; }
+        .kpi-card { flex: 1; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; }
+        .kpi-title { font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: bold; }
+        .kpi-val { font-size: 16px; font-weight: 800; color: #0284C7; }
+        table.data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        table.data-table th { background: #0F172A; color: #FFF; padding: 8px 10px; font-size: 10.5px; text-align: left; }
+        @media print {
+          .no-print { display: none !important; }
+          body { padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print">
+        <div><strong>Vista Previa para Impresión / Exportación a PDF</strong> — Distribuidora Fragama</div>
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+      </div>
+
+      <table class="header-table">
+        <tr>
+          <td>
+            <h1 style="margin:0; font-size:18px; color:#0B192C; font-weight:900;">DISTRIBUIDORA FRAGAMA S.A.</h1>
+            <div style="font-size:11px; color:#64748B; margin-top:2px;">Bodega Central Taras, Cartago, Costa Rica • Cédula Jurídica: 3-101-789456 • Tel: +506 6267-7053</div>
+            <div style="font-size:13px; font-weight:bold; color:#0284C7; margin-top:6px;">DIRECTORIO OFICIAL DE CLIENTES TRIBUTARIOS DGT &amp; COMPROBANTES ELECTRÓNICOS v4.3</div>
+          </td>
+          <td style="text-align:right; font-size:10px; color:#64748B;">
+            <div><strong>Emisión:</strong> ${dateStr}</div>
+            <div><strong>Sistema:</strong> WMS Fragama Enterprise</div>
+          </td>
+        </tr>
+      </table>
+
+      <div class="kpi-container">
+        <div class="kpi-card"><div class="kpi-title">Total Clientes</div><div class="kpi-val">${total}</div></div>
+        <div class="kpi-card"><div class="kpi-title">Cédulas Jurídicas</div><div class="kpi-val" style="color:#10B981;">${juridicas}</div></div>
+        <div class="kpi-card"><div class="kpi-title">Cuentas a Crédito</div><div class="kpi-val" style="color:#F59E0B;">${credito}</div></div>
+        <div class="kpi-card"><div class="kpi-title">Cuentas Contado</div><div class="kpi-val" style="color:#6366F1;">${contado}</div></div>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:35px; text-align:center;">ID</th>
+            <th>Cliente / Razón Social</th>
+            <th style="width:140px;">Cédula Fiscal</th>
+            <th style="width:170px;">Contacto FE v4.3</th>
+            <th>Ubicación / Dirección</th>
+            <th style="width:90px; text-align:center;">Condición</th>
+            <th style="width:70px; text-align:center;">CIUU</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <div style="margin-top:20px; font-size:9.5px; color:#94A3B8; text-align:center; border-top:1px solid #E2E8F0; padding-top:10px;">
+        Documento oficial generado para fines fiscales y comerciales de Distribuidora Fragama. Conforme a las disposiciones de la Dirección General de Tributación (DGT), Ministerio de Hacienda de Costa Rica.
+      </div>
+
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 400);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  showNotificationToast('📄 Ventana de impresión y exportación a PDF abierta.', 'info');
+};
+
+window.exportCustomersToWord = function() {
+  if (!AppState.customers || AppState.customers.length === 0) {
+    showNotificationToast('No hay clientes registrados para exportar.', 'warning');
+    return;
+  }
+
+  const dateStr = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const total = AppState.customers.length;
+
+  const rowsHtml = AppState.customers.map(c => `
+    <tr>
+      <td style="border:1px solid #333333; padding:6px; text-align:center;">${c.id}</td>
+      <td style="border:1px solid #333333; padding:6px; font-weight:bold;">${escapeHtml(c.name)}</td>
+      <td style="border:1px solid #333333; padding:6px; font-family:monospace; text-align:center;">${escapeHtml(c.taxId)}</td>
+      <td style="border:1px solid #333333; padding:6px;">${escapeHtml(c.email || '')}</td>
+      <td style="border:1px solid #333333; padding:6px; text-align:center;">${escapeHtml(c.phone || '')}</td>
+      <td style="border:1px solid #333333; padding:6px;">${escapeHtml(c.canton || '')}, ${escapeHtml(c.province || '')}</td>
+      <td style="border:1px solid #333333; padding:6px; text-align:center;">${escapeHtml(c.terms || 'Contado')}</td>
+      <td style="border:1px solid #333333; padding:6px; text-align:center; font-family:monospace;">${escapeHtml(c.economicActivity || '466901')}</td>
+    </tr>
+  `).join('');
+
+  const wordContent = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <title>Directorio Oficial de Clientes - Distribuidora Fragama</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.4; }
+        h1 { color: #0B192C; font-size: 16pt; margin-bottom: 2px; }
+        h2 { color: #0284C7; font-size: 12pt; margin-top: 0; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th { background-color: #0F172A; color: #FFFFFF; border: 1px solid #000; padding: 8px; font-size: 9.5pt; text-align: left; }
+        td { font-size: 9pt; }
+      </style>
+    </head>
+    <body>
+      <h1>DISTRIBUIDORA FRAGAMA S.A.</h1>
+      <h2>DIRECTORIO OFICIAL DE CLIENTES TRIBUTARIOS DGT</h2>
+      <p><strong>Fecha de Generación:</strong> ${dateStr} | <strong>Total de Registros:</strong> ${total}</p>
+      <p style="font-size:9pt; color:#555;">Bodega Central Taras, Cartago, Costa Rica • Registro de Clientes y Perfiles para Facturación Electrónica v4.3</p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:center;">ID</th>
+            <th>Razón Social Oficial</th>
+            <th style="text-align:center;">Cédula Fiscal</th>
+            <th>Correo FE v4.3</th>
+            <th style="text-align:center;">Teléfono</th>
+            <th>Ubicación</th>
+            <th style="text-align:center;">Condición</th>
+            <th style="text-align:center;">CIUU</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const blob = new Blob(['\uFEFF' + wordContent], { type: 'application/msword;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `directorio_clientes_fragama_dgt_${new Date().toISOString().slice(0, 10)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showNotificationToast('📝 Directorio de clientes exportado exitosamente en Word (.doc).', 'success');
 };
 
 window.exportCustomersToCsv = function() {
