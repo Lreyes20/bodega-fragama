@@ -7442,7 +7442,7 @@ window.printBarcodeLabels = function() {
     `;
   }
 
-  printWindow.document.write(\`
+  printWindow.document.write(`
     <!DOCTYPE html>
     <html lang="es">
     <head>
@@ -7465,7 +7465,7 @@ window.printBarcodeLabels = function() {
         <button class="btn-p" onclick="window.print()">🖨️ Mandar a Imprimir</button>
       </div>
       <div style="display:flex; flex-wrap:wrap; justify-content:flex-start;">
-        \${labelsHtml}
+        ${labelsHtml}
       </div>
       <script>
         window.onload = function() {
@@ -7474,7 +7474,7 @@ window.printBarcodeLabels = function() {
       </script>
     </body>
     </html>
-  \`);
+  `);
   printWindow.document.close();
 };
 
