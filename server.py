@@ -51,8 +51,8 @@ DB_NAME = os.environ.get("MSSQL_DB", "FragamaWarehouseDb")
 # CIBERSEGURIDAD INFORMÁTICA: RATE LIMITING & SANITIZACIÓN
 # ==============================================================================
 RATE_LIMIT_BUCKETS: Dict[str, List[float]] = {}
-RATE_LIMIT_MAX_ORDERS_PER_MIN = 12
-RATE_LIMIT_MAX_API_PER_MIN = 120
+RATE_LIMIT_MAX_ORDERS_PER_MIN = 60
+RATE_LIMIT_MAX_API_PER_MIN = 1200
 
 def check_rate_limit(client_ip: str, is_order: bool = False) -> bool:
     """Protección contra ataques DDoS, fuerza bruta y bots maliciosos."""
@@ -443,10 +443,10 @@ class PublicOrderCreateRequest(BaseModel):
     orderCode: Optional[str] = None
     docType: Optional[str] = "PEDIDO_WEB"
     source: Optional[str] = "TIENDA_WEB"
-    customerName: str = Field(..., min_length=2, max_length=150)
-    customerPhone: str = Field(..., min_length=6, max_length=35)
-    customerTaxId: Optional[str] = Field(None, max_length=40)
-    customerAddress: str = Field(..., min_length=4, max_length=300)
+    customerName: str = Field(..., min_length=1, max_length=150)
+    customerPhone: Optional[str] = Field("Sin teléfono", max_length=50)
+    customerTaxId: Optional[str] = Field(None, max_length=50)
+    customerAddress: Optional[str] = Field("Cartago / Dirección a confirmar", max_length=300)
     deliveryRoute: Optional[str] = Field("Cartago", max_length=100)
     notes: Optional[str] = Field("", max_length=600)
     items: List[PublicOrderItemRequest]
@@ -742,10 +742,10 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
         )
 
     # 2. Ciberseguridad: Sanitización de datos
-    clean_name = sanitize_text(req.customerName)[:150]
-    clean_phone = sanitize_text(req.customerPhone)[:35]
+    clean_name = sanitize_text(req.customerName or "Cliente Tienda Web")[:150]
+    clean_phone = sanitize_text(req.customerPhone or "8888-8888")[:35]
     clean_tax_id = sanitize_text(req.customerTaxId or "")[:35]
-    clean_address = sanitize_text(req.customerAddress)[:300]
+    clean_address = sanitize_text(req.customerAddress or "Cartago / Dirección a coordinar")[:300]
     clean_route = sanitize_text(req.deliveryRoute or "Cartago")[:100]
     clean_notes = sanitize_text(req.notes or "")[:600]
 
@@ -1064,12 +1064,21 @@ def get_orders():
 
     # 3. Combinar con web_orders.json si hay alguno no sincronizado
     web_orders = load_local_web_orders()
-    existing_codes = {o.get("orderCode") for o in all_orders}
+    existing_codes = {str(o.get("orderCode") or "").strip().upper() for o in all_orders if o.get("orderCode")}
     for wo in web_orders:
-        if wo.get("orderCode") not in existing_codes:
-            all_orders.insert(0, wo)
-            existing_codes.add(wo.get("orderCode"))
+        w_code = str(wo.get("orderCode") or "").strip().upper()
+        if w_code and w_code not in existing_codes:
+            all_orders.append(wo)
+            existing_codes.add(w_code)
 
+    def get_order_sort_key(o):
+        oid = o.get("id")
+        try:
+            return int(oid)
+        except Exception:
+            return 0
+
+    all_orders.sort(key=get_order_sort_key, reverse=True)
     return all_orders
 
 @app.post("/api/orders/{order_id}/status")

@@ -2951,11 +2951,11 @@
       submitBtn.disabled = true;
       submitBtn.innerHTML = `<i class="bi bi-arrow-repeat" style="animation:spin 1s infinite;"></i> Registrando en Bodega...`;
 
-      const custName = document.getElementById('custName').value.trim();
-      const custPhone = document.getElementById('custPhone').value.trim();
-      const custTaxId = document.getElementById('custTaxId').value.trim();
-      const custRoute = document.getElementById('custRoute').value;
-      const custAddress = document.getElementById('custAddress').value.trim();
+      const custName = document.getElementById('custName').value.trim() || 'Cliente Tienda Web';
+      const custPhone = document.getElementById('custPhone').value.trim() || '8888-8888';
+      const custTaxId = document.getElementById('custTaxId').value.trim() || 'N/A';
+      const custRoute = document.getElementById('custRoute').value || 'Cartago';
+      const custAddress = document.getElementById('custAddress').value.trim() || 'Cartago / Dirección a confirmar';
       const custNotes = document.getElementById('custNotes').value.trim();
 
       let subtotalBruto = 0;
@@ -3002,20 +3002,26 @@
           body: JSON.stringify(payload)
         });
 
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          console.error("Falla en servidor al registrar pedido:", errData);
+          throw new Error(errData.detail || `Error en servidor HTTP ${response.status}`);
+        }
+
         const result = await response.json();
         const finalOrderCode = result.orderCode || generatedCode;
         
         // Guardar en localStorage para redundancia inmediata en el navegador
         try {
           const stored = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
-          stored.unshift({ ...payload, orderCode: finalOrderCode, id: Date.now(), status: 'PENDIENTE' });
+          stored.unshift({ ...payload, orderCode: finalOrderCode, id: result.order?.id || Date.now(), status: 'PENDIENTE' });
           localStorage.setItem('fragama_web_orders', JSON.stringify(stored.slice(0, 50)));
         } catch (e) {}
 
         showOrderSuccess(payload, finalOrderCode);
       } catch (err) {
-        console.warn("API de Bodega en modo contingencia:", err);
-        // Guardar en localStorage para sincronizar cuando haya conexión
+        console.warn("API de Bodega en contingencia / error:", err);
+        // Guardar en contingencia local
         try {
           const stored = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
           stored.unshift({ ...payload, orderCode: generatedCode, id: Date.now(), status: 'PENDIENTE' });

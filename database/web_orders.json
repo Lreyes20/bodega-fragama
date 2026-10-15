@@ -1,5 +1,141 @@
 [
   {
+    "orderCode": "PED-WEB-65959",
+    "docType": "PEDIDO_WEB",
+    "source": "TIENDA_WEB",
+    "customerId": 9999,
+    "customerName": "Rouse Dánae Reyes Villanueva",
+    "customerTaxId": "3014042047",
+    "customerAddress": "Costado norte del estadio lito monge de Curridabat",
+    "customerPhone": "8888-9999",
+    "assignedUserId": 6,
+    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserRole": "Vendedor",
+    "assignedUserHandle": "cpiedra",
+    "date": "2026-10-15",
+    "deliveryDate": "San José (Martes)",
+    "deliveryRoute": "San José (Martes)",
+    "terms": "Contado / Contra Entrega",
+    "status": "PENDIENTE",
+    "notes": "Ruta: San José (Martes). Ruta: San José (Martes).",
+    "items": [
+      {
+        "productId": 103,
+        "sku": "BAN-BAG-066",
+        "name": "Bandeja Hamburguesa 6x6 Bagazo de Caña",
+        "qty": 50,
+        "unitPrice": 48.0,
+        "subtotal": 2400.0
+      },
+      {
+        "productId": 107,
+        "sku": "BWL-KRF-024",
+        "name": "Bowl 24oz Kraft con Tapa (30 unidades)",
+        "qty": 30,
+        "unitPrice": 164.0,
+        "subtotal": 4920.0
+      },
+      {
+        "productId": 111,
+        "sku": "BAN-MFP-088",
+        "name": "Bandeja 8x8 MFPP Blanca",
+        "qty": 50,
+        "unitPrice": 112.0,
+        "subtotal": 5600.0
+      }
+    ],
+    "subtotalBruto": 12920.0,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 12920.0,
+    "iva": 1679.6000000000001,
+    "total": 14599.6,
+    "id": 110
+  },
+  {
+    "orderCode": "PED-WEB-11388",
+    "docType": "PEDIDO_WEB",
+    "source": "TIENDA_WEB",
+    "customerId": 9999,
+    "customerName": "Rouse Dánae Reyes Villanueva",
+    "customerTaxId": "3014042047",
+    "customerAddress": "Costado norte del estadio lito monge de Curridabat",
+    "customerPhone": "8888-9999",
+    "assignedUserId": 6,
+    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserRole": "Vendedor",
+    "assignedUserHandle": "cpiedra",
+    "date": "2026-10-15",
+    "deliveryDate": "San José (Martes)",
+    "deliveryRoute": "San José (Martes)",
+    "terms": "Contado / Contra Entrega",
+    "status": "PENDIENTE",
+    "notes": "Ruta: San José (Martes). Ruta: San José (Martes). Notas: Recibir antes de medio dia",
+    "items": [
+      {
+        "productId": 116,
+        "sku": "CAR-SOU-050",
+        "name": "Bandeja de Cartón #50 Southland 1/2 lb (Min 250u)",
+        "qty": 250,
+        "unitPrice": 32.8,
+        "subtotal": 8200.0
+      },
+      {
+        "productId": 120,
+        "sku": "BUR-DOM-004",
+        "name": "Burbuja #4 Plástica con Bisagra (Min 25u)",
+        "qty": 25,
+        "unitPrice": 60.0,
+        "subtotal": 1500.0
+      },
+      {
+        "productId": 204,
+        "sku": "TAZ-CHI-EVR",
+        "name": "Taza China Entero Verde con Tapa (25 unidades)",
+        "qty": 25,
+        "unitPrice": 85.0,
+        "subtotal": 2125.0
+      },
+      {
+        "productId": 208,
+        "sku": "TAZ-CHI-MBL",
+        "name": "Taza China Medio Blanca con Tapa (25 unidades)",
+        "qty": 25,
+        "unitPrice": 90.0,
+        "subtotal": 2250.0
+      },
+      {
+        "productId": 220,
+        "sku": "CUB-PLA-CUCH",
+        "name": "Cuchillo Plástico (25 unidades)",
+        "qty": 25,
+        "unitPrice": 9.8,
+        "subtotal": 245.00000000000003
+      },
+      {
+        "productId": 223,
+        "sku": "CUB-PLA-CU5",
+        "name": "Cuchara Plástica #5 (25 unidades)",
+        "qty": 25,
+        "unitPrice": 6.0,
+        "subtotal": 150.0
+      },
+      {
+        "productId": 305,
+        "sku": "VAS-FRI-016",
+        "name": "Vaso Cartón 16oz Bebida Fría con Tapa Plana (50 unidades)",
+        "qty": 50,
+        "unitPrice": 50.42,
+        "subtotal": 2521.0
+      }
+    ],
+    "subtotalBruto": 16991.0,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 16991.0,
+    "iva": 2208.83,
+    "total": 19199.83,
+    "id": 109
+  },
+  {
     "orderCode": "PED-WEB-53917",
     "docType": "PEDIDO_WEB",
     "source": "TIENDA_WEB",

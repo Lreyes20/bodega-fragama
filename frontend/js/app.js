@@ -764,89 +764,115 @@ async function loadInitialDataFromSql() {
 }
 
 // ==============================================================================
-// SINCRONIZACIÓN EN TIEMPO REAL CON LA BASE DE DATOS Y TIENDA WEB (4 SEGUNDOS)
+// SINCRONIZACIÓN EN TIEMPO REAL ESTILO PLAZAS VACANTES (COUNTDOWN & AUTO-REFRESH)
 // ==============================================================================
 let _orderSyncInterval = null;
+let _syncCountdown = 4;
+let _isSyncInProgress = false;
+
+async function performOrderSync(isManual = false) {
+  if (_isSyncInProgress) return;
+  _isSyncInProgress = true;
+
+  const icon = document.getElementById('iconManualSync');
+  if (icon) icon.classList.add('spin-anim');
+
+  try {
+    const res = await fetch('/api/orders', { cache: 'no-store' });
+    if (!res.ok) {
+      if (res.status === 429) console.warn("Rate limit temporal en sync");
+      return;
+    }
+    const serverOrders = await res.json();
+    if (!Array.isArray(serverOrders)) return;
+
+    // Sincronización con pedidos web locales (localStorage) creados en contingencia
+    try {
+      const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+      if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
+        const srvCodes = new Set(serverOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
+        for (const lwo of localWebOrders) {
+          const cleanLwoCode = (lwo.orderCode || '').trim().toUpperCase();
+          if (cleanLwoCode && !srvCodes.has(cleanLwoCode)) {
+            serverOrders.unshift(lwo);
+            srvCodes.add(cleanLwoCode);
+            fetch('/api/public/orders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(lwo)
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Actualizar estampa de tiempo visible en la UI
+    const nowStr = new Date().toLocaleTimeString('es-CR');
+    const tsEl = document.getElementById('liveSyncTimestamp');
+    if (tsEl) tsEl.textContent = nowStr;
+
+    // Detectar si hay nuevos pedidos para alerta sonora y toast
+    const prevCodes = new Set(AppState.salesOrders.map(o => String(o.orderCode || o.id || '').toUpperCase().trim()));
+    const newIncomingOrders = serverOrders.filter(so => {
+      const code = String(so.orderCode || so.id || '').toUpperCase().trim();
+      return code && !prevCodes.has(code);
+    });
+
+    let hasStatusChange = false;
+    for (const so of serverOrders) {
+      const ex = AppState.salesOrders.find(o => 
+        String(o.id) === String(so.id) || 
+        String(o.orderCode || '').toUpperCase() === String(so.orderCode || '').toUpperCase()
+      );
+      if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
+        hasStatusChange = true;
+        break;
+      }
+    }
+
+    const countChanged = serverOrders.length !== AppState.salesOrders.length;
+
+    AppState.salesOrders = serverOrders;
+    updateWebOrdersBadges();
+
+    if (newIncomingOrders.length > 0 || hasStatusChange || countChanged || isManual) {
+      refreshAllOrderViews();
+
+      if (newIncomingOrders.length > 0) {
+        playOrderChime();
+        const newest = newIncomingOrders[0];
+        if (typeof showNotificationToast === 'function') {
+          showNotificationToast(`🔔 ¡Nuevo Pedido Recibido: ${newest.orderCode} (${newest.customerName}) para alistar!`, 'success');
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Falla en sincronización de pedidos:", err);
+  } finally {
+    _isSyncInProgress = false;
+    if (icon) icon.classList.remove('spin-anim');
+  }
+}
 
 function initRealtimeOrderSync() {
   updateWebOrdersBadges();
+  _syncCountdown = 4;
   
   if (_orderSyncInterval) clearInterval(_orderSyncInterval);
   
-  _orderSyncInterval = setInterval(async () => {
-    try {
-      // Actualizar estampa de tiempo de sincronización en vivo en la UI
-      const tsEl = document.getElementById('liveSyncTimestamp');
-      if (tsEl) tsEl.textContent = new Date().toLocaleTimeString('es-CR');
-
-      const res = await fetch('/api/orders');
-      if (!res.ok) return;
-      const serverOrders = await res.json();
-      if (!Array.isArray(serverOrders)) return;
-
-      // Sincronización con pedidos web locales (localStorage) creados en el navegador
-      try {
-        const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
-        if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
-          const srvCodes = new Set(serverOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
-          for (const lwo of localWebOrders) {
-            const cleanLwoCode = (lwo.orderCode || '').trim().toUpperCase();
-            if (cleanLwoCode && !srvCodes.has(cleanLwoCode)) {
-              serverOrders.unshift(lwo);
-              srvCodes.add(cleanLwoCode);
-              // Asentar silenciosamente en el servidor
-              fetch('/api/public/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(lwo)
-              }).catch(() => {});
-            }
-          }
-        }
-      } catch (e) {}
-
-      const currentCodes = new Set(AppState.salesOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
-      let hasNewOrders = false;
-      let newestOrder = null;
-
-      serverOrders.forEach(so => {
-        const soCode = (so.orderCode || '').trim().toUpperCase();
-        if (soCode && !currentCodes.has(soCode)) {
-          hasNewOrders = true;
-          if (!newestOrder) newestOrder = so;
-        }
-      });
-
-      let hasStatusChange = false;
-      if (!hasNewOrders && serverOrders.length === AppState.salesOrders.length) {
-        for (const so of serverOrders) {
-          const ex = AppState.salesOrders.find(o => 
-            String(o.id) === String(so.id) || 
-            (o.orderCode && o.orderCode.trim().toUpperCase() === (so.orderCode || '').trim().toUpperCase())
-          );
-          if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
-            hasStatusChange = true;
-            break;
-          }
-        }
-      }
-
-      if (hasNewOrders || serverOrders.length !== AppState.salesOrders.length || hasStatusChange) {
-        AppState.salesOrders = serverOrders;
-        refreshAllOrderViews();
-
-        // Si llegó un nuevo pedido web, emitir chime y notificación toast
-        if (newestOrder) {
-          playOrderChime();
-          if (typeof showNotificationToast === 'function') {
-            showNotificationToast(`🔔 ¡Nuevo Pedido Web Recibido: ${newestOrder.orderCode} (${newestOrder.customerName}) para alistar!`, 'success');
-          }
-        }
-      }
-    } catch (err) {
-      // Ignorar fallas momentáneas de red
+  _orderSyncInterval = setInterval(() => {
+    _syncCountdown--;
+    
+    const countEl = document.getElementById('syncCountdownSec');
+    if (countEl) {
+      countEl.textContent = _syncCountdown > 0 ? `${_syncCountdown}s` : '...';
     }
-  }, 3000);
+    
+    if (_syncCountdown <= 0) {
+      _syncCountdown = 4;
+      performOrderSync();
+    }
+  }, 1000);
 }
 
 function playOrderChime() {
@@ -881,9 +907,12 @@ function isOrderPending(o) {
 }
 
 function updateWebOrdersBadges() {
-  const webOrders = AppState.salesOrders.filter(isWebOrder);
-  const pendingWeb = webOrders.filter(isOrderPending);
-  const count = pendingWeb.length;
+  const allOrders = AppState.salesOrders.filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
+  const webOrders = allOrders.filter(isWebOrder);
+  const bodegaOrders = allOrders.filter(o => !isWebOrder(o));
+  
+  const pendingOrders = allOrders.filter(isOrderPending);
+  const count = pendingOrders.length;
   
   const sideBadge = document.getElementById('badgePendingWebOrders');
   if (sideBadge) {
@@ -893,7 +922,7 @@ function updateWebOrdersBadges() {
 
   const totalBadge = document.getElementById('badgeWebOrdersTotalBadge');
   if (totalBadge) {
-    totalBadge.textContent = `${webOrders.length} pedidos web`;
+    totalBadge.textContent = `${allOrders.length} pedidos (${webOrders.length} web / ${bodegaOrders.length} bodega)`;
   }
 
   const kpiPending = document.getElementById('kpiWebPending');
@@ -901,7 +930,7 @@ function updateWebOrdersBadges() {
 
   const kpiPrepared = document.getElementById('kpiWebPrepared');
   if (kpiPrepared) {
-    kpiPrepared.textContent = webOrders.filter(o => {
+    kpiPrepared.textContent = allOrders.filter(o => {
       const s = String(o.status || '').toUpperCase().trim();
       return s === 'ALISTADO' || s === 'EN_ALISTADO';
     }).length;
@@ -909,12 +938,12 @@ function updateWebOrdersBadges() {
 
   const kpiInRoute = document.getElementById('kpiWebInRoute');
   if (kpiInRoute) {
-    kpiInRoute.textContent = webOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
+    kpiInRoute.textContent = allOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
   }
 
   const kpiDelivered = document.getElementById('kpiWebDelivered');
   if (kpiDelivered) {
-    kpiDelivered.textContent = webOrders.filter(o => {
+    kpiDelivered.textContent = allOrders.filter(o => {
       const s = String(o.status || '').toUpperCase().trim();
       return s === 'ENTREGADO' || s === 'FACTURADO';
     }).length;
@@ -922,7 +951,7 @@ function updateWebOrdersBadges() {
 
   const kpiUndelivered = document.getElementById('kpiWebUndelivered');
   if (kpiUndelivered) {
-    kpiUndelivered.textContent = webOrders.filter(o => {
+    kpiUndelivered.textContent = allOrders.filter(o => {
       const s = String(o.status || '').toUpperCase().trim();
       return s === 'NO_ENTREGADO' || s === 'RECHAZADO';
     }).length;
@@ -5694,14 +5723,18 @@ function renderOrderHistory() {
 // 1. MODAL DE ALISTADO & PICKING CON ASIGNACIÓN DE RESPONSABLES
 // ==============================================================================
 window.openOrderPickingModal = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
   if (!order) {
     alert("No se encontró el pedido seleccionado.");
     return;
   }
 
-  document.getElementById('pickingOrderId').value = order.id;
-  document.getElementById('pickingOrderCode').value = order.orderCode;
+  document.getElementById('pickingOrderId').value = order.id || order.orderCode;
+  document.getElementById('pickingOrderCode').value = order.orderCode || order.id;
   document.getElementById('pickingModalSubtitle').textContent = `Pedido #${order.orderCode} • Emisión: ${order.date || 'Hoy'}`;
   document.getElementById('pickingCustomerName').textContent = order.customerName || 'Cliente';
   document.getElementById('pickingCustomerPhone').textContent = order.customerPhone ? `Tel: ${order.customerPhone}` : 'Sin teléfono';
@@ -5759,7 +5792,12 @@ window.openOrderPickingModal = async function(orderIdentifier) {
     }
   }
 
-  document.getElementById('orderPickingModal').classList.add('active');
+  const modal = document.getElementById('orderPickingModal');
+  if (modal) {
+    modal.style.removeProperty('display');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
 };
 
 window.checkAllPickingItems = function() {
@@ -8255,13 +8293,18 @@ window.renderWebOrdersFullTable = function() {
   const searchInput = document.getElementById('webOrdersSearchInput');
   const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
 
-  // Filtrar solo pedidos web
-  const webOrders = AppState.salesOrders.filter(isWebOrder);
+  // Obtener pedidos elegibles para alistado y despacho (Web y Bodega, excluyendo cotizaciones)
+  const allOrders = AppState.salesOrders.filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
 
-  const filtered = webOrders.filter(order => {
+  const filtered = allOrders.filter(order => {
+    const isWeb = isWebOrder(order);
     const st = (order.status || 'PENDIENTE').toUpperCase().trim();
     let matchFilter = true;
-    if (_currentWebOrderFilter === 'PENDIENTE') {
+    if (_currentWebOrderFilter === 'WEB') {
+      matchFilter = isWeb;
+    } else if (_currentWebOrderFilter === 'BODEGA') {
+      matchFilter = !isWeb;
+    } else if (_currentWebOrderFilter === 'PENDIENTE') {
       matchFilter = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
     } else if (_currentWebOrderFilter === 'ALISTADO') {
       matchFilter = (st === 'ALISTADO' || st === 'EN_ALISTADO');
@@ -8288,9 +8331,9 @@ window.renderWebOrdersFullTable = function() {
       <tr>
         <td colspan="8" style="text-align:center; padding:3rem 1rem; color:#64748B;">
           <i class="bi bi-inbox" style="font-size:2.2rem; color:#CBD5E1; display:block; margin-bottom:8px;"></i>
-          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos web coincidentes con el filtro actual</span>
+          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos coincidentes con el filtro actual</span>
           <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
-            Los pedidos generados por clientes en la Tienda Virtual de Fragama ingresarán automáticamente a esta bandeja.
+            Los pedidos de la tienda web y los generados en bodega ingresan automáticamente con trazabilidad completa.
           </p>
         </td>
       </tr>
@@ -8299,6 +8342,7 @@ window.renderWebOrdersFullTable = function() {
   }
 
   tbody.innerHTML = filtered.map(o => {
+    const isWeb = isWebOrder(o);
     const st = (o.status || 'PENDIENTE').toUpperCase().trim();
     const isPending = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
     const isPrepared = (st === 'ALISTADO' || st === 'EN_ALISTADO');
@@ -8345,6 +8389,17 @@ window.renderWebOrdersFullTable = function() {
         <td style="padding:12px 14px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
           ${o.orderCode}
           ${isPending ? `<span style="display:inline-block; font-size:0.65rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:4px; font-weight:800; animation:pulse 2s infinite;">NUEVO</span>` : ''}
+          <div style="margin-top:4px;">
+            ${isWeb ? `
+              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; display:inline-flex; align-items:center; gap:3px;">
+                <i class="bi bi-globe2"></i> Web
+              </span>
+            ` : `
+              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; display:inline-flex; align-items:center; gap:3px;">
+                <i class="bi bi-building"></i> Bodega
+              </span>
+            `}
+          </div>
           <div style="font-size:0.72rem; color:#64748B; font-family:inherit; font-weight:normal; margin-top:2px;">
             ${o.date || 'Hoy'}
           </div>
@@ -8444,22 +8499,10 @@ window.renderWebOrdersFullTable = function() {
 };
 
 window.triggerManualOrderSync = async function() {
-  try {
-    const res = await fetch('/api/orders');
-    if (res.ok) {
-      const orders = await res.json();
-      if (Array.isArray(orders)) {
-        AppState.salesOrders = orders;
-        renderAllViews();
-        if (typeof showNotificationToast === 'function') {
-          showNotificationToast(`✅ Bandeja sincronizada: ${orders.length} pedidos en total.`, 'success');
-        }
-      }
-    }
-  } catch (e) {
-    if (typeof showNotificationToast === 'function') {
-      showNotificationToast('Aviso: Sincronizando con base de datos local.', 'info');
-    }
+  _syncCountdown = 4;
+  await performOrderSync(true);
+  if (typeof showNotificationToast === 'function') {
+    showNotificationToast(`✅ Bandeja sincronizada (${AppState.salesOrders.length} pedidos en total).`, 'success');
   }
 };
 
