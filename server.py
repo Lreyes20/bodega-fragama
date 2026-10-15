@@ -905,7 +905,7 @@ def track_order(order_code: str):
                        so.Status as status,
                        COALESCE(c.BusinessName, 'Cliente') as customer,
                        COALESCE(c.Phone, '') as phone,
-                       COALESCE(so.DeliveryNotes, c.Address, '') as address,
+                       COALESCE(c.Address, so.DeliveryNotes, '') as address,
                        COALESCE(so.DeliveryRoute, 'Cartago') as route,
                        COALESCE(so.PreparedByName, '') as preparedByName,
                        COALESCE(so.DriverName, '') as driverName,
@@ -949,7 +949,8 @@ def track_order(order_code: str):
                 "address": o.get("customerAddress"),
                 "route": o.get("deliveryRoute"),
                 "preparedByName": o.get("preparedByName", ""),
-                "driverName": o.get("driverName", "")
+                "driverName": o.get("driverName", ""),
+                "deliveredAt": o.get("deliveredAt")
             }
 
     return {"found": False, "message": f"No se encontró un pedido con el código '{order_code}'."}

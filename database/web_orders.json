@@ -1,5 +1,61 @@
 [
   {
+    "orderCode": "PED-WEB-64324",
+    "docType": "PEDIDO_WEB",
+    "source": "TIENDA_WEB",
+    "customerId": 9999,
+    "customerName": "Danae Reyes",
+    "customerTaxId": "3014042047",
+    "customerAddress": "dsv`jdjsn`jsjn; vionszjnf kjs",
+    "customerPhone": "8888-9999",
+    "assignedUserId": 6,
+    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserRole": "Vendedor",
+    "assignedUserHandle": "cpiedra",
+    "date": "2026-10-15",
+    "deliveryDate": "San José (Martes)",
+    "deliveryRoute": "San José (Martes)",
+    "terms": "Contado / Contra Entrega",
+    "status": "ENTREGADO",
+    "notes": "Ruta: San José (Martes). Mercadería entregada a entera satisfacción del cliente. Stock rebajado en Kardex.",
+    "items": [
+      {
+        "productId": 103,
+        "sku": "BAN-BAG-066",
+        "name": "Bandeja Hamburguesa 6x6 Bagazo de Caña",
+        "qty": 50,
+        "unitPrice": 48.0,
+        "subtotal": 2400.0
+      },
+      {
+        "productId": 107,
+        "sku": "BWL-KRF-024",
+        "name": "Bowl 24oz Kraft con Tapa (30 unidades)",
+        "qty": 30,
+        "unitPrice": 164.0,
+        "subtotal": 4920.0
+      },
+      {
+        "productId": 130,
+        "sku": "SOU-PLA-005",
+        "name": "Envase Soufflé 5oz con Tapa (125 unidades)",
+        "qty": 125,
+        "unitPrice": 12.87,
+        "subtotal": 1608.75
+      }
+    ],
+    "subtotalBruto": 8928.75,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 8928.75,
+    "iva": 1160.74,
+    "total": 10089.49,
+    "id": 114,
+    "preparedByName": "Christian Reyes",
+    "driverName": "Mauricio Brenes (Chofer)",
+    "stockDeducted": 1,
+    "deliveredAt": "2026-10-15 15:35:00"
+  },
+  {
     "orderCode": "PED-WEB-65959",
     "docType": "PEDIDO_WEB",
     "source": "TIENDA_WEB",
