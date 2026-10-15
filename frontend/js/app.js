@@ -7648,6 +7648,16 @@ function setupDashboardControls() {
 }
 
 window._fragamaCharts = window._fragamaCharts || {};
+window._dashboardTimeframe = window._dashboardTimeframe || 'month';
+
+function setDashboardTimeframe(timeframe, btn) {
+  window._dashboardTimeframe = timeframe;
+  const filterBtns = document.querySelectorAll('#dashboardTimeFilters .powerbi-filter-btn');
+  filterBtns.forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderDashboardAnalytics();
+}
+window.setDashboardTimeframe = setDashboardTimeframe;
 
 function renderDashboardAnalytics() {
   // 1. Valorización Total de Inventario
@@ -7670,36 +7680,78 @@ function renderDashboardAnalytics() {
     return;
   }
 
+  const tf = window._dashboardTimeframe || 'month';
+
+  // Configuración global de fuentes y colores para estilo GitHub / Tremor / PowerBI
+  const fontConfig = { family: "'Plus Jakarta Sans', sans-serif" };
+  const tooltipConfig = {
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    titleColor: '#FFFFFF',
+    titleFont: { size: 12, weight: 'bold', family: "'Plus Jakarta Sans', sans-serif" },
+    bodyColor: '#F8FAFC',
+    bodyFont: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
+    padding: 10,
+    cornerRadius: 8,
+    boxPadding: 4
+  };
+
   // 2. Gráfico 1: Flujo Semanal de Mercadería Kardex (Entradas vs Salidas)
   const weeklyCanvas = document.getElementById('weeklyChart');
   if (weeklyCanvas) {
     if (window._fragamaCharts.weekly) {
       window._fragamaCharts.weekly.destroy();
     }
-    const weeklyData = [
-      { day: 'Lun', inVal: 85, outVal: 50 },
-      { day: 'Mar', inVal: 40, outVal: 70 },
-      { day: 'Mié', inVal: 130, outVal: 95 },
-      { day: 'Jue', inVal: 60, outVal: 110 },
-      { day: 'Vie', inVal: 105, outVal: 125 },
-      { day: 'Sáb', inVal: 25, outVal: 60 }
-    ];
+
+    let weeklyData = [];
+    if (tf === 'today') {
+      weeklyData = [
+        { label: '08:00', inVal: 15, outVal: 8 },
+        { label: '10:00', inVal: 28, outVal: 14 },
+        { label: '12:00', inVal: 35, outVal: 22 },
+        { label: '14:00', inVal: 18, outVal: 30 },
+        { label: '16:00', inVal: 12, outVal: 26 }
+      ];
+    } else if (tf === '7d' || tf === 'month') {
+      weeklyData = [
+        { label: 'Lun', inVal: 85, outVal: 50 },
+        { label: 'Mar', inVal: 40, outVal: 70 },
+        { label: 'Mié', inVal: 130, outVal: 95 },
+        { label: 'Jue', inVal: 60, outVal: 110 },
+        { label: 'Vie', inVal: 105, outVal: 125 },
+        { label: 'Sáb', inVal: 25, outVal: 60 }
+      ];
+    } else {
+      weeklyData = [
+        { label: 'Q1', inVal: 340, outVal: 290 },
+        { label: 'Q2', inVal: 410, outVal: 380 },
+        { label: 'Q3', inVal: 390, outVal: 420 },
+        { label: 'Q4', inVal: 480, outVal: 460 }
+      ];
+    }
+
+    const sumIn = weeklyData.reduce((acc, d) => acc + d.inVal, 0);
+    const sumOut = weeklyData.reduce((acc, d) => acc + d.outVal, 0);
+    const kBadge = document.getElementById('kardexTotalBadge');
+    if (kBadge) {
+      kBadge.textContent = `Entradas: ${sumIn} • Salidas: ${sumOut}`;
+    }
+
     window._fragamaCharts.weekly = new Chart(weeklyCanvas, {
       type: 'bar',
       data: {
-        labels: weeklyData.map(d => d.day),
+        labels: weeklyData.map(d => d.label),
         datasets: [
           {
             label: 'Entradas (Uds)',
             data: weeklyData.map(d => d.inVal),
             backgroundColor: '#10B981',
-            borderRadius: 4
+            borderRadius: 6
           },
           {
             label: 'Salidas (Uds)',
             data: weeklyData.map(d => d.outVal),
             backgroundColor: '#0284C7',
-            borderRadius: 4
+            borderRadius: 6
           }
         ]
       },
@@ -7707,16 +7759,20 @@ function renderDashboardAnalytics() {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+          legend: {
+            position: 'top',
+            labels: { boxWidth: 12, font: { ...fontConfig, size: 11 } }
+          },
           tooltip: {
+            ...tooltipConfig,
             callbacks: {
               label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} uds`
             }
           }
         },
         scales: {
-          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { ...fontConfig, size: 10 } } },
+          x: { grid: { display: false }, ticks: { font: { ...fontConfig, size: 11 } } }
         }
       }
     });
@@ -7752,7 +7808,7 @@ function renderDashboardAnalytics() {
           label: 'Unidades en Bodega',
           data: unitsData,
           backgroundColor: ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6'],
-          borderRadius: 4
+          borderRadius: 6
         }]
       },
       options: {
@@ -7761,17 +7817,18 @@ function renderDashboardAnalytics() {
         plugins: {
           legend: { display: false },
           tooltip: {
+            ...tooltipConfig,
             callbacks: {
               label: ctx => ` Unidades: ${ctx.raw.toLocaleString()} uds (${formatCRC(valueData[ctx.dataIndex])})`
             }
           }
         },
         scales: {
-          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { ...fontConfig, size: 10 } } },
           x: {
             grid: { display: false },
             ticks: {
-              font: { size: 10 },
+              font: { ...fontConfig, size: 10 },
               callback: function(val) {
                 const label = this.getLabelForValue(val);
                 return label.length > 15 ? label.substring(0, 14) + '...' : label;
@@ -7783,20 +7840,29 @@ function renderDashboardAnalytics() {
     });
   }
 
-  // 4. Gráfico 3: Tendencia de Facturación (Área / Línea PowerBI)
+  // 4. Gráfico 3: Tendencia de Facturación (Área / Spline PowerBI)
   const salesCanvas = document.getElementById('salesTrendChart');
   if (salesCanvas) {
     if (window._fragamaCharts.sales) {
       window._fragamaCharts.sales.destroy();
     }
-    const salesLabels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4 (Actual)'];
-    const salesData = [1850000, 2420000, 2190000, 2030200];
+
+    let salesLabels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4 (Actual)'];
+    let salesData = [1850000, 2420000, 2190000, 2030200];
+    if (tf === 'today') {
+      salesLabels = ['08h', '10h', '12h', '14h', '16h', '18h'];
+      salesData = [180000, 420000, 890000, 1250000, 1680000, 2030200];
+    } else if (tf === 'year') {
+      salesLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct'];
+      salesData = [6200000, 7100000, 7800000, 8100000, 8400000, 8650000, 8900000, 8300000, 8700000, 8490200];
+    }
+
     window._fragamaCharts.sales = new Chart(salesCanvas, {
       type: 'line',
       data: {
         labels: salesLabels,
         datasets: [{
-          label: 'Ventas Semanales (₡)',
+          label: 'Ventas (₡)',
           data: salesData,
           borderColor: '#059669',
           backgroundColor: 'rgba(16, 185, 129, 0.12)',
@@ -7804,8 +7870,10 @@ function renderDashboardAnalytics() {
           tension: 0.35,
           borderWidth: 2.5,
           pointBackgroundColor: '#059669',
-          pointRadius: 4,
-          pointHoverRadius: 6
+          pointBorderColor: '#FFFFFF',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7
         }]
       },
       options: {
@@ -7814,6 +7882,7 @@ function renderDashboardAnalytics() {
         plugins: {
           legend: { display: false },
           tooltip: {
+            ...tooltipConfig,
             callbacks: {
               label: ctx => ` Facturación: ${formatCRC(ctx.raw)}`
             }
@@ -7824,11 +7893,11 @@ function renderDashboardAnalytics() {
             beginAtZero: false,
             grid: { color: '#F1F5F9' },
             ticks: {
-              font: { size: 10 },
+              font: { ...fontConfig, size: 10 },
               callback: v => '₡' + (v / 1000000).toFixed(1) + 'M'
             }
           },
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+          x: { grid: { display: false }, ticks: { font: { ...fontConfig, size: 11 } } }
         }
       }
     });
@@ -7865,13 +7934,14 @@ function renderDashboardAnalytics() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '68%',
+        cutout: '72%',
         plugins: {
           legend: {
-            position: 'right',
-            labels: { boxWidth: 12, font: { size: 10.5 } }
+            position: 'bottom',
+            labels: { boxWidth: 10, font: { ...fontConfig, size: 10 }, padding: 8 }
           },
           tooltip: {
+            ...tooltipConfig,
             callbacks: {
               label: ctx => ` ${ctx.label}: ${ctx.raw} pedidos`
             }
