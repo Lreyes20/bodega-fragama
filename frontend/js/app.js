@@ -7666,31 +7666,55 @@ function renderDashboardAnalytics() {
   // 2. Gráfico Visual de Barras por Familia
   const familyBarsContainer = document.getElementById('dashboardFamilyBars');
   if (familyBarsContainer) {
-    const colors = ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6'];
-    familyBarsContainer.innerHTML = AppState.families.map((f, idx) => {
-      const familyProducts = AppState.products.filter(p => p.familyId === f.id);
-      const unitsInFamily = familyProducts.reduce((sum, p) => sum + p.stock, 0);
-      const valInFamily = familyProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
-      const pct = totalUnits > 0 ? Math.round((unitsInFamily / totalUnits) * 100) : 0;
-      const barColor = colors[idx % colors.length];
+    // Clear container and add canvas for Chart.js
+    familyBarsContainer.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    canvas.id = 'familyChart';
+    familyBarsContainer.appendChild(canvas);
 
-      return `
-        <div class="family-bar-row">
-          <div class="family-bar-header">
-            <span><i class="bi ${f.icon || 'bi-boxes'}" style="color:${barColor}"></i> ${f.name}</span>
-            <span><strong>${pct}%</strong> (${unitsInFamily} uds • ${formatCRC(valInFamily)})</span>
-          </div>
-          <div class="family-bar-track">
-            <div class="family-bar-fill" style="width:${pct}%; background:${barColor};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
+    const labels = AppState.families.map(f => f.name);
+    const unitsData = AppState.families.map(f => {
+      const familyProducts = AppState.products.filter(p => p.familyId === f.id);
+      return familyProducts.reduce((sum, p) => sum + p.stock, 0);
+    });
+    const valueData = AppState.families.map(f => {
+      const familyProducts = AppState.products.filter(p => p.familyId === f.id);
+      return familyProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
+    });
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Unidades en familia',
+          data: unitsData,
+          backgroundColor: ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444', '#3B82F6']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.raw} uds (${formatCRC(valueData[ctx.dataIndex])})`
+            }
+          }
+        },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
   }
 
   // 3. Gráfico Semanal de Kardex (Entradas vs Salidas)
   const weeklyContainer = document.getElementById('dashboardWeeklyChart');
   if (weeklyContainer) {
+    // Clear container and add canvas
+    weeklyContainer.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    canvas.id = 'weeklyChart';
+    weeklyContainer.appendChild(canvas);
+
     const weeklyData = [
       { day: 'Lun', inVal: 80, outVal: 45 },
       { day: 'Mar', inVal: 30, outVal: 65 },
@@ -7699,21 +7723,24 @@ function renderDashboardAnalytics() {
       { day: 'Vie', inVal: 90, outVal: 110 },
       { day: 'Sáb', inVal: 20, outVal: 50 }
     ];
-    const maxVal = 140;
-
-    weeklyContainer.innerHTML = weeklyData.map(d => {
-      const inHeight = Math.round((d.inVal / maxVal) * 110);
-      const outHeight = Math.round((d.outVal / maxVal) * 110);
-      return `
-        <div class="weekly-col">
-          <div class="weekly-bar-pair">
-            <div class="weekly-bar in" style="height:${inHeight}px;" data-tooltip="Entradas: ${d.inVal} uds"></div>
-            <div class="weekly-bar out" style="height:${outHeight}px;" data-tooltip="Salidas: ${d.outVal} uds"></div>
-          </div>
-          <span class="weekly-label">${d.day}</span>
-        </div>
-      `;
-    }).join('');
+    const labels = weeklyData.map(d => d.day);
+    const inVals = weeklyData.map(d => d.inVal);
+    const outVals = weeklyData.map(d => d.outVal);
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Entradas', data: inVals, backgroundColor: '#10B981' },
+          { label: 'Salidas', data: outVals, backgroundColor: '#0284C7' }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { position: 'top' } }
+      }
+    });
   }
 
   // 4. Feed de Actividad Reciente del Kardex
