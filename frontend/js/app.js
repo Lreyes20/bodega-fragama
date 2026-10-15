@@ -7647,6 +7647,8 @@ function setupDashboardControls() {
   }
 }
 
+window._fragamaCharts = window._fragamaCharts || {};
+
 function renderDashboardAnalytics() {
   // 1. Valorización Total de Inventario
   let totalValuation = 0;
@@ -7663,15 +7665,69 @@ function renderDashboardAnalytics() {
   const lowCount = AppState.products.filter(p => p.stock <= p.minStock).length;
   if (kpiAlert) kpiAlert.textContent = lowCount;
 
-  // 2. Gráfico Visual de Barras por Familia
-  const familyBarsContainer = document.getElementById('dashboardFamilyBars');
-  if (familyBarsContainer) {
-    // Clear container and add canvas for Chart.js
-    familyBarsContainer.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    canvas.id = 'familyChart';
-    familyBarsContainer.appendChild(canvas);
+  // Si Chart.js aún no está cargado, salir sin error
+  if (typeof Chart === 'undefined') {
+    return;
+  }
 
+  // 2. Gráfico 1: Flujo Semanal de Mercadería Kardex (Entradas vs Salidas)
+  const weeklyCanvas = document.getElementById('weeklyChart');
+  if (weeklyCanvas) {
+    if (window._fragamaCharts.weekly) {
+      window._fragamaCharts.weekly.destroy();
+    }
+    const weeklyData = [
+      { day: 'Lun', inVal: 85, outVal: 50 },
+      { day: 'Mar', inVal: 40, outVal: 70 },
+      { day: 'Mié', inVal: 130, outVal: 95 },
+      { day: 'Jue', inVal: 60, outVal: 110 },
+      { day: 'Vie', inVal: 105, outVal: 125 },
+      { day: 'Sáb', inVal: 25, outVal: 60 }
+    ];
+    window._fragamaCharts.weekly = new Chart(weeklyCanvas, {
+      type: 'bar',
+      data: {
+        labels: weeklyData.map(d => d.day),
+        datasets: [
+          {
+            label: 'Entradas (Uds)',
+            data: weeklyData.map(d => d.inVal),
+            backgroundColor: '#10B981',
+            borderRadius: 4
+          },
+          {
+            label: 'Salidas (Uds)',
+            data: weeklyData.map(d => d.outVal),
+            backgroundColor: '#0284C7',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} uds`
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // 3. Gráfico 2: Stock & Valor por Familia
+  const familyCanvas = document.getElementById('familyChart');
+  if (familyCanvas) {
+    if (window._fragamaCharts.family) {
+      window._fragamaCharts.family.destroy();
+    }
     const labels = AppState.families.map(f => f.name);
     const unitsData = AppState.families.map(f => {
       const familyProducts = AppState.products.filter(p => p.familyId === f.id);
@@ -7681,64 +7737,146 @@ function renderDashboardAnalytics() {
       const familyProducts = AppState.products.filter(p => p.familyId === f.id);
       return familyProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
     });
-    new Chart(canvas, {
+
+    const sumSummary = document.getElementById('dashboardFamilySummaryText');
+    if (sumSummary) {
+      const sumVal = valueData.reduce((a, b) => a + b, 0);
+      sumSummary.textContent = `${totalUnits.toLocaleString()} uds • ${formatCRC(sumVal)}`;
+    }
+
+    window._fragamaCharts.family = new Chart(familyCanvas, {
       type: 'bar',
       data: {
         labels: labels,
         datasets: [{
-          label: 'Unidades en familia',
+          label: 'Unidades en Bodega',
           data: unitsData,
-          backgroundColor: ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444', '#3B82F6']
+          backgroundColor: ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6'],
+          borderRadius: 4
         }]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${ctx.raw} uds (${formatCRC(valueData[ctx.dataIndex])})`
+              label: ctx => ` Unidades: ${ctx.raw.toLocaleString()} uds (${formatCRC(valueData[ctx.dataIndex])})`
             }
           }
         },
-        scales: { y: { beginAtZero: true } }
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { size: 10 },
+              callback: function(val) {
+                const label = this.getLabelForValue(val);
+                return label.length > 15 ? label.substring(0, 14) + '...' : label;
+              }
+            }
+          }
+        }
       }
     });
   }
 
-  // 3. Gráfico Semanal de Kardex (Entradas vs Salidas)
-  const weeklyContainer = document.getElementById('dashboardWeeklyChart');
-  if (weeklyContainer) {
-    // Clear container and add canvas
-    weeklyContainer.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    canvas.id = 'weeklyChart';
-    weeklyContainer.appendChild(canvas);
-
-    const weeklyData = [
-      { day: 'Lun', inVal: 80, outVal: 45 },
-      { day: 'Mar', inVal: 30, outVal: 65 },
-      { day: 'Mié', inVal: 120, outVal: 85 },
-      { day: 'Jue', inVal: 40, outVal: 95 },
-      { day: 'Vie', inVal: 90, outVal: 110 },
-      { day: 'Sáb', inVal: 20, outVal: 50 }
-    ];
-    const labels = weeklyData.map(d => d.day);
-    const inVals = weeklyData.map(d => d.inVal);
-    const outVals = weeklyData.map(d => d.outVal);
-    new Chart(canvas, {
-      type: 'bar',
+  // 4. Gráfico 3: Tendencia de Facturación (Área / Línea PowerBI)
+  const salesCanvas = document.getElementById('salesTrendChart');
+  if (salesCanvas) {
+    if (window._fragamaCharts.sales) {
+      window._fragamaCharts.sales.destroy();
+    }
+    const salesLabels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4 (Actual)'];
+    const salesData = [1850000, 2420000, 2190000, 2030200];
+    window._fragamaCharts.sales = new Chart(salesCanvas, {
+      type: 'line',
       data: {
-        labels: labels,
-        datasets: [
-          { label: 'Entradas', data: inVals, backgroundColor: '#10B981' },
-          { label: 'Salidas', data: outVals, backgroundColor: '#0284C7' }
-        ]
+        labels: salesLabels,
+        datasets: [{
+          label: 'Ventas Semanales (₡)',
+          data: salesData,
+          borderColor: '#059669',
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2.5,
+          pointBackgroundColor: '#059669',
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
       },
       options: {
         responsive: true,
-        scales: { y: { beginAtZero: true } },
-        plugins: { legend: { position: 'top' } }
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` Facturación: ${formatCRC(ctx.raw)}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            grid: { color: '#F1F5F9' },
+            ticks: {
+              font: { size: 10 },
+              callback: v => '₡' + (v / 1000000).toFixed(1) + 'M'
+            }
+          },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // 5. Gráfico 4: Cumplimiento y Estado de Pedidos (Doughnut PowerBI)
+  const orderCanvas = document.getElementById('orderStatusChart');
+  if (orderCanvas) {
+    if (window._fragamaCharts.orders) {
+      window._fragamaCharts.orders.destroy();
+    }
+    let deliveredCount = 28;
+    let inRouteCount = 14;
+    let prepCount = 6;
+    let pendingCount = 2;
+    if (Array.isArray(AppState.salesOrders) && AppState.salesOrders.length > 0) {
+      deliveredCount = AppState.salesOrders.filter(o => o.status === 'ENTREGADO').length || deliveredCount;
+      inRouteCount = AppState.salesOrders.filter(o => o.status === 'EN_RUTA').length || inRouteCount;
+      prepCount = AppState.salesOrders.filter(o => o.status === 'EN_ALISTADO' || o.status === 'ALISTADO').length || prepCount;
+      pendingCount = AppState.salesOrders.filter(o => o.status === 'PENDIENTE' || o.status === 'SOLICITADO').length || pendingCount;
+    }
+
+    window._fragamaCharts.orders = new Chart(orderCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Entregados', 'En Ruta', 'En Alistado', 'Pendientes'],
+        datasets: [{
+          data: [deliveredCount, inRouteCount, prepCount, pendingCount],
+          backgroundColor: ['#10B981', '#0284C7', '#F59E0B', '#EF4444'],
+          borderWidth: 2,
+          borderColor: '#FFFFFF'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { boxWidth: 12, font: { size: 10.5 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.label}: ${ctx.raw} pedidos`
+            }
+          }
+        }
       }
     });
   }

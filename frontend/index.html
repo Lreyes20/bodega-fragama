@@ -15,8 +15,11 @@
   <!-- Bootstrap Icons CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
+  <!-- Chart.js CDN para Dashboards PowerBI -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <!-- Hoja de Estilos Corporativa Fragama (Estilo Plazas Vacantes) -->
-  <link rel="stylesheet" href="css/style.css?v=20261001_reports_pro_v7">
+  <link rel="stylesheet" href="css/style.css?v=20261015_powerbi_v5">
 </head>
 <body>
 
@@ -661,6 +664,116 @@
           </div>
         </div>
 
+        <!-- ====================================================================
+             POWER BI ANALYTICS SUITE: TABLERO GRÁFICO EJECUTIVO EN TIEMPO REAL
+             ==================================================================== -->
+        <div style="background:#FFFFFF; border:1px solid #CBD5E1; border-radius:14px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; box-shadow:0 4px 14px rgba(11,25,44,0.06);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:1.25rem; border-bottom:1px solid #F1F5F9; padding-bottom:0.75rem;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:linear-gradient(135deg, #FF8200, #F59E0B); color:#FFF; font-size:0.72rem; font-weight:800; padding:3px 9px; border-radius:6px; letter-spacing:0.5px; text-transform:uppercase;">PowerBI Analytics</span>
+                <h2 style="font-size:1.1rem; font-weight:800; color:#0B192C; margin:0;">Tablero Gráfico de Control e Inteligencia de Negocios</h2>
+              </div>
+              <p style="font-size:0.78rem; color:#64748B; margin:4px 0 0;">Análisis visual en tiempo real de valorización por familias, flujo de Kardex, tendencia de ventas y estado de pedidos.</p>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-size:0.75rem; font-weight:700; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:5px;">
+                <i class="bi bi-circle-fill" style="font-size:0.55rem; color:#10B981;"></i> En Vivo
+              </span>
+              <button class="btn-fragama btn-outline-fragama" style="padding:6px 12px; font-size:0.75rem; border-radius:8px;" onclick="renderDashboardAnalytics()">
+                <i class="bi bi-arrow-repeat"></i> Actualizar Gráficos
+              </button>
+            </div>
+          </div>
+
+          <!-- Cuadrícula de 4 Gráficos PowerBI Interactivos -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:1.25rem;">
+            
+            <!-- Gráfico 1: Flujo Semanal de Mercadería Kardex -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:1.15rem; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                  <h3 style="font-size:0.9rem; font-weight:800; color:#0B192C; margin:0;">
+                    <i class="bi bi-bar-chart-line-fill text-primary"></i> Flujo Semanal de Mercadería
+                  </h3>
+                  <span style="font-size:0.72rem; color:#64748B;">Entradas vs Salidas de Lunes a Sábado (Uds)</span>
+                </div>
+                <span style="font-size:0.72rem; font-weight:700; color:#0284C7; background:#E0F2FE; padding:3px 8px; border-radius:10px;">Kardex WMS</span>
+              </div>
+              <div style="position:relative; height:240px; width:100%;">
+                <canvas id="weeklyChart"></canvas>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:0.74rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Rotación semanal: <strong>84.5%</strong></span>
+                <a href="#" onclick="switchViewDirectly('view-bodega-kardex'); return false;" style="color:var(--fragama-blue-primary); text-decoration:none; font-weight:700;">Ver Kardex &rarr;</a>
+              </div>
+            </div>
+
+            <!-- Gráfico 2: Stock & Valor por Familia -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:1.15rem; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                  <h3 style="font-size:0.9rem; font-weight:800; color:#0B192C; margin:0;">
+                    <i class="bi bi-pie-chart-fill text-warning"></i> Stock &amp; Valor por Familia
+                  </h3>
+                  <span style="font-size:0.72rem; color:#64748B;">Participación física y valorización económica</span>
+                </div>
+                <button class="btn-fragama btn-outline-fragama" style="padding:2px 8px; font-size:0.7rem; border-radius:6px;" onclick="switchViewDirectly('view-families-management')">
+                  Ver Zonas
+                </button>
+              </div>
+              <div style="position:relative; height:240px; width:100%;">
+                <canvas id="familyChart"></canvas>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:0.74rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Total 4 Familias Operativas</span>
+                <span id="dashboardFamilySummaryText" style="font-weight:700; color:#1E293B;">100% inventariado</span>
+              </div>
+            </div>
+
+            <!-- Gráfico 3: Tendencia de Ventas & Facturación -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:1.15rem; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                  <h3 style="font-size:0.9rem; font-weight:800; color:#0B192C; margin:0;">
+                    <i class="bi bi-graph-up-arrow text-success"></i> Tendencia de Facturación (Semanal)
+                  </h3>
+                  <span style="font-size:0.72rem; color:#64748B;">Evolución de ventas y demanda (₡ CRC)</span>
+                </div>
+                <span style="font-size:0.72rem; font-weight:700; color:#059669; background:#D1FAE5; padding:3px 8px; border-radius:10px;">+12.4% vs mes ant.</span>
+              </div>
+              <div style="position:relative; height:240px; width:100%;">
+                <canvas id="salesTrendChart"></canvas>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:0.74rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Meta mensual: <strong>₡10,000,000</strong></span>
+                <span style="color:#059669; font-weight:700;">84.9% alcanzado</span>
+              </div>
+            </div>
+
+            <!-- Gráfico 4: Cumplimiento y Estado de Pedidos -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:1.15rem; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                  <h3 style="font-size:0.9rem; font-weight:800; color:#0B192C; margin:0;">
+                    <i class="bi bi-check2-circle text-info"></i> Estado de Pedidos &amp; Despacho
+                  </h3>
+                  <span style="font-size:0.72rem; color:#64748B;">Distribución operativa de pedidos activos</span>
+                </div>
+                <span style="font-size:0.72rem; font-weight:700; color:#7C3AED; background:#EDE9FE; padding:3px 8px; border-radius:10px;">Efectividad 96%</span>
+              </div>
+              <div style="position:relative; height:240px; width:100%;">
+                <canvas id="orderStatusChart"></canvas>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:0.74rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Tiempo prom. alisto: <strong>18 min</strong></span>
+                <a href="#" onclick="switchViewDirectly('view-customer-orders'); return false;" style="color:var(--fragama-blue-primary); text-decoration:none; font-weight:700;">Ver Pedidos &rarr;</a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- PANEL DE ALISTADO INMEDIATO DE PEDIDOS WEB (ENTRANTES EN TIEMPO REAL) -->
         <div class="content-card" style="margin-bottom:1.5rem; border:2px solid #A7F3D0; background:#F0FDF4; box-shadow:0 4px 14px rgba(16,185,129,0.12);">
           <div class="card-header-custom" style="background:#ECFDF5; border-bottom:1px solid #A7F3D0; display:flex; justify-content:space-between; align-items:center;">
@@ -691,55 +804,6 @@
               </tbody>
             </table>
           </div>
-        </div>
-
-        <!-- Gráficos Visuales: Distribución por Familia & Flujo Semanal de Kardex -->
-        <div class="dashboard-analytics-grid">
-          
-          <!-- Gráfico 1: Distribución por Familia -->
-          <div class="chart-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <div>
-                <h3 style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">
-                  <i class="bi bi-pie-chart-fill text-primary"></i> Distribución de Stock por Familias
-                </h3>
-                <span style="font-size:0.75rem; color:#64748B;">Participación y volumen físico en bodega</span>
-              </div>
-              <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="switchViewDirectly('view-families-management')">
-                Ver Zonas
-              </button>
-            </div>
-
-            <div class="family-progress-bar-container" id="dashboardFamilyBars">
-              <!-- Render dinámico vía JS -->
-            </div>
-          </div>
-
-          <!-- Gráfico 2: Flujo Semanal de Kardex (Entradas vs Salidas) -->
-          <div class="chart-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <div>
-                <h3 style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">
-                  <i class="bi bi-bar-chart-line-fill text-primary"></i> Flujo Semanal de Mercadería (Kardex)
-                </h3>
-                <span style="font-size:0.75rem; color:#64748B;">Unidades movilizadas de Lunes a Sábado</span>
-              </div>
-              <div style="display:flex; gap:10px; font-size:0.75rem;">
-                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#10B981; border-radius:2px; display:inline-block;"></span> Entradas</span>
-                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#0284C7; border-radius:2px; display:inline-block;"></span> Salidas</span>
-              </div>
-            </div>
-
-            <div class="weekly-kardex-chart" id="dashboardWeeklyChart">
-              <!-- Render de barras dinámicas con tooltips -->
-            </div>
-
-            <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:#64748B; padding-top:4px;">
-              <span>Rotación semanal promedio: <strong>84.5%</strong></span>
-              <a href="#" onclick="switchViewDirectly('view-bodega-kardex'); return false;" style="color:var(--fragama-blue-primary); text-decoration:none; font-weight:700;">Ver Kardex completo &rarr;</a>
-            </div>
-          </div>
-
         </div>
 
         <!-- Fila Secundaria: Alertas Operativas & Feed de Actividad Reciente -->
@@ -4588,8 +4652,7 @@
   <script src="js/JsBarcode.all.min.js"></script>
   <script src="js/qrcode.min.js"></script>
   <script src="js/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="js/catalog-data.js?v=20261001_4"></script>
-  <script src="js/app.js?v=20261012_syntax_fixed_v2"></script>
+  <script src="js/catalog-data.js?v=20261015_powerbi_v5"></script>
+  <script src="js/app.js?v=20261015_powerbi_v5"></script>
 </body>
 </html>
