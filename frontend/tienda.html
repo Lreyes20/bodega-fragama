@@ -3192,7 +3192,7 @@
             step1 = 'done'; step2 = 'current';
           } else if (status.includes('RUTA') || status.includes('DESPACH')) {
             step1 = 'done'; step2 = 'done'; step3 = 'current';
-          } else if (status.includes('ENTREG') || status.includes('FINALIZ')) {
+          } else if (status.includes('ENTREG') || status.includes('FINALIZ') || status.includes('FACTUR')) {
             step1 = 'done'; step2 = 'done'; step3 = 'done'; step4 = 'done';
           } else {
             step1 = 'current';

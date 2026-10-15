@@ -5915,8 +5915,15 @@ window.handleConfirmOrderPicking = async function(event) {
 // 2. DESPACHO A RUTA (ALISTADO -> EN_RUTA)
 // ==============================================================================
 window.dispatchOrderToRoute = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
-  if (!order) return;
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
+  if (!order) {
+    alert("No se encontró el pedido a despachar.");
+    return;
+  }
 
   const driver = order.driverName || 'Chofer de Ruta';
   if (!confirm(`¿Confirmar que el pedido #${order.orderCode} ha salido de bodega en ruta con ${driver}?`)) {
@@ -5949,8 +5956,15 @@ window.dispatchOrderToRoute = async function(orderIdentifier) {
 // 3. CONFIRMAR ENTREGA Y DESCUENTO AUTOMÁTICO EN KARDEX (ALISTADO/EN_RUTA -> ENTREGADO)
 // ==============================================================================
 window.confirmOrderDelivered = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
-  if (!order) return;
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
+  if (!order) {
+    alert("No se encontró el pedido seleccionado para entrega.");
+    return;
+  }
 
   const confirmMsg = `¿CONFIRMAR ENTREGA DEL PEDIDO #${order.orderCode} AL CLIENTE?\n\n` +
                      `📦 Cliente: ${order.customerName}\n` +
@@ -5975,10 +5989,11 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
       })
     });
 
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
     if (res.ok && result.success) {
       order.status = 'ENTREGADO';
       order.stockDeducted = 1;
+      order.deliveredAt = new Date().toISOString();
       
       // Recargar catálogo de productos para actualizar stocks en pantalla
       if (typeof fetchProducts === 'function') {
@@ -5988,7 +6003,7 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
       refreshAllOrderViews();
       showNotificationToast(`🎉 Pedido ${order.orderCode} entregado. ¡Inventario Kardex descontado automáticamente sin descuadre!`, 'success');
     } else {
-      alert(result.detail || "Error al confirmar entrega.");
+      alert(result.detail || "Error al confirmar entrega en el servidor central.");
     }
   } catch(e) {
     console.error("Error confirmando entrega:", e);
@@ -6001,18 +6016,27 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
 // 4. REGISTRAR NO ENTREGA / RECHAZO (JUSTIFICACIÓN OBLIGATORIA)
 // ==============================================================================
 window.openOrderUndeliveredModal = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
   if (!order) return;
 
-  document.getElementById('undeliveredOrderId').value = order.id;
-  document.getElementById('undeliveredOrderCode').value = order.orderCode;
+  document.getElementById('undeliveredOrderId').value = order.id || order.orderCode;
+  document.getElementById('undeliveredOrderCode').value = order.orderCode || order.id;
   document.getElementById('undeliveredModalSubtitle').textContent = `Pedido #${order.orderCode} • Cliente: ${order.customerName}`;
   document.getElementById('undeliveredPredefinedReason').value = '';
   document.getElementById('undeliveredJustificationText').value = '';
   document.getElementById('undeliveredErrorAlert').style.display = 'none';
 
   await loadStaffSelectors();
-  document.getElementById('orderUndeliveredModal').classList.add('active');
+  const modal = document.getElementById('orderUndeliveredModal');
+  if (modal) {
+    modal.style.removeProperty('display');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
 };
 
 window.handlePredefinedReasonChange = function() {

@@ -15,7 +15,7 @@ window.FRAGAMA_CATALOG = [
     "imageIcon": "bi-box2-heart",
     "image": "img/catalog/prod_101.jpg",
     "costPrice": 74.89999999999999,
-    "stock": 150,
+    "stock": 383,
     "cabysCode": "3215900000000",
     "taxRate": 13.0
   },
@@ -34,7 +34,7 @@ window.FRAGAMA_CATALOG = [
     "description": "Bandeja cuadrada de bagazo de caña resistente para almuerzos y comidas calientes.",
     "imageIcon": "bi-box2",
     "image": "img/catalog/prod_102.jpg",
-    "stock": 150,
+    "stock": 197,
     "cabysCode": "3215900000000",
     "taxRate": 13.0
   },
@@ -53,7 +53,7 @@ window.FRAGAMA_CATALOG = [
     "description": "Bandeja tipo almeja perfecta para hamburguesas, repostería y porciones individuales.",
     "imageIcon": "bi-archive",
     "image": "img/catalog/prod_103.jpg",
-    "stock": 150,
+    "stock": 156,
     "cabysCode": "3215900000000",
     "taxRate": 13.0
   },
@@ -73,7 +73,7 @@ window.FRAGAMA_CATALOG = [
     "description": "Plato pastelero/postre biodegradable y resistente a cortes y salsas.",
     "imageIcon": "bi-disc",
     "image": "img/catalog/prod_104.jpg",
-    "stock": 150,
+    "stock": 1030,
     "cabysCode": "3215900000000",
     "taxRate": 13.0
   },
@@ -93,7 +93,7 @@ window.FRAGAMA_CATALOG = [
     "description": "Plato grande para almuerzos ejecutivos y eventos, 100% compostable.",
     "imageIcon": "bi-record-circle",
     "image": "img/catalog/prod_105.jpg",
-    "stock": 150,
+    "stock": 200,
     "cabysCode": "3215900000000",
     "taxRate": 13.0
   },

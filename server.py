@@ -898,40 +898,58 @@ def track_order(order_code: str):
             conn = get_sqlite_conn()
             cur = conn.cursor()
             cur.execute("""
-                SELECT o.OrderId, o.OrderNumber, o.OrderDate, o.TotalAmount, o.Status,
-                       c.Name as CustomerName, c.Phone as CustomerPhone, c.Address as DeliveryAddress
-                FROM Orders o
-                LEFT JOIN Customers c ON o.CustomerId = c.CustomerId
-                WHERE UPPER(o.OrderNumber) = ? OR UPPER(o.OrderNumber) = ?
-            """, (code, f"PED-{code}"))
+                SELECT so.SalesOrderId as id,
+                       so.OrderNumber as orderCode,
+                       so.CreatedAt as date,
+                       so.TotalAmount as total,
+                       so.Status as status,
+                       COALESCE(c.BusinessName, 'Cliente') as customer,
+                       COALESCE(c.Phone, '') as phone,
+                       COALESCE(so.DeliveryNotes, c.Address, '') as address,
+                       COALESCE(so.DeliveryRoute, 'Cartago') as route,
+                       COALESCE(so.PreparedByName, '') as preparedByName,
+                       COALESCE(so.DriverName, '') as driverName,
+                       so.PreparedAt as preparedAt,
+                       so.DeliveredAt as deliveredAt,
+                       so.DispatchedAt as dispatchedAt
+                FROM SalesOrders so
+                LEFT JOIN Customers c ON so.CustomerId = c.CustomerId
+                WHERE UPPER(so.OrderNumber) = ? OR UPPER(so.OrderNumber) = ? OR so.SalesOrderId = ?
+            """, (code, f"PED-{code}", int(code) if code.isdigit() else -1))
             row = cur.fetchone()
             conn.close()
             if row:
                 d = dict(row)
                 return {
                     "found": True,
-                    "orderCode": d["OrderNumber"],
-                    "customer": d["CustomerName"],
-                    "date": d["OrderDate"],
-                    "status": d["Status"] or "En Preparación",
-                    "total": d["TotalAmount"],
-                    "address": d["DeliveryAddress"]
+                    "orderCode": d["orderCode"],
+                    "customer": d["customer"],
+                    "date": d["date"],
+                    "status": d["status"] or "PENDIENTE",
+                    "total": d["total"],
+                    "address": d["address"],
+                    "route": d["route"],
+                    "preparedByName": d["preparedByName"],
+                    "driverName": d["driverName"],
+                    "deliveredAt": d["deliveredAt"]
                 }
         except Exception as e:
             logger.warning(f"Error consultando tracking en SQLite: {e}")
 
     local_orders = load_local_web_orders()
     for o in local_orders:
-        if o.get("orderCode", "").upper() == code or o.get("orderNumber", "").upper() == code:
+        if str(o.get("orderCode", "")).upper() == code or str(o.get("orderNumber", "")).upper() == code:
             return {
                 "found": True,
                 "orderCode": o.get("orderCode"),
                 "customer": o.get("customerName"),
                 "date": o.get("date"),
-                "status": o.get("status", "Recibido en Bodega"),
+                "status": o.get("status", "PENDIENTE"),
                 "total": o.get("total"),
                 "address": o.get("customerAddress"),
-                "route": o.get("deliveryRoute")
+                "route": o.get("deliveryRoute"),
+                "preparedByName": o.get("preparedByName", ""),
+                "driverName": o.get("driverName", "")
             }
 
     return {"found": False, "message": f"No se encontró un pedido con el código '{order_code}'."}
@@ -1220,7 +1238,7 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
         """, (sql_order_id,))
         items = cur.fetchall()
 
-        for it in items:
+        for idx, it in enumerate(items):
             p_id = it["ProductId"]
             p_qty = it["Quantity"]
             p_sku = it["Sku"]
@@ -1236,8 +1254,8 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
                 # Descontar stock
                 cur.execute("UPDATE Products SET Stock = ? WHERE ProductId = ?", (new_stock, p_id))
 
-                # Registrar movimiento en Kardex
-                mov_num = f"MOV-SAL-{int(time.time()) % 1000000:06d}"
+                # Registrar movimiento en Kardex con ID único
+                mov_num = f"MOV-SAL-{int(time.time()) % 100000:05d}-{sql_order_id}-{p_id}-{idx+1}"
                 cur.execute("""
                     INSERT INTO InventoryMovements 
                     (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock, UnitCost, TotalAmount, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
@@ -1260,7 +1278,7 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
         """, (sql_order_id,))
         items = cur.fetchall()
 
-        for it in items:
+        for idx, it in enumerate(items):
             p_id = it["ProductId"]
             p_qty = it["Quantity"]
             p_sku = it["Sku"]
@@ -1276,8 +1294,8 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
                 # Reingresar stock
                 cur.execute("UPDATE Products SET Stock = ? WHERE ProductId = ?", (new_stock, p_id))
 
-                # Registrar movimiento de reingreso en Kardex
-                mov_num = f"MOV-REING-{int(time.time()) % 1000000:06d}"
+                # Registrar movimiento de reingreso en Kardex con ID único
+                mov_num = f"MOV-REING-{int(time.time()) % 100000:05d}-{sql_order_id}-{p_id}-{idx+1}"
                 cur.execute("""
                     INSERT INTO InventoryMovements 
                     (MovementNumber, MovementDate, ProductId, Sku, ProductName, MovementType, Quantity, PreviousStock, FinalStock, UnitCost, TotalAmount, ReferenceDocument, UserId, UserName, Notes, CreatedAt)
