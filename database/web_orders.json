@@ -1,5 +1,36 @@
 [
   {
+    "id": 114,
+    "orderCode": "PED-2026-26533",
+    "docType": "PEDIDO",
+    "status": "ENTREGADO",
+    "customerId": 100000,
+    "customerName": "dane",
+    "customerTaxId": "1-1823-0456",
+    "customerPhone": "8888-9999",
+    "customerAddress": "San Jose Centro",
+    "paymentTerms": "Contado Inmediato",
+    "paymentMethod": "SINPE Móvil",
+    "date": "2026-10-15",
+    "deliveryDate": "2026-10-15",
+    "subtotalBruto": 2900.0,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 2900.0,
+    "iva": 377.0,
+    "total": 3277.0,
+    "items": [
+      {
+        "productId": 1,
+        "sku": null,
+        "name": null,
+        "qty": 2,
+        "unitPrice": 1450.0,
+        "subtotal": 0.0
+      }
+    ],
+    "stockDeducted": 1
+  },
+  {
     "orderCode": "PED-WEB-64324",
     "docType": "PEDIDO_WEB",
     "source": "TIENDA_WEB",

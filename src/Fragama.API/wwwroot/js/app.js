@@ -681,21 +681,31 @@ async function loadInitialDataFromSql() {
       AppState.salesOrders = ordersRes.value;
     }
 
-    // Integración con pedidos web almacenados en localStorage (contingencia local / offline)
+    // Integración con pedidos web y pedidos de bodega almacenados en localStorage (contingencia local / offline)
     try {
       const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
-      if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
+      const localSalesOrders = JSON.parse(localStorage.getItem('fragama_sales_orders') || '[]');
+      const combinedLocal = [...localSalesOrders, ...localWebOrders];
+
+      if (Array.isArray(combinedLocal) && combinedLocal.length > 0) {
         const existingCodes = new Set(AppState.salesOrders.map(o => o.orderCode));
-        localWebOrders.forEach(lwo => {
-          if (!existingCodes.has(lwo.orderCode)) {
-            AppState.salesOrders.unshift(lwo);
-            existingCodes.add(lwo.orderCode);
+        combinedLocal.forEach(lso => {
+          if (!existingCodes.has(lso.orderCode)) {
+            AppState.salesOrders.unshift(lso);
+            existingCodes.add(lso.orderCode);
             // Sincronizar silenciosamente al servidor si no estaba asentado
-            fetch('/api/public/orders', {
+            fetch(lso.source === 'TIENDA_WEB' ? '/api/public/orders' : '/api/orders', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(lwo)
+              body: JSON.stringify(lso)
             }).catch(() => {});
+          } else {
+            // Si en local ya estaba marcado ENTREGADO, asegurar que no se revierta
+            const current = AppState.salesOrders.find(o => o.orderCode === lso.orderCode);
+            if (current && lso.status === 'ENTREGADO' && current.status !== 'ENTREGADO') {
+              current.status = 'ENTREGADO';
+              current.deliveredAt = lso.deliveredAt;
+            }
           }
         });
       }
@@ -4432,7 +4442,23 @@ function setupDriverActions() {
 
       if (window.currentSelectedDispatchId) {
         let item = AppState.dispatches.find(d => String(d.id) === String(window.currentSelectedDispatchId));
-        if (item) {
+        
+        // Si el despacho provino de getUnifiedDriverDispatches (ord_xxx), asociar o registrar en dispatches
+        if (!item && String(window.currentSelectedDispatchId).startsWith('ord_')) {
+          const ordId = String(window.currentSelectedDispatchId).replace('ord_', '');
+          const so = AppState.salesOrders.find(o => String(o.id) === ordId || String(o.orderCode) === ordId);
+          if (so) {
+            item = {
+              id: window.currentSelectedDispatchId,
+              orderCode: so.orderCode || so.id,
+              code: `DSP-${so.orderCode || so.id}`,
+              customer: so.customerName,
+              status: selectedStatus,
+              observation: notes
+            };
+            AppState.dispatches.unshift(item);
+          }
+        } else if (item) {
           item.status = selectedStatus;
           item.observation = notes;
         }
@@ -4478,7 +4504,12 @@ function setupDriverActions() {
             if (targetStatus === 'ENTREGADO') ord.stockDeducted = 1;
           }
 
-          // Enviar confirmación al servidor backend para persistencia en SQL Server
+          // Respaldo local inmediato en localStorage para que nunca se pierda en el navegador
+          try {
+            localStorage.setItem('fragama_sales_orders', JSON.stringify(AppState.salesOrders));
+          } catch (e) {}
+
+          // Enviar confirmación al servidor backend para persistencia en base de datos
           fetch(`/api/orders/${encodeURIComponent(orderCode)}/status`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4496,8 +4527,10 @@ function setupDriverActions() {
         }
 
         renderDriverDispatches();
+        if (typeof renderOrderHistory === 'function') renderOrderHistory();
         if (typeof renderWebOrdersView === 'function') renderWebOrdersView();
-        showNotificationToast(`Entrega ${item ? item.code : ''} marcada como "${selectedStatus}". Trazabilidad actualizada.`, 'success');
+        if (typeof renderDashboardMetrics === 'function') renderDashboardMetrics();
+        showNotificationToast(`Entrega ${item ? item.code : (orderCode || '')} marcada como "${selectedStatus}". Historial y Base de Datos actualizados.`, 'success');
       }
       modal.classList.remove('active');
     });
@@ -5791,6 +5824,9 @@ async function saveOrder(isQuote = false) {
   }
 
   AppState.salesOrders.unshift(newOrder);
+  try {
+    localStorage.setItem('fragama_sales_orders', JSON.stringify(AppState.salesOrders));
+  } catch (e) {}
 
   // Abrir comprobante oficial impreso con logo de Facebook
   openOrderPrintModal(newOrder);
@@ -5962,6 +5998,112 @@ ${lineasXml}
   document.body.removeChild(a);
   URL.revokeObjectURL(downloadUrl);
   showNotificationToast('📄 Archivo XML oficial Hacienda v4.3 generado y descargado.', 'success');
+};
+
+// ------------------------------------------------------------------------------
+// MOTOR DE IMPRESIÓN OFICIAL AISLADO (PREVIENE PÁGINAS EN BLANCO EN CHROME / MÓVIL)
+// ------------------------------------------------------------------------------
+window.printCurrentInvoice = function() {
+  // 1. Obtener contenido del modal activo
+  let modalBody = document.getElementById('orderPrintModalBody');
+  const printModal = document.getElementById('orderPrintModal');
+  const receiptModal = document.getElementById('invoiceReceiptModal');
+
+  if (receiptModal && receiptModal.classList.contains('active')) {
+    modalBody = document.getElementById('invoiceReceiptBody');
+  } else if (!printModal || !printModal.classList.contains('active')) {
+    modalBody = document.getElementById('orderPrintModalBody') || document.getElementById('invoiceReceiptBody');
+  }
+
+  if (!modalBody || !modalBody.innerHTML.trim()) {
+    showNotificationToast('Abra un comprobante o factura antes de imprimir.', 'warning');
+    return;
+  }
+
+  // 2. Crear iframe temporal aislado para que el motor de impresión del navegador
+  // no se confunda con la estructura oculta de la SPA / modal
+  let iframe = document.getElementById('fragama_invoice_print_frame');
+  if (iframe) iframe.remove();
+
+  iframe = document.createElement('iframe');
+  iframe.id = 'fragama_invoice_print_frame';
+  iframe.style.position = 'fixed';
+  iframe.style.top = '-9999px';
+  iframe.style.left = '-9999px';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <title>Comprobante Oficial Factura - Distribuidora Fragama S.A.</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+      <style>
+        @page {
+          size: portrait;
+          margin: 8mm 10mm 8mm 10mm;
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #FFFFFF !important;
+          color: #0B192C !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-size: 11px;
+          line-height: 1.35;
+        }
+        .no-print {
+          display: none !important;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          page-break-inside: auto;
+        }
+        tr {
+          page-break-inside: avoid;
+          page-break-after: auto;
+        }
+        img {
+          max-height: 60px;
+          object-fit: contain;
+        }
+        svg {
+          max-width: 100%;
+          height: auto;
+        }
+      </style>
+    </head>
+    <body>
+      <div style="padding: 10px 15px;">
+        ${modalBody.innerHTML}
+      </div>
+    </body>
+    </html>
+  `);
+  doc.close();
+
+  // 3. Imprimir tras permitir que renderice imágenes y códigos SVG
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      console.warn("Fallback to native print:", e);
+      window.print();
+    }
+  }, 250);
 };
 
 window.shareCurrentOrderWhatsApp = function() {
@@ -6345,10 +6487,10 @@ function renderOrderHistory() {
       (String(order.assignedUserId) === assigneeFilter) ||
       (order.assignedUserHandle === assigneeFilter);
     const matchSearch = !searchTerm ||
-      order.orderCode.toLowerCase().includes(searchTerm) ||
-      order.customerName.toLowerCase().includes(searchTerm) ||
+      (order.orderCode && order.orderCode.toLowerCase().includes(searchTerm)) ||
+      (order.customerName && order.customerName.toLowerCase().includes(searchTerm)) ||
       (order.assignedUserName && order.assignedUserName.toLowerCase().includes(searchTerm)) ||
-      (order.customerTaxId && order.customerTaxId.toLowerCase().includes(searchTerm));
+      (order.customerTaxId && String(order.customerTaxId).toLowerCase().includes(searchTerm));
 
     return matchStatus && matchAssignee && matchSearch;
   });

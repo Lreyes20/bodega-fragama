@@ -220,6 +220,12 @@ namespace Fragama.Domain.Entities
         public decimal TaxAmount { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = "PENDIENTE"; // COTIZACION, PENDIENTE, ALISTADO, FACTURADO, EN_RUTA, ENTREGADO
+        public string? CustomerName { get; set; }
+        public string? CustomerTaxId { get; set; }
+        public string? CustomerPhone { get; set; }
+        public string? CustomerAddress { get; set; }
+        public string? PaymentTerms { get; set; }
+        public string? PaymentMethod { get; set; }
         public string? DeliveryNotes { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public ICollection<SalesOrderDetail> Details { get; set; } = new List<SalesOrderDetail>();

@@ -102,9 +102,10 @@ def log_security_event(ip: str, endpoint: str, method: str, status_code: int, th
 # ==============================================================================
 def get_sqlite_conn():
     """Conexión a SQLite con modo WAL de alta concurrencia y llaves foráneas."""
-    conn = sqlite3.connect(SQLITE_DB_PATH, timeout=10.0)
+    conn = sqlite3.connect(SQLITE_DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=30000;")
     conn.execute("PRAGMA foreign_keys=ON;")
     return conn
 
@@ -175,6 +176,12 @@ def init_database_schema():
         cur.execute("PRAGMA table_info(SalesOrders)")
         so_cols = set(r[1] for r in cur.fetchall())
         cols_to_add = [
+            ("CustomerName", "TEXT"),
+            ("CustomerTaxId", "TEXT"),
+            ("CustomerPhone", "TEXT"),
+            ("CustomerAddress", "TEXT"),
+            ("PaymentTerms", "TEXT"),
+            ("PaymentMethod", "TEXT"),
             ("PreparedByUserId", "INTEGER"),
             ("PreparedByName", "TEXT"),
             ("PreparedAt", "TEXT"),
@@ -478,6 +485,9 @@ class OrderCreateRequest(BaseModel):
     assignedUserId: Optional[int] = 6
     deliveryDate: Optional[str] = None
     terms: Optional[str] = "Contado"
+    paymentTerms: Optional[str] = "Contado Inmediato"
+    paymentMethod: Optional[str] = "SINPE Móvil"
+    customerEmail: Optional[str] = None
     notes: Optional[str] = ""
     items: List[OrderItemRequest]
     subtotalBruto: float
@@ -987,10 +997,12 @@ def get_orders():
                        so.Source as source,
                        so.CreatedAt as date,
                        COALESCE(c.CustomerId, so.CustomerId, 9999) as customerId,
-                       COALESCE(c.BusinessName, 'Cliente Tienda Web') as customerName,
-                       COALESCE(c.TaxId, 'N/A') as customerTaxId,
-                       COALESCE(c.Phone, '') as customerPhone,
-                       COALESCE(c.Address, '') as customerAddress,
+                       COALESCE(NULLIF(so.CustomerName, ''), c.BusinessName, 'Cliente Tienda Web') as customerName,
+                       COALESCE(NULLIF(so.CustomerTaxId, ''), c.TaxId, 'N/A') as customerTaxId,
+                       COALESCE(NULLIF(so.CustomerPhone, ''), c.Phone, '') as customerPhone,
+                       COALESCE(NULLIF(so.CustomerAddress, ''), c.Address, '') as customerAddress,
+                       COALESCE(NULLIF(so.PaymentTerms, ''), 'Contado Inmediato') as paymentTerms,
+                       COALESCE(NULLIF(so.PaymentMethod, ''), 'SINPE Móvil') as paymentMethod,
                        so.AssignedToUserId as assignedUserId,
                        COALESCE(u.FullName, 'Carlos Piedra (Ventas / Despacho)') as assignedUserName,
                        COALESCE(r.Name, 'Vendedor') as assignedUserRole,
@@ -1012,7 +1024,7 @@ def get_orders():
             rows = s_cur.fetchall()
             for r in rows:
                 o_dict = dict(r)
-                o_dict["terms"] = "Contado / Contra Entrega"
+                o_dict["terms"] = o_dict.get("paymentTerms") or "Contado / Contra Entrega"
                 o_dict["assignedUserHandle"] = "cpiedra"
                 
                 # Cargar artículos del pedido
@@ -1175,10 +1187,11 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
 
                 cur.execute("""
                     INSERT INTO SalesOrders 
-                    (OrderNumber, CustomerId, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
-                    VALUES (?, ?, 1, 6, ?, ?, ?, ?, ?, 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
+                    (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, 1, 6, ?, ?, ?, ?, ?, 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
                 """, (
                     found_wo.get("orderCode", order_id), cid,
+                    c_name, c_tax, c_phone, c_addr,
                     found_wo.get("subtotalBruto", found_wo.get("total", 0)),
                     found_wo.get("descuentoTotal", 0),
                     found_wo.get("iva", 0),
@@ -1211,6 +1224,20 @@ def update_order_status(order_id: str, req: OrderStatusUpdateRequest):
                 logger.info(f"🔄 Pedido web {order_id} auto-recuperado y registrado en SQLite (ID: {new_so_id}).")
             except Exception as e:
                 logger.error(f"Error auto-recuperando pedido web a SQLite: {e}")
+
+    if not order_row:
+        try:
+            cur.execute("""
+                INSERT INTO SalesOrders 
+                (OrderNumber, CustomerId, CustomerName, CustomerTaxId, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryNotes, Source, CreatedAt)
+                VALUES (?, 1, 'Cliente Fragama', 'N/A', 1, 6, 0.0, 0.0, 0.0, 0.0, ?, 'PEDIDO', ?, 'BODEGA_ERP', ?)
+            """, (str(order_id), new_status, notes or "Auto-registrado al entregar", now_date))
+            conn.commit()
+            cur.execute("SELECT SalesOrderId, OrderNumber, Status, StockDeducted, PreparedByName, DriverName, DeliveryNotes, TotalAmount FROM SalesOrders WHERE SalesOrderId = ?", (cur.lastrowid,))
+            order_row = cur.fetchone()
+            logger.info(f"🔄 Pedido {order_id} auto-creado en base de datos para registrar entrega.")
+        except Exception as e:
+            logger.error(f"Error auto-creando pedido de respaldo: {e}")
 
     if not order_row:
         conn.close()
@@ -1469,15 +1496,60 @@ def create_internal_order(req: OrderCreateRequest):
     try:
         conn = get_sqlite_conn()
         cur = conn.cursor()
+
+        actual_customer_id = req.customerId
+        cust_name = (req.customerName or "").strip()
+        cust_tax = (req.customerTaxId or "").strip()
+        cust_phone = (req.customerPhone or "").strip()
+        cust_addr = (req.customerAddress or "").strip()
+        cust_email = (req.customerEmail or "").strip()
+
+        if cust_name:
+            if not cust_tax:
+                cust_tax = f"CLI-{int(time.time())}"
+            try:
+                cur.execute("""
+                    INSERT INTO Customers (TaxId, BusinessName, Email, Phone, Address, Canton, Province)
+                    VALUES (?, ?, ?, ?, ?, 'Central', 'Cartago')
+                    ON CONFLICT(TaxId) DO UPDATE SET
+                        BusinessName = excluded.BusinessName,
+                        Phone = excluded.Phone,
+                        Address = excluded.Address
+                """, (cust_tax, cust_name, cust_email, cust_phone, cust_addr))
+                cur.execute("SELECT CustomerId FROM Customers WHERE TaxId = ? OR BusinessName = ?", (cust_tax, cust_name))
+                crow = cur.fetchone()
+                if crow:
+                    actual_customer_id = crow["CustomerId"]
+            except Exception as ce:
+                logger.warning(f"Aviso registrando cliente en SQLite: {ce}")
+
+        # Garantizar que actual_customer_id exista en Customers para cumplir la Foreign Key
+        cur.execute("SELECT CustomerId FROM Customers WHERE CustomerId = ?", (actual_customer_id,))
+        if not cur.fetchone():
+            cur.execute("SELECT CustomerId FROM Customers WHERE CustomerId = 99999")
+            if cur.fetchone():
+                actual_customer_id = 99999
+            else:
+                cur.execute("SELECT CustomerId FROM Customers LIMIT 1")
+                first_c = cur.fetchone()
+                actual_customer_id = first_c["CustomerId"] if first_c else 1
+
+        pay_terms = req.paymentTerms or req.terms or "Contado Inmediato"
+        pay_method = req.paymentMethod or "SINPE Móvil"
+        order_status = req.docType if req.docType == "COTIZACION" else "ALISTADO"
+
         cur.execute("""
             INSERT INTO SalesOrders 
-            (OrderNumber, CustomerId, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryNotes, Source, CreatedAt)
-            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'BODEGA_ERP', ?)
+            (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, PaymentTerms, PaymentMethod, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryNotes, DeliveryDate, Source, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'BODEGA_ERP', ?)
         """, (
-            order_code, req.customerId, req.assignedUserId or 6, req.subtotalBruto,
+            order_code, actual_customer_id, cust_name, cust_tax, cust_phone, cust_addr,
+            pay_terms, pay_method,
+            req.assignedUserId or 6, req.subtotalBruto,
             req.descuentoTotal, req.iva, req.total,
-            req.docType if req.docType == "COTIZACION" else "PENDIENTE",
-            req.docType, req.notes or "", datetime.now().strftime("%Y-%m-%d")
+            order_status,
+            req.docType, req.notes or "", req.deliveryDate or datetime.now().strftime("%Y-%m-%d"),
+            datetime.now().strftime("%Y-%m-%d")
         ))
         order_id = cur.lastrowid
         
@@ -1488,11 +1560,46 @@ def create_internal_order(req: OrderCreateRequest):
             """, (order_id, it.productId, it.sku or "", it.name or "", it.qty, it.unitPrice, it.subtotal or (it.qty * it.unitPrice)))
 
         conn.commit()
-        conn.close()
-        return {"success": True, "orderId": order_id, "orderCode": order_code, "message": "Pedido guardado en base de datos."}
+
+        # También respaldar en web_orders.json para contingencia y persistencia completa
+        try:
+            wo_list = load_local_web_orders()
+            wo_list.insert(0, {
+                "id": order_id,
+                "orderCode": order_code,
+                "docType": req.docType,
+                "status": order_status,
+                "customerId": actual_customer_id,
+                "customerName": cust_name,
+                "customerTaxId": cust_tax,
+                "customerPhone": cust_phone,
+                "customerAddress": cust_addr,
+                "paymentTerms": pay_terms,
+                "paymentMethod": pay_method,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "deliveryDate": req.deliveryDate or datetime.now().strftime("%Y-%m-%d"),
+                "subtotalBruto": req.subtotalBruto,
+                "descuentoTotal": req.descuentoTotal,
+                "subtotalNeto": req.subtotalNeto,
+                "iva": req.iva,
+                "total": req.total,
+                "items": [{"productId": it.productId, "sku": it.sku, "name": it.name, "qty": it.qty, "unitPrice": it.unitPrice, "subtotal": it.subtotal} for it in req.items]
+            })
+            with open(WEB_ORDERS_FILE, "w", encoding="utf-8") as f:
+                json.dump(wo_list, f, ensure_ascii=False, indent=2)
+        except Exception as we:
+            logger.warning(f"Error respaldando en web_orders.json: {we}")
+
+        return {"success": True, "orderId": order_id, "orderCode": order_code, "message": "Pedido guardado y respaldado exitosamente en base de datos."}
     except Exception as e:
         logger.error(f"Error creando orden interna: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            if 'conn' in locals() and conn:
+                conn.close()
+        except Exception:
+            pass
 
 @app.get("/api/products")
 def get_products():
