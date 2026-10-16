@@ -96,10 +96,7 @@ const AppState = {
   sidebarCollapsed: false,
   invoiceCounter: 2140,
   customers: [],
-  posCart: [
-    { productId: 1, sku: 'FRAG-DES-001', name: 'Desengrasante Industrial Alcalino Galón (3.8L)', price: 6950, qty: 4, stock: 185 },
-    { productId: 3, sku: 'FRAG-PAP-001', name: 'Papel Higiénico Jumbo Roll 250m (Caja x6)', price: 13850, qty: 2, stock: 95 }
-  ],
+  posCart: [],
 
   // 1. ESTRUCTURA ROBUSTA DE FAMILIAS MACRO DE BODEGA
   families: [
@@ -398,15 +395,12 @@ const AppState = {
 
   // 5. ORDEN ACTUAL EN CURSO
   currentOrder: {
-    customerId: 1,
+    customerId: null,
     assignedUserId: 6, // Ana Mora (Ejecutiva Comercial) por defecto
     docType: 'PEDIDO',
     deliveryDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    notes: 'Entregar en horario matutino de 8am a 11am por el área de recibo.',
-    items: [
-      { productId: 1, qty: 4, discountPct: 5 },
-      { productId: 4, qty: 2, discountPct: 0 }
-    ]
+    notes: '',
+    items: []
   },
   orderCounter: 143,
 
@@ -856,6 +850,9 @@ async function performOrderSync(isManual = false) {
         }
       }
     }
+
+    // Sincronizar notificaciones de trámites asignados al usuario en tiempo real
+    fetchUserNotifications();
   } catch (err) {
     console.warn("Falla en sincronización de pedidos:", err);
   } finally {
@@ -866,6 +863,7 @@ async function performOrderSync(isManual = false) {
 
 function initRealtimeOrderSync() {
   updateWebOrdersBadges();
+  fetchUserNotifications();
   _syncCountdown = 4;
   
   if (_orderSyncInterval) clearInterval(_orderSyncInterval);
@@ -901,6 +899,281 @@ function playOrderChime() {
     osc.stop(audioCtx.currentTime + 0.4);
   } catch (e) {}
 }
+
+// ==============================================================================
+// SISTEMA DE NOTIFICACIONES Y ALERTAS EN TIEMPO REAL PARA COLABORADORES
+// ==============================================================================
+let _lastSeenNotificationId = 0;
+
+async function fetchUserNotifications() {
+  const curUser = (window.AppState && AppState.currentUser) ? AppState.currentUser : {};
+  const uname = curUser.username || '';
+  if (!uname) return;
+
+  try {
+    const url = `/api/notifications?username=${encodeURIComponent(uname)}&unread_only=false`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.success) return;
+
+    const unreadCount = data.unreadCount || 0;
+    const notifs = data.notifications || [];
+
+    // Actualizar badge en la campanita
+    const badgeEl = document.getElementById('userNotifBadgeCount');
+    const bellIcon = document.getElementById('topNotifBellIcon');
+    if (badgeEl) {
+      badgeEl.textContent = unreadCount > 9 ? '9+' : unreadCount;
+      badgeEl.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
+
+    if (bellIcon) {
+      if (unreadCount > 0) {
+        bellIcon.style.color = '#EF4444';
+        bellIcon.style.transform = 'scale(1.15)';
+      } else {
+        bellIcon.style.color = '#F59E0B';
+        bellIcon.style.transform = 'scale(1)';
+      }
+    }
+
+    // Si hay una notificación no leída nueva con ID mayor al último visto
+    const newestUnread = notifs.find(n => !n.isRead && n.id > _lastSeenNotificationId);
+    if (newestUnread) {
+      _lastSeenNotificationId = Math.max(...notifs.map(n => n.id));
+      playOrderChime();
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`🔔 ${newestUnread.title}: ${newestUnread.message}`, 'success');
+      }
+    } else if (notifs.length > 0 && _lastSeenNotificationId === 0) {
+      _lastSeenNotificationId = Math.max(...notifs.map(n => n.id));
+    }
+
+    renderUserNotificationsList(notifs);
+  } catch (err) {
+    console.debug('Aviso consultando notificaciones:', err);
+  }
+}
+
+function renderUserNotificationsList(notifs) {
+  const container = document.getElementById('userNotificationsList');
+  if (!container) return;
+
+  if (!notifs || notifs.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:24px 16px; color:#64748B; font-size:0.85rem;">
+        <i class="bi bi-check-circle-fill text-success" style="font-size:1.8rem; display:block; margin-bottom:8px;"></i>
+        No tiene trámites o asignaciones pendientes.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = notifs.map(n => {
+    const isUnread = !n.isRead;
+    const isDispatch = String(n.title).includes('Ruta') || String(n.userRole).toLowerCase().includes('chofer');
+    const targetView = isDispatch ? 'view-driver-dispatches' : 'view-alistado-web';
+
+    return `
+      <div style="padding:10px 14px; border-bottom:1px solid #F1F5F9; background:${isUnread ? '#FEF3C7' : '#FFFFFF'}; display:flex; gap:10px; align-items:flex-start; transition:background 0.2s;">
+        <div style="font-size:1.25rem; line-height:1; padding-top:2px;">
+          ${n.type === 'ASSIGNMENT' ? (isDispatch ? '🚚' : '📦') : '🔔'}
+        </div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <strong style="font-size:0.8rem; color:#0F172A;">${escapeHtml(n.title)}</strong>
+            <span style="font-size:0.68rem; color:#64748B;">${escapeHtml(n.createdAt ? n.createdAt.slice(11, 16) : '')}</span>
+          </div>
+          <p style="margin:0 0 6px 0; font-size:0.77rem; color:#334155; line-height:1.35;">
+            ${escapeHtml(n.message)}
+          </p>
+          <div style="display:flex; gap:8px; align-items:center;">
+            ${n.referenceCode ? `
+              <button type="button" class="btn-fragama" onclick="switchViewDirectly('${targetView}'); closeUserNotificationsDropdown();" style="padding:2px 8px; font-size:0.72rem; background:#0284C7; color:#FFF; border:none; border-radius:4px; font-weight:700;">
+                <i class="bi bi-arrow-right-circle"></i> Atender Pedido
+              </button>
+            ` : ''}
+            ${isUnread ? `
+              <button type="button" onclick="markNotificationAsRead(${n.id})" style="background:none; border:none; color:#64748B; font-size:0.72rem; cursor:pointer; text-decoration:underline;">
+                Marcar leída
+              </button>
+            ` : '<span style="font-size:0.7rem; color:#10B981;"><i class="bi bi-check2"></i> Leída</span>'}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleUserNotificationsDropdown(event) {
+  if (event) event.stopPropagation();
+  const tray = document.getElementById('userNotificationsTray');
+  if (tray) {
+    const isShowing = tray.style.display === 'block';
+    tray.style.display = isShowing ? 'none' : 'block';
+    if (!isShowing) {
+      fetchUserNotifications();
+    }
+  }
+}
+
+function closeUserNotificationsDropdown() {
+  const tray = document.getElementById('userNotificationsTray');
+  if (tray) tray.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('userNotifContainer');
+  if (container && !container.contains(e.target)) {
+    closeUserNotificationsDropdown();
+  }
+});
+
+async function markNotificationAsRead(id) {
+  try {
+    await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+    fetchUserNotifications();
+  } catch (e) {
+    console.debug('Error marcando notificación:', e);
+  }
+}
+
+async function markAllNotificationsAsRead() {
+  const curUser = (window.AppState && AppState.currentUser) ? AppState.currentUser : {};
+  try {
+    await fetch(`/api/notifications/read-all?username=${encodeURIComponent(curUser.username || '')}`, { method: 'POST' });
+    fetchUserNotifications();
+  } catch (e) {
+    console.debug('Error marcando todas las notificaciones:', e);
+  }
+}
+
+window.fetchUserNotifications = fetchUserNotifications;
+window.toggleUserNotificationsDropdown = toggleUserNotificationsDropdown;
+window.closeUserNotificationsDropdown = closeUserNotificationsDropdown;
+window.markNotificationAsRead = markNotificationAsRead;
+window.markAllNotificationsAsRead = markAllNotificationsAsRead;
+
+// ==============================================================================
+// GESTIÓN Y ENVÍO DE FACTURACIÓN ELECTRÓNICA CR DGT v4.3
+// ==============================================================================
+window.openSendElectronicInvoiceModalFromPrint = function() {
+  const order = window._currentPrintingOrder;
+  if (!order) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('No hay pedido activo para facturar.', 'warning');
+    }
+    return;
+  }
+  openSendElectronicInvoiceModal(order.orderCode || order.id);
+};
+
+window.openSendElectronicInvoiceModal = function(orderIdOrCode) {
+  const modal = document.getElementById('sendElectronicInvoiceModal');
+  if (!modal) return;
+
+  const order = (AppState.salesOrders || []).find(o => 
+    String(o.id) === String(orderIdOrCode) || String(o.orderCode).toUpperCase() === String(orderIdOrCode).toUpperCase()
+  ) || window._currentPrintingOrder || {};
+
+  const orderIdent = order.orderCode || order.id || orderIdOrCode;
+  document.getElementById('feSendOrderId').value = orderIdent;
+  document.getElementById('feSendOrderCodeDisplay').textContent = order.orderCode || `Pedido #${orderIdent}`;
+  document.getElementById('feSendCustomerNameDisplay').textContent = order.customerName || 'Cliente';
+  document.getElementById('feSendRecipientEmail').value = order.customerEmail || '';
+  document.getElementById('feSendRecipientPhone').value = order.customerPhone || '';
+  document.getElementById('feSendRecipientTaxId').value = order.customerTaxId && order.customerTaxId !== 'N/A' ? order.customerTaxId : '';
+
+  const badge = document.getElementById('feSendCustomerStatusBadge');
+  const banner = document.getElementById('feCustomerRequestedBanner');
+  if (order.wantsElectronicInvoice) {
+    if (badge) badge.textContent = '⚡ El cliente SOLICITÓ Factura Electrónica formal en su pedido';
+    if (banner) {
+      banner.style.background = '#ECFDF5';
+      banner.style.borderColor = '#A7F3D0';
+    }
+  } else {
+    if (badge) badge.textContent = 'ℹ️ Envío estándar de Comprobante / Factura Electrónica';
+    if (banner) {
+      banner.style.background = '#F8FAFC';
+      banner.style.borderColor = '#CBD5E1';
+    }
+  }
+
+  modal.classList.add('active');
+};
+
+window.closeSendElectronicInvoiceModal = function() {
+  const modal = document.getElementById('sendElectronicInvoiceModal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.executeSendElectronicInvoice = async function(event) {
+  if (event) event.preventDefault();
+
+  const orderId = document.getElementById('feSendOrderId').value;
+  const email = document.getElementById('feSendRecipientEmail').value.trim();
+  const phone = document.getElementById('feSendRecipientPhone').value.trim();
+  const taxId = document.getElementById('feSendRecipientTaxId').value.trim();
+  const btn = document.getElementById('btnExecuteSendFE');
+
+  if (!email && !phone) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('Debe ingresar al menos un correo o WhatsApp para el envío.', 'warning');
+    }
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="bi bi-arrow-repeat spin-anim"></i> Emitiendo Comprobante Hacienda...`;
+  }
+
+  try {
+    const res = await fetch('/api/tax/send-electronic-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: orderId,
+        recipientEmail: email,
+        recipientPhone: phone,
+        customerTaxId: taxId,
+        sendEmail: Boolean(email),
+        sendWhatsApp: Boolean(phone)
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || data.message || 'Error al emitir y enviar la factura.');
+    }
+
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast(`✅ Factura Electrónica oficial emitida con éxito (Clave: ${data.clave.slice(0, 10)}...${data.clave.slice(-6)}).`, 'success');
+    }
+    closeSendElectronicInvoiceModal();
+
+    if (data.whatsappUrl) {
+      setTimeout(() => {
+        if (confirm(`Factura generada con éxito.\n¿Desea abrir WhatsApp para enviar el comprobante directamente al cliente (${phone})?`)) {
+          window.open(data.whatsappUrl, '_blank');
+        }
+      }, 350);
+    }
+
+    performOrderSync();
+  } catch (err) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast(`Error: ${err.message}`, 'error');
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="bi bi-send-fill"></i> Emitir y Enviar Factura`;
+    }
+  }
+};
 
 function isWebOrder(o) {
   if (!o) return false;
@@ -966,6 +1239,61 @@ function updateWebOrdersBadges() {
       return s === 'NO_ENTREGADO' || s === 'RECHAZADO';
     }).length;
   }
+
+  // Contadores dinámicos para los botones de filtro (separando activos de entregados)
+  const activeCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    return s !== 'ENTREGADO' && s !== 'FACTURADO' && s !== 'CANCELADO' && s !== 'NO_ENTREGADO' && s !== 'RECHAZADO';
+  }).length;
+
+  const curU = AppState.currentUser || {};
+  const uName = (curU.name || '').toLowerCase();
+  const uFirst = uName.split(' ')[0] || '';
+
+  const myAssignedCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    const isActive = s !== 'ENTREGADO' && s !== 'FACTURADO' && s !== 'CANCELADO';
+    const ordDriver = (o.driverName || '').toLowerCase();
+    const ordResp = (o.assignedUserName || o.preparedByName || '').toLowerCase();
+    const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && o.driverUserId && Number(o.driverUserId) === Number(curU.id));
+    const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && o.assignedUserId && Number(o.assignedUserId) === Number(curU.id));
+    const isDefaultChofer = (curU.username === 'chofer' && (ordDriver.includes('minor') || !ordDriver));
+    return (isMyDriver || isMyResp || isDefaultChofer) && isActive;
+  }).length;
+
+  const unassignedCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    const isActive = s !== 'ENTREGADO' && s !== 'FACTURADO' && s !== 'CANCELADO';
+    const noResp = !o.preparedByName || o.preparedByName.trim() === '' || o.preparedByName === 'Sin asignar';
+    return noResp && isActive;
+  }).length;
+
+  const pendingCount = count;
+  const preparedCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    return s === 'ALISTADO' || s === 'EN_ALISTADO';
+  }).length;
+
+  const inRouteCount = allOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
+  const deliveredCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    return s === 'ENTREGADO' || s === 'FACTURADO';
+  }).length;
+
+  const elActive = document.getElementById('filterCountActive');
+  if (elActive) elActive.textContent = activeCount;
+  const elMy = document.getElementById('filterCountMyAssigned');
+  if (elMy) elMy.textContent = myAssignedCount;
+  const elUn = document.getElementById('filterCountUnassigned');
+  if (elUn) elUn.textContent = unassignedCount;
+  const elPend = document.getElementById('filterCountPending');
+  if (elPend) elPend.textContent = pendingCount;
+  const elPrep = document.getElementById('filterCountPrepared');
+  if (elPrep) elPrep.textContent = preparedCount;
+  const elRoute = document.getElementById('filterCountInRoute');
+  if (elRoute) elRoute.textContent = inRouteCount;
+  const elDeliv = document.getElementById('filterCountDelivered');
+  if (elDeliv) elDeliv.textContent = deliveredCount;
   
   const topCount = document.getElementById('topLiveWebOrdersCount');
   if (topCount) topCount.textContent = count;
@@ -977,6 +1305,10 @@ function updateWebOrdersBadges() {
 
   const histBadge = document.getElementById('orderHistoryBadgeCount');
   if (histBadge) histBadge.textContent = AppState.salesOrders.length;
+
+  if (typeof renderCollaboratorWorkloadChips === 'function') {
+    renderCollaboratorWorkloadChips();
+  }
 }
 
 // Navegación directa a pestaña de historial de pedidos
@@ -1016,7 +1348,8 @@ function renderAllViews() {
 // Actualización omnicanal de pedidos en todas las vistas de la bodega
 function refreshAllOrderViews() {
   if (typeof renderOrderHistory === 'function') renderOrderHistory();
-  if (typeof renderWebOrdersFullTable === 'function') renderWebOrdersFullTable();
+  if (typeof renderWebOrdersCurrentView === 'function') renderWebOrdersCurrentView();
+  else if (typeof renderWebOrdersFullTable === 'function') renderWebOrdersFullTable();
   if (typeof updateWebOrdersBadges === 'function') updateWebOrdersBadges();
   if (typeof renderDashboardAnalytics === 'function') renderDashboardAnalytics();
   if (typeof renderDriverDispatches === 'function') renderDriverDispatches();
@@ -1175,6 +1508,8 @@ function setupLoginModule() {
 
           if (loginWrapper) loginWrapper.classList.add('hidden');
           applyRoleRestrictions(u.role);
+          const roleConfig = RolePermissions[u.role] || RolePermissions['Administrador'];
+          switchViewDirectly(roleConfig.homeView);
           updateHeaderProfile();
           showNotificationToast(`Conectado a SQL Server como ${u.name} (${u.role})`, 'success');
           return;
@@ -1623,17 +1958,14 @@ const RolePermissions = {
   'Chofer': {
     homeView: 'view-chofer-mobile',
     allowedViews: [
-      'view-alistado-web',
       'view-chofer-mobile'
     ]
   },
   'Vendedor': {
     homeView: 'view-customer-orders',
     allowedViews: [
-      'view-alistado-web',
       'view-customer-orders',
-      'view-customers-management',
-      'view-product-maintenance'
+      'view-customers-management'
     ]
   }
 };
@@ -1652,39 +1984,79 @@ function setupRoleSwitcher() {
 }
 
 function applyRoleRestrictions(role) {
+  const currentRole = role || (AppState.currentUser && AppState.currentUser.role) || 'Administrador';
+  const isAdmin = (currentRole === 'Administrador');
+  const isBodeguero = (currentRole === 'Bodeguero');
+  const isChofer = (currentRole === 'Chofer');
+  const isCajero = (currentRole === 'Cajero');
+  const isVendedor = (currentRole === 'Vendedor');
+
   const userRoleBadge = document.getElementById('userRoleBadge');
   const userNameDisplay = document.getElementById('userNameDisplay');
 
-  if (userRoleBadge) userRoleBadge.textContent = role;
+  if (userRoleBadge) {
+    userRoleBadge.textContent = currentRole.toUpperCase();
+    if (isAdmin) {
+      userRoleBadge.style.background = 'var(--fragama-orange-main)';
+      userRoleBadge.style.color = '#FFF';
+    } else if (isChofer) {
+      userRoleBadge.style.background = '#8B5CF6';
+      userRoleBadge.style.color = '#FFF';
+    } else {
+      userRoleBadge.style.background = '#0284C7';
+      userRoleBadge.style.color = '#FFF';
+    }
+  }
 
-  // Mostrar el nombre real del usuario autenticado actual
+  // 1. Mostrar nombre real del usuario autenticado
   if (userNameDisplay) {
     if (AppState.currentUser && AppState.currentUser.name) {
       userNameDisplay.textContent = AppState.currentUser.name;
     } else {
-      const currentSysUser = AppState.systemUsers.find(u => u.username === (AppState.currentUser && AppState.currentUser.username));
-      if (currentSysUser && currentSysUser.name) {
-        userNameDisplay.textContent = currentSysUser.name;
-      } else {
-        userNameDisplay.textContent = 'Usuario Fragama';
-      }
+      const currentSysUser = (AppState.systemUsers || []).find(u => u.username === (AppState.currentUser && AppState.currentUser.username));
+      userNameDisplay.textContent = currentSysUser ? currentSysUser.name : 'Usuario Fragama';
     }
   }
 
-  const roleConfig = RolePermissions[role] || RolePermissions['Administrador'];
+  // 2. Control Estricto de Acceso en Barra Superior (Top Navbar)
+  const topBtnNewUser = document.getElementById('topBtnNewUser');
+  if (topBtnNewUser) {
+    // Únicamente el Administrador puede registrar y asignar roles a colaboradores
+    topBtnNewUser.style.display = isAdmin ? 'inline-flex' : 'none';
+  }
+
+  const topBtnProducts = document.getElementById('topBtnProducts');
+  if (topBtnProducts) {
+    // Solo Administrador y Bodeguero pueden mantener catálogo de productos
+    topBtnProducts.style.display = (isAdmin || isBodeguero) ? 'inline-flex' : 'none';
+  }
+
+  const topLiveWebOrdersBtn = document.getElementById('topLiveWebOrdersBtn');
+  if (topLiveWebOrdersBtn && isChofer) {
+    // Ocultar alerta de alistado para choferes en ruta
+    topLiveWebOrdersBtn.style.display = 'none';
+  }
+
+  // 3. Control de Acceso en Botones Operativos de Vistas
+  const btnAutoAssign = document.getElementById('btnAutoAssignOrders');
+  if (btnAutoAssign) {
+    btnAutoAssign.style.display = (isAdmin || isBodeguero) ? 'inline-flex' : 'none';
+  }
+
+  const roleConfig = RolePermissions[currentRole] || RolePermissions['Administrador'];
   const allowed = roleConfig.allowedViews;
 
-  // 1. Filtrar visibilidad de enlaces en el Menú Lateral según roles autorizados
+  // 4. Filtrar visibilidad en el Menú Lateral según roles autorizados
   document.querySelectorAll('.sidebar .nav-link').forEach(link => {
     const rolesAttr = link.getAttribute('data-roles');
     if (rolesAttr) {
       const rolesList = rolesAttr.split(',').map(r => r.trim());
-      const hasAccess = rolesList.includes(role);
+      const hasAccess = rolesList.includes(currentRole);
       link.style.display = hasAccess ? 'flex' : 'none';
     }
   });
 
-  // 2. Ocultar grupos de menú (acordeones) si no tienen enlaces visibles
+  // Ocultar grupos de menú (acordeones) si no tienen enlaces visibles
   document.querySelectorAll('.sidebar .collapse-menu').forEach(menu => {
     const visibleLinks = Array.from(menu.querySelectorAll('.nav-link')).filter(l => l.style.display !== 'none');
     const groupToggle = document.querySelector(`.sidebar .tree-toggle[data-collapse="${menu.id}"]`);
@@ -1697,12 +2069,36 @@ function applyRoleRestrictions(role) {
     }
   });
 
-  // 3. Si la vista actual no está permitida para este rol, redirigir automáticamente
+  // 5. Redirección automática si la vista actual no está permitida para este rol
   const currentActiveView = document.querySelector('.role-view.active');
   const currentViewId = currentActiveView ? currentActiveView.id : '';
 
-  if (!allowed.includes(currentViewId)) {
+  if (!allowed.includes(currentViewId) || (isChofer && currentViewId !== 'view-chofer-mobile')) {
     switchViewDirectly(roleConfig.homeView);
+  }
+
+  // 6. Ajustar Barra Inferior Móvil (Mobile Bottom Nav) según Rol
+  const mobNavHome = document.getElementById('mobNavHome');
+  const mobNavInventory = document.getElementById('mobNavInventory');
+  const mobNavOrders = document.getElementById('mobNavOrders');
+  const mobNavPos = document.getElementById('mobNavPos');
+
+  if (isChofer) {
+    if (mobNavHome) {
+      mobNavHome.setAttribute('onclick', "switchMobileNav('view-chofer-mobile', this)");
+      mobNavHome.innerHTML = '<i class="bi bi-truck"></i><span>Mi Ruta</span>';
+    }
+    if (mobNavInventory) mobNavInventory.style.display = 'none';
+    if (mobNavOrders) mobNavOrders.style.display = 'none';
+    if (mobNavPos) mobNavPos.style.display = 'none';
+  } else {
+    if (mobNavHome) {
+      mobNavHome.setAttribute('onclick', "switchMobileNav('view-admin-dashboard', this)");
+      mobNavHome.innerHTML = '<i class="bi bi-house-door-fill"></i><span>Inicio</span>';
+    }
+    if (mobNavInventory) mobNavInventory.style.display = (isAdmin || isBodeguero) ? 'flex' : 'none';
+    if (mobNavOrders) mobNavOrders.style.display = 'flex';
+    if (mobNavPos) mobNavPos.style.display = (isAdmin || isCajero) ? 'flex' : 'none';
   }
 }
 
@@ -5408,18 +5804,18 @@ window.adjustOrderCatalogQty = function(productId, delta) {
 };
 
 window.addOrderItemToCurrentOrder = function(productId) {
-  const product = AppState.products.find(p => p.id === productId);
+  const product = AppState.products.find(p => String(p.id) === String(productId));
   if (!product) return;
 
   const input = document.getElementById(`catQty_${productId}`);
   const qtyToAdd = input ? parseInt(input.value, 10) || 1 : 1;
 
-  if (product.stock <= 0) {
-    alert(`❌ No hay existencias disponibles para [${product.sku}].`);
+  if (Number(product.stock) <= 0) {
+    alert(`❌ No hay existencias disponibles para [${product.sku || product.name}].`);
     return;
   }
 
-  const existing = AppState.currentOrder.items.find(item => item.productId === productId);
+  const existing = AppState.currentOrder.items.find(item => String(item.productId) === String(productId));
   if (existing) {
     if (existing.qty + qtyToAdd > product.stock) {
       alert(`⚠️ Advertencia de Inventario: La cantidad solicitada (${existing.qty + qtyToAdd}) supera el stock físico disponible en bodega (${product.stock}).`);
@@ -5431,6 +5827,8 @@ window.addOrderItemToCurrentOrder = function(productId) {
     }
     AppState.currentOrder.items.push({
       productId: product.id,
+      sku: product.sku,
+      name: product.name,
       qty: qtyToAdd,
       discountPct: 0
     });
@@ -5444,6 +5842,16 @@ function renderOrderLines() {
   const tbody = document.getElementById('orderItemsTableBody');
   const countEl = document.getElementById('orderItemCount');
   if (!tbody) return;
+
+  // Filtrar artículos fantasmas que no existan en AppState.products para evitar errores de SKU fantasma
+  if (Array.isArray(AppState.currentOrder.items)) {
+    AppState.currentOrder.items = AppState.currentOrder.items.filter(item => {
+      return AppState.products.some(p => 
+        String(p.id) === String(item.productId) || 
+        (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+      );
+    });
+  }
 
   if (countEl) countEl.textContent = AppState.currentOrder.items.length;
 
@@ -5465,7 +5873,10 @@ function renderOrderLines() {
   let totalDescuentos = 0;
 
   tbody.innerHTML = AppState.currentOrder.items.map(item => {
-    const product = AppState.products.find(p => p.id === item.productId);
+    const product = AppState.products.find(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    );
     if (!product) return '';
 
     const lineBruto = product.price * item.qty;
@@ -5478,21 +5889,21 @@ function renderOrderLines() {
     return `
       <tr style="border-bottom:1px solid #E2E8F0;">
         <td style="padding:8px 10px;">
-          <div style="font-weight:700; color:#0B192C;">${product.name}</div>
-          <div style="font-size:0.72rem; color:#64748B; font-family:'JetBrains Mono',monospace;">${product.sku} | ${product.unit || 'UNIDAD'}</div>
+          <div style="font-weight:700; color:#0B192C;">${escapeHtml(product.name)}</div>
+          <div style="font-size:0.72rem; color:#64748B; font-family:'JetBrains Mono',monospace;">${escapeHtml(product.sku)} | ${escapeHtml(product.unit || 'UNIDAD')} &bull; <span style="color:#059669; font-weight:700;">Stock: ${product.stock}</span></div>
         </td>
         <td style="padding:6px; text-align:center;">
           <div style="display:inline-flex; align-items:center; border:1px solid #CBD5E1; border-radius:4px; overflow:hidden;">
-            <button type="button" style="background:#F1F5F9; border:none; width:20px; height:22px; cursor:pointer;" onclick="updateOrderItemQty(${item.productId}, -1)">-</button>
-            <span style="font-weight:700; min-width:26px; text-align:center; font-size:0.8rem;">${item.qty}</span>
-            <button type="button" style="background:#F1F5F9; border:none; width:20px; height:22px; cursor:pointer;" onclick="updateOrderItemQty(${item.productId}, 1)">+</button>
+            <button type="button" style="background:#F1F5F9; border:none; width:22px; height:24px; cursor:pointer;" onclick="updateOrderItemQty('${item.productId}', -1)">-</button>
+            <span style="font-weight:700; min-width:28px; text-align:center; font-size:0.82rem;">${item.qty}</span>
+            <button type="button" style="background:#F1F5F9; border:none; width:22px; height:24px; cursor:pointer;" onclick="updateOrderItemQty('${item.productId}', 1)">+</button>
           </div>
         </td>
         <td style="padding:6px; text-align:right; font-weight:600; color:#475569;">
           ${formatCRC(product.price)}
         </td>
         <td style="padding:6px; text-align:center;">
-          <select style="border:1px solid #CBD5E1; border-radius:4px; padding:2px 4px; font-size:0.75rem; font-weight:600;" onchange="setOrderItemDiscount(${item.productId}, this.value)">
+          <select style="border:1px solid #CBD5E1; border-radius:4px; padding:2px 4px; font-size:0.75rem; font-weight:600;" onchange="setOrderItemDiscount('${item.productId}', this.value)">
             <option value="0" ${item.discountPct === 0 ? 'selected' : ''}>0%</option>
             <option value="5" ${item.discountPct === 5 ? 'selected' : ''}>5%</option>
             <option value="8" ${item.discountPct === 8 ? 'selected' : ''}>8%</option>
@@ -5504,7 +5915,7 @@ function renderOrderLines() {
           ${formatCRC(lineNeto)}
         </td>
         <td style="padding:6px; text-align:center;">
-          <button type="button" style="background:none; border:none; color:#EF4444; cursor:pointer; font-size:0.9rem;" onclick="removeOrderItem(${item.productId})" title="Quitar item">
+          <button type="button" style="background:none; border:none; color:#EF4444; cursor:pointer; font-size:0.95rem;" onclick="removeOrderItem('${item.productId}')" title="Quitar item">
             <i class="bi bi-trash"></i>
           </button>
         </td>
@@ -5534,10 +5945,10 @@ function updateOrderFinancialTotals(subtotalBruto, totalDescuentos) {
 }
 
 window.updateOrderItemQty = function(productId, delta) {
-  const item = AppState.currentOrder.items.find(i => i.productId === productId);
+  const item = AppState.currentOrder.items.find(i => String(i.productId) === String(productId));
   if (!item) return;
 
-  const product = AppState.products.find(p => p.id === productId);
+  const product = AppState.products.find(p => String(p.id) === String(productId));
   const newQty = item.qty + delta;
 
   if (newQty <= 0) {
@@ -5554,7 +5965,7 @@ window.updateOrderItemQty = function(productId, delta) {
 };
 
 window.setOrderItemDiscount = function(productId, discountVal) {
-  const item = AppState.currentOrder.items.find(i => i.productId === productId);
+  const item = AppState.currentOrder.items.find(i => String(i.productId) === String(productId));
   if (item) {
     item.discountPct = parseFloat(discountVal) || 0;
     renderOrderLines();
@@ -5562,7 +5973,7 @@ window.setOrderItemDiscount = function(productId, discountVal) {
 };
 
 window.removeOrderItem = function(productId) {
-  AppState.currentOrder.items = AppState.currentOrder.items.filter(i => i.productId !== productId);
+  AppState.currentOrder.items = AppState.currentOrder.items.filter(i => String(i.productId) !== String(productId));
   renderOrderLines();
 };
 
@@ -5678,12 +6089,30 @@ async function saveOrder(isQuote = false) {
     return;
   }
 
-  // Si es pedido firme, validar stock estricto
+  // 1. Filtrar artículos inválidos o fantasmas que no existan en el catálogo maestro
+  AppState.currentOrder.items = AppState.currentOrder.items.filter(item => {
+    return AppState.products.some(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    );
+  });
+
+  if (AppState.currentOrder.items.length === 0) {
+    alert('❌ Por favor agregue al menos un producto a la orden desde el catálogo.');
+    return;
+  }
+
+  // 2. Si es pedido firme, validar stock estricto
   if (!isQuote) {
     for (const item of AppState.currentOrder.items) {
-      const product = AppState.products.find(p => p.id === item.productId);
-      if (!product || product.stock < item.qty) {
-        alert(`❌ ACCIÓN BLOQUEADA: Stock insuficiente para [${product ? product.sku : 'SKU'}]. Hay ${product ? product.stock : 0} en existencia y se solicitaron ${item.qty}.`);
+      const product = AppState.products.find(p => 
+        String(p.id) === String(item.productId) || 
+        (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+      );
+      if (!product) continue;
+      const availableStock = Number(product.stock) || 0;
+      if (availableStock < Number(item.qty)) {
+        alert(`❌ ACCIÓN BLOQUEADA: Stock insuficiente para [${product.sku || product.name}]. Hay ${availableStock} en existencia en bodega y se solicitaron ${item.qty}.`);
         return;
       }
     }
@@ -5736,8 +6165,12 @@ async function saveOrder(isQuote = false) {
   let totalDescuentos = 0;
 
   const orderItemsDetails = AppState.currentOrder.items.map(item => {
-    const product = AppState.products.find(p => p.id === item.productId);
-    const lineBruto = product.price * item.qty;
+    const product = AppState.products.find(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    ) || {};
+    const price = Number(product.price) || 0;
+    const lineBruto = price * item.qty;
     const lineDesc = (lineBruto * (item.discountPct || 0)) / 100;
     const lineNeto = lineBruto - lineDesc;
 
@@ -5745,12 +6178,13 @@ async function saveOrder(isQuote = false) {
     totalDescuentos += lineDesc;
 
     return {
-      productId: product.id,
-      sku: product.sku,
-      name: product.name,
+      productId: product.id || item.productId,
+      sku: product.sku || item.sku || 'N/A',
+      name: product.name || item.name || 'Producto Fragama',
+      cabys: product.cabys || item.cabys || '4669010000000',
       unit: product.unit || 'UNIDAD',
       qty: item.qty,
-      unitPrice: product.price,
+      unitPrice: price,
       discountPct: item.discountPct || 0,
       subtotal: lineNeto
     };
@@ -6197,6 +6631,26 @@ function openOrderPrintModal(order) {
         </button>
       </div>
     </div>
+
+    <!-- BANNER DE SOLICITUD DE FACTURA ELECTRÓNICA POR EL CLIENTE -->
+    ${order.wantsElectronicInvoice ? `
+      <div style="background:#ECFDF5; border:1px solid #10B981; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px; color:#065F46; font-size:0.82rem; font-weight:800;">
+          <i class="bi bi-shield-check text-success" style="font-size:1.3rem;"></i>
+          <span>⚡ EL CLIENTE SOLICITÓ FACTURA ELECTRÓNICA V4.3 (${escapeHtml(order.customerEmail || 'Correo a confirmar')})</span>
+        </div>
+        <button type="button" class="btn-fragama no-print" onclick="openSendElectronicInvoiceModalFromPrint()" style="background:#0284C7; color:#FFF; padding:4px 12px; font-size:0.75rem; font-weight:700; border:none; border-radius:6px; cursor:pointer;">
+          <i class="bi bi-send-fill"></i> Enviar Factura Ahora
+        </button>
+      </div>
+    ` : ''}
+
+    ${order.invoiceSentAt ? `
+      <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:8px; padding:8px 12px; margin-bottom:14px; color:#0369A1; font-size:0.8rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+        <i class="bi bi-check2-all text-primary" style="font-size:1.2rem;"></i>
+        <span>Factura Electrónica enviada exitosamente a <strong>${escapeHtml(order.invoiceSentTo || '')}</strong> el ${escapeHtml(order.invoiceSentAt)}.</span>
+      </div>
+    ` : ''}
 
     <!-- BANNER DESTACADO DE CONDICIÓN DE PAGO (CONTADO, CRÉDITO A COBRAR EN TIEMPO O CONTRA ENTREGA) -->
     ${(() => {
@@ -7145,11 +7599,124 @@ function renderTimelineItems(logs) {
 }
 
 window.viewSavedOrderPrint = function(orderId) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === orderId);
+  if (!orderId) {
+    showNotificationToast("Indique un número de pedido o factura válido.", "warning");
+    return;
+  }
+  const cleanId = String(orderId).trim();
+
+  // 1. Buscar coincidencia en AppState.salesOrders
+  let order = (AppState.salesOrders || []).find(o => 
+    String(o.id) === cleanId || 
+    String(o.orderCode || '').toUpperCase() === cleanId.toUpperCase() ||
+    cleanId.toUpperCase().includes(String(o.orderCode || '').toUpperCase()) ||
+    (o.orderCode && String(o.orderCode).toUpperCase().includes(cleanId.toUpperCase()))
+  );
+
+  // 2. Si no se encontró en salesOrders, buscar en despachos unificados
+  if (!order) {
+    const allDispatches = (typeof getUnifiedDriverDispatches === 'function') 
+      ? getUnifiedDriverDispatches() 
+      : (AppState.dispatches || []);
+    const d = allDispatches.find(item => 
+      String(item.id) === cleanId || 
+      String(item.code || '').toUpperCase() === cleanId.toUpperCase() ||
+      String(item.orderCode || '').toUpperCase() === cleanId.toUpperCase() ||
+      String(item.invoice || '').toUpperCase() === cleanId.toUpperCase()
+    );
+
+    if (d) {
+      if (d.originalOrder) {
+        order = d.originalOrder;
+      } else {
+        const totalAmount = Number(d.total) || 48500;
+        const subNeto = Math.round(totalAmount / 1.13);
+        const ivaAmount = totalAmount - subNeto;
+
+        let parsedItems = [];
+        if (Array.isArray(d.rawItems) && d.rawItems.length > 0) {
+          parsedItems = d.rawItems;
+        } else if (Array.isArray(d.packages) && d.packages.length > 0) {
+          parsedItems = d.packages.map((pkg, idx) => ({
+            sku: `FRG-BULTO-${idx + 1}`,
+            cabys: '4669010000000',
+            name: pkg.desc || `Bulto logístico #${idx + 1}`,
+            qty: Number(pkg.qty) || 1,
+            unit: pkg.unit || 'Bulto',
+            unitPrice: Math.round(totalAmount / (d.packages.length || 1)),
+            discountPct: 0,
+            subtotal: Math.round(totalAmount / (d.packages.length || 1))
+          }));
+        } else if (typeof d.items === 'string' && d.items.length > 0) {
+          parsedItems = d.items.split(',').map((itStr, idx) => {
+            const parts = itStr.trim().split('x ');
+            const qty = parts.length > 1 ? parseInt(parts[0]) || 1 : 1;
+            const name = parts.length > 1 ? parts.slice(1).join('x ') : itStr.trim();
+            const lineTotal = Math.round(totalAmount / (d.items.split(',').length || 1));
+            return {
+              sku: `FRG-PROD-${idx + 1}`,
+              cabys: '4669010000000',
+              name: name,
+              qty: qty,
+              unit: 'UND',
+              unitPrice: Math.round(lineTotal / qty),
+              discountPct: 0,
+              subtotal: lineTotal
+            };
+          });
+        } else {
+          parsedItems = [{
+            sku: 'FRG-GEN-01',
+            cabys: '4669010000000',
+            name: 'Carga de Mercadería Fragama',
+            qty: 1,
+            unit: 'CARGA',
+            unitPrice: totalAmount,
+            discountPct: 0,
+            subtotal: totalAmount
+          }];
+        }
+
+        order = {
+          id: d.id,
+          orderCode: d.orderCode || d.invoice || d.code,
+          docType: 'PEDIDO',
+          status: d.status === 'Entregado' ? 'ENTREGADO' : (d.status === 'En Ruta' ? 'EN_RUTA' : 'ALISTADO'),
+          date: d.departureTime ? `2026-10-16 ${d.departureTime}` : new Date().toLocaleDateString('es-CR'),
+          customerName: d.customer || 'Cliente Fragama',
+          customerTaxId: '3-101-778899',
+          customerPhone: d.customerPhone || (d.contact ? (d.contact.match(/\((.*?)\)/)?.[1] || d.contact) : '+506 2551-0000'),
+          customerContact: d.contact ? d.contact.split(' (')[0] : 'Encargado de Compras',
+          customerEmail: 'facturacion@fragama.cr',
+          customerProvince: d.province || 'Cartago',
+          customerCanton: d.canton || 'Central',
+          customerAddress: d.address || 'Dirección de Entrega Registrada en Costa Rica',
+          deliveryRoute: d.province || 'Cartago',
+          driverName: d.driverName || (d.driver ? d.driver.split(' - ')[0] : 'Minor Coto (Chofer Logístico)'),
+          driverUserId: d.driverUserId || 5,
+          preparedByName: 'Supervisor de Despacho Fragama',
+          paymentTerms: d.paymentTerms || (d.isCredit ? 'Crédito 30 días' : (d.isCashOnDelivery ? 'Contra Entrega' : 'Contado')),
+          paymentMethod: d.paymentMethod || 'SINPE Móvil / Transferencia',
+          isCredit: Boolean(d.isCredit),
+          creditDays: d.creditDays || 30,
+          dueDate: d.dueDate || '30 días',
+          isCashOnDelivery: Boolean(d.isCashOnDelivery),
+          items: parsedItems,
+          total: totalAmount,
+          subtotalBruto: subNeto,
+          descuentoTotal: 0,
+          subtotalNeto: subNeto,
+          iva: ivaAmount,
+          notes: `Ruta de entrega programada para ${d.province || 'Costa Rica'}. Comprobante oficial de alisto y transporte.`
+        };
+      }
+    }
+  }
+
   if (order) {
     openOrderPrintModal(order);
   } else {
-    showNotificationToast("No se encontró el comprobante del pedido solicitado.", "warning");
+    showNotificationToast(`No se encontró el comprobante para "${cleanId}".`, "warning");
   }
 };
 
@@ -7157,12 +7724,18 @@ window.convertQuoteToSalesOrder = function(orderId) {
   const order = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === orderId);
   if (!order) return;
 
-  // Validar stock
-  for (const item of order.items) {
-    const product = AppState.products.find(p => p.id === item.productId);
-    if (!product || product.stock < item.qty) {
-      alert(`❌ Stock insuficiente para [${product ? product.sku : 'SKU'}].`);
-      return;
+  // Validar stock con coincidencia flexible
+  for (const item of (order.items || [])) {
+    const product = AppState.products.find(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    );
+    if (product) {
+      const avail = Number(product.stock) || 0;
+      if (avail < Number(item.qty)) {
+        alert(`❌ Stock insuficiente para [${product.sku || product.name}]. Hay ${avail} disponibles y se solicitaron ${item.qty}.`);
+        return;
+      }
     }
   }
 
@@ -7306,50 +7879,115 @@ window.onAdminDriverFilterChange = function(driverVal) {
   renderDriverDispatches();
 };
 
-function getUnifiedDriverDispatches() {
-  const curUser = AppState.currentUser || {};
-  const list = [...AppState.dispatches];
-
-  // Integrar pedidos en ALISTADO o EN_RUTA desde AppState.salesOrders si aún no están en la lista
-  const activeOrders = (AppState.salesOrders || []).filter(o => {
-    const st = (o.status || '').toUpperCase();
-    return st === 'EN_RUTA' || st === 'ALISTADO' || st === 'ENTREGADO';
+window.setDriverStatusFilter = function(statusFilter) {
+  AppState.driverStatusFilter = statusFilter || 'ALL';
+  const pills = document.querySelectorAll('.driver-status-pill');
+  pills.forEach(p => {
+    if (p.getAttribute('data-status-filter') === (statusFilter || 'ALL')) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
   });
 
-  activeOrders.forEach(o => {
-    const code = o.orderCode || o.id;
-    const exists = list.some(d => d.orderCode === code || d.code === code);
-    if (!exists) {
-      const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(o) : 'Carga general';
-      const itemsList = Array.isArray(o.items) && o.items.length > 0
-        ? o.items.map(it => `${it.qty || 1}x ${it.name || it.productName || 'Producto'}`).join(', ')
-        : 'Carga de mercadería';
+  const badge = document.getElementById('driverStatusFilterSummaryBadge');
+  if (badge) {
+    if (statusFilter === 'EN_RUTA') badge.textContent = 'En Ruta (Activos)';
+    else if (statusFilter === 'LISTO') badge.textContent = 'Listos / Alistados';
+    else if (statusFilter === 'ENTREGADO') badge.textContent = 'Entregados';
+    else badge.textContent = 'Todos los pedidos';
+  }
 
+  renderDriverDispatches();
+};
+
+function getUnifiedDriverDispatches() {
+  const curUser = AppState.currentUser || {};
+  const list = [];
+  const registeredCodes = new Set();
+
+  // 1. PRIORIDAD MÁXIMA: Pedidos reales de AppState.salesOrders (desde la base de datos)
+  const allSalesOrders = Array.isArray(AppState.salesOrders) ? AppState.salesOrders : [];
+
+  // Ordenar los pedidos reales de forma que los activos aparezcan primero
+  const sortedOrders = [...allSalesOrders].sort((a, b) => {
+    const score = st => {
+      const s = (st || '').toUpperCase();
+      if (s === 'EN_RUTA') return 5;
+      if (s === 'ALISTADO') return 4;
+      if (s === 'EN_ALISTADO') return 3;
+      if (s === 'PENDIENTE') return 2;
+      if (s === 'ENTREGADO') return 1;
+      return 0;
+    };
+    return score(b.status) - score(a.status);
+  });
+
+  sortedOrders.forEach(o => {
+    const code = o.orderCode || o.id;
+    if (!code || registeredCodes.has(String(code).toUpperCase())) return;
+    registeredCodes.add(String(code).toUpperCase());
+
+    const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(o) : 'Carga general';
+    const itemsList = Array.isArray(o.items) && o.items.length > 0
+      ? o.items.map(it => `${it.qty || it.quantity || 1}x ${it.name || it.productName || 'Producto'}`).join(', ')
+      : 'Carga de mercadería Fragama';
+
+    const orderStatusUpper = (o.status || '').toUpperCase();
+    let displayStatus = 'Asignado';
+    if (orderStatusUpper === 'ENTREGADO') displayStatus = 'Entregado';
+    else if (orderStatusUpper === 'EN_RUTA') displayStatus = 'En Ruta';
+    else if (orderStatusUpper === 'ALISTADO') displayStatus = 'Listo para Despacho';
+    else if (orderStatusUpper === 'EN_ALISTADO') displayStatus = 'En Alisto Bodega';
+    else if (orderStatusUpper === 'PENDIENTE') displayStatus = 'Pendiente de Alisto';
+    else if (orderStatusUpper === 'RECHAZADO' || orderStatusUpper === 'NOVEDAD') displayStatus = 'Rechazado';
+
+    const cleanContact = o.customerContact || o.customerName || 'Cliente';
+    const contactStr = o.customerPhone ? `${cleanContact} (${o.customerPhone})` : cleanContact;
+
+    list.push({
+      id: 'ord_' + (o.id || code),
+      code: code,
+      orderCode: code,
+      customer: o.customerName || 'Cliente Fragama',
+      province: o.customerProvince || o.deliveryRoute || 'Cartago',
+      canton: o.customerCanton || 'Central',
+      address: o.customerAddress || 'Dirección registrada en pedido',
+      contact: contactStr,
+      customerPhone: o.customerPhone || '',
+      invoice: `FAC-${code}`,
+      items: itemsList,
+      rawItems: o.items || [],
+      packages: [{ qty: (Array.isArray(o.items) ? o.items.length : 1), unit: 'Bultos', desc: bultos }],
+      driver: o.driverName || 'Minor Coto - Isuzu CL-294012',
+      driverName: o.driverName || 'Minor Coto',
+      driverUserId: o.driverUserId || (o.driverName && o.driverName.includes('Mauricio') ? 6 : 5),
+      status: displayStatus,
+      rawStatus: orderStatusUpper,
+      verified: (orderStatusUpper === 'EN_RUTA' || orderStatusUpper === 'ENTREGADO' || orderStatusUpper === 'ALISTADO'),
+      paymentTerms: o.paymentTerms || o.terms || 'Contado',
+      paymentMethod: o.paymentMethod || 'SINPE Móvil / Transferencia',
+      total: Number(o.total) || 0,
+      isCredit: o.isCredit || String(o.paymentTerms || o.terms || '').toLowerCase().includes('crédito'),
+      creditDays: o.creditDays || 30,
+      dueDate: o.dueDate || '30 días',
+      isCashOnDelivery: o.isCashOnDelivery || String(o.paymentTerms || o.terms || '').toLowerCase().includes('contra entrega'),
+      departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM',
+      isRealOrder: true,
+      originalOrder: o
+    });
+  });
+
+  // 2. Mock Dispatches como respaldo si no colisionan
+  (AppState.dispatches || []).forEach(d => {
+    const code = d.orderCode || d.code;
+    if (code && !registeredCodes.has(String(code).toUpperCase())) {
+      registeredCodes.add(String(code).toUpperCase());
+      const rawSt = (d.status === 'Entregado' ? 'ENTREGADO' : (d.status === 'En Ruta' ? 'EN_RUTA' : 'ALISTADO'));
       list.push({
-        id: 'ord_' + o.id,
-        code: `DSP-${code}`,
-        orderCode: code,
-        customer: o.customerName || 'Cliente Fragama',
-        province: o.customerProvince || o.deliveryRoute || 'Cartago',
-        canton: o.customerCanton || 'Central',
-        address: o.customerAddress || 'Dirección registrada en pedido',
-        contact: `${o.customerContact || o.customerName || 'Cliente'} (${o.customerPhone || 'N/A'})`,
-        invoice: `FAC-${code}`,
-        items: itemsList,
-        packages: [{ qty: (Array.isArray(o.items) ? o.items.length : 1), unit: 'Bultos', desc: bultos }],
-        driver: o.driverName || 'Minor Coto - Isuzu CL-294012',
-        driverName: o.driverName || 'Minor Coto',
-        driverUserId: o.driverUserId || 5,
-        status: o.status === 'ENTREGADO' ? 'Entregado' : (o.status === 'EN_RUTA' ? 'En Ruta' : 'Asignado'),
-        verified: true,
-        paymentTerms: o.paymentTerms || o.terms || 'Contado',
-        paymentMethod: o.paymentMethod || 'SINPE Móvil / Transferencia',
-        total: o.total || 0,
-        isCredit: o.isCredit || String(o.paymentTerms || o.terms || '').toLowerCase().includes('crédito'),
-        creditDays: o.creditDays || 30,
-        dueDate: o.dueDate || '30 días',
-        isCashOnDelivery: o.isCashOnDelivery || String(o.paymentTerms || o.terms || '').toLowerCase().includes('contra entrega'),
-        departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM'
+        ...d,
+        rawStatus: rawSt,
+        isRealOrder: false
       });
     }
   });
@@ -7377,7 +8015,6 @@ function renderDriverDispatches() {
   if (isAdmin) {
     if (adminBar) adminBar.style.display = 'block';
     if (adminSelect) {
-      // Recopilar nombres únicos de choferes asignados
       const setDrivers = new Set();
       (AppState.systemUsers || []).filter(u => u.role === 'Chofer').forEach(u => setDrivers.add(u.name.split(' (')[0].trim()));
       allDispatches.forEach(d => {
@@ -7414,7 +8051,6 @@ function renderDriverDispatches() {
   // 2. SEGREGACIÓN DE DATOS POR ASIGNACIÓN (Row-Level Security)
   let visibleDispatches = allDispatches;
   if (!isAdmin) {
-    // Si no es Administrador (ej. Chofer), SOLO ve lo que tiene asignado
     const uNameLower = (curUser.name || '').toLowerCase();
     const uFirst = uNameLower.split(' ')[0] || '';
     visibleDispatches = allDispatches.filter(d => {
@@ -7434,58 +8070,117 @@ function renderDriverDispatches() {
     });
   }
 
-  // 3. Filtrado por provincia de Costa Rica
+  // 3. Conteo en vivo de los Tabs de Flujo de Trabajo (Status Tabs)
+  const countAll = visibleDispatches.length;
+  const countEnRuta = visibleDispatches.filter(d => d.rawStatus === 'EN_RUTA' || d.status === 'En Ruta').length;
+  const countListo = visibleDispatches.filter(d => 
+    ['ALISTADO', 'EN_ALISTADO', 'PENDIENTE'].includes(d.rawStatus) || 
+    ['Asignado', 'Listo para Despacho', 'En Alisto Bodega', 'Pendiente de Alisto'].includes(d.status)
+  ).length;
+  const countEntregado = visibleDispatches.filter(d => d.rawStatus === 'ENTREGADO' || d.status === 'Entregado').length;
+
+  const elCountAll = document.getElementById('countTabAll');
+  const elCountEnRuta = document.getElementById('countTabEnRuta');
+  const elCountListo = document.getElementById('countTabListo');
+  const elCountEntregado = document.getElementById('countTabEntregado');
+
+  if (elCountAll) elCountAll.textContent = countAll;
+  if (elCountEnRuta) elCountEnRuta.textContent = countEnRuta;
+  if (elCountListo) elCountListo.textContent = countListo;
+  if (elCountEntregado) elCountEntregado.textContent = countEntregado;
+
+  // 4. Filtrado por Estado Operativo
+  const currentStatusFilter = AppState.driverStatusFilter || 'ALL';
+  let statusFiltered = visibleDispatches;
+  if (currentStatusFilter === 'EN_RUTA') {
+    statusFiltered = visibleDispatches.filter(d => d.rawStatus === 'EN_RUTA' || d.status === 'En Ruta');
+  } else if (currentStatusFilter === 'LISTO') {
+    statusFiltered = visibleDispatches.filter(d => 
+      ['ALISTADO', 'EN_ALISTADO', 'PENDIENTE'].includes(d.rawStatus) || 
+      ['Asignado', 'Listo para Despacho', 'En Alisto Bodega', 'Pendiente de Alisto'].includes(d.status)
+    );
+  } else if (currentStatusFilter === 'ENTREGADO') {
+    statusFiltered = visibleDispatches.filter(d => d.rawStatus === 'ENTREGADO' || d.status === 'Entregado');
+  }
+
+  // 5. Filtrado por provincia de Costa Rica
   const currentProv = AppState.driverProvinceFilter || 'ALL';
-  const filtered = visibleDispatches.filter(d => {
+  const filtered = statusFiltered.filter(d => {
     if (currentProv === 'ALL') return true;
     return d.province === currentProv;
   });
 
-  // 4. Métricas superiores calculadas con las entregas asignadas visibles
+  // 6. Métricas superiores
   const totalPkgsEl = document.getElementById('driverTotalPackages');
   const covProvsEl = document.getElementById('driverCoveredProvinces');
   const deliveredRatioEl = document.getElementById('driverDeliveredRatio');
   const navBadgeEl = document.getElementById('navDispatchCount');
 
-  if (navBadgeEl) navBadgeEl.textContent = visibleDispatches.length;
+  if (navBadgeEl) navBadgeEl.textContent = countEnRuta + countListo;
 
   let totalBultos = 0;
   visibleDispatches.forEach(d => {
     if (d.packages && Array.isArray(d.packages)) {
-      d.packages.forEach(p => totalBultos += (p.qty || 0));
+      d.packages.forEach(p => totalBultos += (Number(p.qty) || 0));
     } else {
       totalBultos += 3;
     }
   });
 
   const uniqueProvs = new Set(visibleDispatches.map(d => d.province || 'Cartago')).size;
-  const deliveredCount = visibleDispatches.filter(d => d.status === 'Entregado').length;
-
   if (totalPkgsEl) totalPkgsEl.textContent = `${totalBultos} bultos`;
   if (covProvsEl) covProvsEl.textContent = `${uniqueProvs} Zonas`;
-  if (deliveredRatioEl) deliveredRatioEl.textContent = `${deliveredCount} / ${visibleDispatches.length}`;
+  if (deliveredRatioEl) deliveredRatioEl.textContent = `${countEntregado} / ${visibleDispatches.length}`;
 
   if (filtered.length === 0) {
+    const filterDesc = currentStatusFilter === 'ALL' ? 'en su ruta' : (currentStatusFilter === 'EN_RUTA' ? 'en ruta' : (currentStatusFilter === 'LISTO' ? 'listos para cargar' : 'entregados'));
     container.innerHTML = `
       <div style="background:#FFF; border:1px dashed #CBD5E1; border-radius:12px; padding:2rem; text-align:center; color:#64748B;">
-        <i class="bi bi-geo-alt-fill" style="font-size:2rem; color:#CBD5E1;"></i>
-        <div style="font-weight:700; margin-top:8px;">No hay despachos asignados para ${currentProv === 'ALL' ? 'su ruta actual' : currentProv}</div>
-        <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
-          ${!isAdmin ? 'Usted solo visualiza los paquetes y pedidos asignados específicamente a su usuario/camión.' : 'No hay despachos con el filtro seleccionado.'}
+        <i class="bi bi-inbox-fill" style="font-size:2.2rem; color:#94A3B8;"></i>
+        <div style="font-weight:800; margin-top:8px; font-size:1rem; color:#1E293B;">No hay pedidos ${filterDesc} ${currentProv === 'ALL' ? '' : 'en ' + currentProv}</div>
+        <p style="font-size:0.82rem; color:#94A3B8; margin-top:4px;">
+          ${!isAdmin ? 'Usted solo visualiza los pedidos asignados específicamente a su usuario/camión.' : 'No hay pedidos con el filtro actual.'}
         </p>
-        <button class="btn-fragama btn-outline-fragama" style="margin-top:12px; padding:6px 14px; font-size:0.8rem;" onclick="setDriverProvinceFilter('ALL')">
-          Ver todas las provincias
-        </button>
+        <div style="display:flex; justify-content:center; gap:8px; margin-top:12px;">
+          <button class="btn-fragama btn-outline-fragama" style="padding:6px 14px; font-size:0.8rem;" onclick="setDriverStatusFilter('ALL'); setDriverProvinceFilter('ALL');">
+            Ver Todos los Pedidos Asignados
+          </button>
+        </div>
       </div>
     `;
     return;
   }
 
   container.innerHTML = filtered.map(d => {
+    const isDelivered = (d.rawStatus === 'ENTREGADO' || d.status === 'Entregado');
+    const isInRoute = (d.rawStatus === 'EN_RUTA' || d.status === 'En Ruta');
+    const isReady = (d.rawStatus === 'ALISTADO' || d.status === 'Listo para Despacho');
+    const isPending = (d.rawStatus === 'PENDIENTE' || d.status === 'Pendiente de Alisto');
+
     let badgeClass = 'badge-in-route';
-    if (d.status === 'Entregado') badgeClass = 'badge-delivered';
-    if (d.status === 'Rechazado') badgeClass = 'badge-rejected';
-    if (d.status === 'Observado') badgeClass = 'badge-observed';
+    let badgeText = d.status;
+    let badgeBg = '#E0F2FE';
+    let badgeColor = '#0369A1';
+    let badgeIcon = 'bi-truck';
+
+    if (isDelivered) {
+      badgeClass = 'badge-delivered';
+      badgeBg = '#DCFCE7';
+      badgeColor = '#15803D';
+      badgeIcon = 'bi-check-circle-fill';
+    } else if (isInRoute) {
+      badgeBg = '#FEF3C7';
+      badgeColor = '#B45309';
+      badgeIcon = 'bi-cursor-fill';
+    } else if (isReady) {
+      badgeBg = '#F0FDF4';
+      badgeColor = '#166534';
+      badgeIcon = 'bi-box-seam-fill';
+    } else if (isPending) {
+      badgeBg = '#F1F5F9';
+      badgeColor = '#475569';
+      badgeIcon = 'bi-clock-history';
+    }
 
     let provClass = 'prov-cartago';
     const pLower = (d.province || '').toLowerCase();
@@ -7497,14 +8192,20 @@ function renderDriverDispatches() {
 
     const bultosStr = d.items || (d.packages ? d.packages.map(p => `${p.qty}x ${p.unit}`).join(', ') : 'Varios bultos');
     const assignedDriverName = d.driverName || (d.driver ? d.driver.split(' - ')[0] : 'Chofer');
+    const targetOrderCode = d.orderCode || d.code;
+    const cleanPhoneDigits = String(d.customerPhone || d.contact || '').replace(/\D/g, '');
+    const cleanPhone = cleanPhoneDigits.length >= 8 ? cleanPhoneDigits.slice(-8) : '';
+    const fullAddress = `${d.address || ''}, ${d.canton || ''}, ${d.province || 'Cartago'}, Costa Rica`;
 
     return `
-      <div class="dispatch-card ${d.status === 'En Ruta' ? 'highlight' : ''}">
-        <div class="dispatch-card-header">
+      <div class="dispatch-card ${isInRoute ? 'highlight' : ''}" style="border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,0.06); border:1.5px solid ${isDelivered ? '#86EFAC' : (isInRoute ? '#0284C7' : '#E2E8F0')}; margin-bottom:14px; background:#FFFFFF;">
+        
+        <!-- ENCABEZADO DE LA TARJETA: CÓDIGO, PROVINCIA Y ACCIÓN DE IMPRESIÓN DIRECTA -->
+        <div class="dispatch-card-header" style="border-bottom:1px solid #F1F5F9; padding-bottom:10px; margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span class="dispatch-code">${d.code}</span>
+            <span class="dispatch-code" style="font-size:0.95rem; font-weight:800; color:#0B192C;">${d.code}</span>
             <span class="badge-province ${provClass}">
-              <i class="bi bi-pin-map-fill"></i> ${d.province || 'Costa Rica'} &bull; ${d.canton || 'Central'}
+              <i class="bi bi-pin-map-fill"></i> ${escapeHtml(d.province || 'Costa Rica')} &bull; ${escapeHtml(d.canton || 'Central')}
             </span>
             ${isAdmin ? `
               <span style="background:#0F172A; color:#E2E8F0; font-size:0.72rem; padding:2px 8px; border-radius:12px; font-weight:700;">
@@ -7512,64 +8213,103 @@ function renderDriverDispatches() {
               </span>
             ` : ''}
           </div>
-          <span class="badge-status ${badgeClass}"><i class="bi bi-circle-fill" style="font-size:6px"></i> ${d.status}</span>
+          
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:${badgeBg}; color:${badgeColor}; font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; border:1px solid rgba(0,0,0,0.06);">
+              <i class="bi ${badgeIcon}"></i> ${escapeHtml(d.status)}
+            </span>
+          </div>
         </div>
 
-        <div class="dispatch-customer">${d.customer}</div>
-        <div class="dispatch-address">
-          <i class="bi bi-geo-alt-fill text-danger"></i>
-          <span>${d.address}</span>
+        <!-- DATOS DEL CLIENTE Y DIRECCIÓN -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px;">
+          <div>
+            <div class="dispatch-customer" style="font-size:1.05rem; font-weight:900; color:#0B192C; margin-bottom:2px;">
+              ${escapeHtml(d.customer)}
+            </div>
+            <div class="dispatch-address" style="font-size:0.84rem; color:#475569; display:flex; align-items:flex-start; gap:6px;">
+              <i class="bi bi-geo-alt-fill text-danger" style="font-size:1rem; margin-top:2px;"></i>
+              <span>${escapeHtml(d.address)}</span>
+            </div>
+          </div>
+
+          <!-- BOTÓN DESTACADO: IMPRIMIR FACTURA ELECTRÓNICA DIRECTO -->
+          <button type="button" class="btn-fragama" style="background:#0284C7; color:#FFF; font-weight:700; padding:8px 12px; font-size:0.78rem; border-radius:8px; border:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; box-shadow:0 2px 6px rgba(2,132,199,0.25);" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" title="Imprimir Factura / Comprobante Oficial">
+            <i class="bi bi-printer-fill" style="font-size:0.95rem;"></i> Imprimir Factura
+          </button>
         </div>
         
-        <div class="dispatch-contact">
-          <span><i class="bi bi-person-fill text-primary"></i> ${d.contact}</span>
-          <span><i class="bi bi-clock-history"></i> Salida: ${d.departureTime}</span>
+        <!-- ENLACES RÁPIDOS: WAZE, GOOGLE MAPS Y WHATSAPP CLIENTE -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
+          <a href="https://waze.com/ul?q=${encodeURIComponent(fullAddress)}" target="_blank" class="btn-contact-pill" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-cursor-fill text-primary"></i> Navegar en Waze
+          </a>
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}" target="_blank" class="btn-contact-pill" style="background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-geo-alt text-danger"></i> Google Maps
+          </a>
+          ${cleanPhone ? `
+            <a href="https://wa.me/506${cleanPhone}?text=${encodeURIComponent('Hola estimado cliente de Distribuidora Fragama, le saluda su chofer de ruta respecto al pedido ' + targetOrderCode)}" target="_blank" class="btn-contact-pill" style="background:#DCFCE7; color:#15803D; border:1px solid #86EFAC; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+              <i class="bi bi-whatsapp"></i> WhatsApp (${cleanPhone})
+            </a>
+          ` : `
+            <span style="font-size:0.75rem; color:#94A3B8;"><i class="bi bi-telephone-x"></i> Sin teléfono</span>
+          `}
         </div>
 
         <!-- CAJA DE BULTOS ESPECÍFICOS PARA EL CHOFER -->
-        <div class="dispatch-items-box" style="border-left:4px solid #0284C7; background:#F0F9FF;">
+        <div class="dispatch-items-box" style="border-left:4px solid #0284C7; background:#F0F9FF; margin-bottom:10px; border-radius:8px; padding:8px 12px;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
-              <strong style="color:#0369A1;"><i class="bi bi-box-seam"></i> Carga a Entregar (Bultos):</strong>
-              <div style="font-weight:700; color:#0B192C; font-size:0.85rem; margin-top:3px;">
-                ${bultosStr}
+              <strong style="color:#0369A1; font-size:0.8rem;"><i class="bi bi-box-seam"></i> Detalle de Carga / Bultos:</strong>
+              <div style="font-weight:700; color:#0B192C; font-size:0.85rem; margin-top:2px;">
+                ${escapeHtml(bultosStr)}
               </div>
             </div>
-            <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch('${d.id}')" title="Ver Código QR de estos bultos">
-              <i class="bi bi-qr-code"></i> Ver QR
-            </button>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" title="Ver Factura Completa">
+                <i class="bi bi-file-earmark-text"></i> Factura
+              </button>
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch('${escapeHtml(d.id)}')" title="Ver Código QR de estos bultos">
+                <i class="bi bi-qr-code"></i> QR
+              </button>
+            </div>
           </div>
-          <div style="margin-top:6px; color:${d.verified ? '#10B981' : '#F59E0B'}; font-weight:600; font-size:0.75rem; display:flex; align-items:center; gap:4px;">
+          <div style="margin-top:4px; color:${d.verified ? '#10B981' : '#F59E0B'}; font-weight:600; font-size:0.74rem; display:flex; align-items:center; gap:4px;">
             <i class="bi ${d.verified ? 'bi-shield-check' : 'bi-exclamation-circle'}"></i>
-            <span>${d.verified ? 'Bultos auditados y verificados con QR en rampa' : 'Pendiente de escaneo con celular'}</span>
+            <span>${d.verified ? 'Bultos auditados y verificados con QR en rampa' : 'Pendiente de escaneo / verificación en camión'}</span>
           </div>
         </div>
 
-        <!-- INSTRUCCIÓN DE COBRO EN RUTA PARA EL CHOFER -->
+        <!-- INSTRUCCIÓN CLARA DE COBRO EN RUTA PARA EL CHOFER -->
         ${(() => {
           const termsStr = String(d.paymentTerms || d.terms || 'Contado');
           const isCred = d.isCredit || termsStr.toLowerCase().includes('crédito');
           const isContra = d.isCashOnDelivery || termsStr.toLowerCase().includes('contra entrega');
           const meth = d.paymentMethod || 'SINPE Móvil / Efectivo';
-          const totAmount = d.total ? formatCRC(d.total) : 'Ver Comprobante';
+          const totAmount = d.total ? formatCRC(d.total) : 'Ver Factura';
 
           if (isContra) {
             return `
-              <div style="margin-top:8px; background:#FFFBEB; border:1.5px solid #F59E0B; border-radius:8px; padding:8px 10px; font-size:0.8rem;">
-                <div style="font-weight:900; color:#B45309; display:flex; align-items:center; gap:6px;">
-                  <i class="bi bi-cash-stack"></i> ⚠️ COBRAR CONTRA ENTREGA AL CLIENTE
+              <div style="margin-bottom:10px; background:#FFFBEB; border:1.5px solid #F59E0B; border-radius:8px; padding:8px 12px; font-size:0.8rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:900; color:#B45309; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-cash-stack"></i> ⚠️ COBRAR CONTRA ENTREGA:
+                  </span>
+                  <span style="font-size:1.05rem; font-weight:900; color:#B45309;">${totAmount}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3px;">
-                  <span style="font-size:0.75rem; color:#78350F;">Método: <strong>${escapeHtml(meth)}</strong></span>
-                  <span style="font-size:0.95rem; font-weight:900; color:#B45309;">${totAmount}</span>
+                <div style="font-size:0.75rem; color:#78350F; margin-top:2px;">
+                  Método pactado: <strong>${escapeHtml(meth)}</strong> &bull; Cobrar antes de bajar la mercadería.
                 </div>
               </div>
             `;
           } else if (isCred) {
             return `
-              <div style="margin-top:8px; background:#EFF6FF; border:1px solid #93C5FD; border-radius:8px; padding:6px 10px; font-size:0.78rem;">
-                <div style="font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:6px;">
-                  <i class="bi bi-calendar-check-fill"></i> FACTURA A COBRAR EN TIEMPO (CRÉDITO ${d.creditDays || 30} DÍAS)
+              <div style="margin-bottom:10px; background:#EFF6FF; border:1.5px solid #93C5FD; border-radius:8px; padding:8px 12px; font-size:0.78rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-calendar-check-fill"></i> CRÉDITO COMERCIAL (${d.creditDays || 30} DÍAS)
+                  </span>
+                  <span style="font-size:0.85rem; font-weight:800; color:#1D4ED8;">${totAmount}</span>
                 </div>
                 <div style="font-size:0.74rem; color:#475569; margin-top:2px;">
                   <i class="bi bi-shield-check text-primary"></i> <strong>NO COBRAR EN RUTA:</strong> Se cobra en oficina/transferencia (Vence: ${escapeHtml(d.dueDate || '30 días')}).
@@ -7578,33 +8318,44 @@ function renderDriverDispatches() {
             `;
           } else {
             return `
-              <div style="margin-top:8px; background:#F0FDF4; border:1px solid #86EFAC; border-radius:8px; padding:6px 10px; font-size:0.78rem;">
-                <div style="font-weight:800; color:#15803D; display:flex; align-items:center; gap:6px;">
-                  <i class="bi bi-check-circle-fill"></i> VENTA DE CONTADO (YA CANCELADA)
+              <div style="margin-bottom:10px; background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:8px; padding:8px 12px; font-size:0.78rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:800; color:#15803D; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-check-circle-fill"></i> VENTA DE CONTADO (CANCELADA)
+                  </span>
+                  <span style="font-size:0.85rem; font-weight:800; color:#15803D;">${totAmount}</span>
                 </div>
                 <div style="font-size:0.74rem; color:#14532D; margin-top:2px;">
-                  Pagado previamente con <strong>${escapeHtml(meth)}</strong>. No cobrar nada al cliente.
+                  Pagado con <strong>${escapeHtml(meth)}</strong>. No solicitar dinero al cliente en ruta.
                 </div>
               </div>
             `;
           }
         })()}
 
-        ${d.status !== 'Entregado' && d.status !== 'Rechazado' ? `
-          <div class="driver-actions-grid" style="grid-template-columns: 1.2fr 1fr 1fr; gap:6px;">
-            <button class="btn-driver-action btn-delivered" onclick="openQrScannerModal('${d.orderCode || d.code}')" style="background:#0284C7; color:#FFF; border-color:#0284C7;">
-              <i class="bi bi-qr-code-scan"></i> Auditar QR
+        <!-- ACCIONES PRINCIPALES DEL CHOFER: IMPRIMIR, ENTREGAR, NOVEDAD -->
+        ${!isDelivered && d.status !== 'Rechazado' ? `
+          <div class="driver-actions-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:6px;">
+            <button class="btn-driver-action" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" style="background:#0284C7; color:#FFF; border:none; padding:8px; font-size:0.8rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
+              <i class="bi bi-printer"></i> Imprimir Factura
             </button>
-            <button class="btn-driver-action btn-delivered" onclick="openDriverModal('${d.id}', 'Entregado')">
+            <button class="btn-driver-action btn-delivered" onclick="openDriverModal('${escapeHtml(d.id)}', 'Entregado')" style="padding:8px; font-size:0.8rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
               <i class="bi bi-check-circle-fill"></i> Entregado
             </button>
-            <button class="btn-driver-action btn-observed" onclick="openDriverModal('${d.id}', 'Observado')">
+            <button class="btn-driver-action btn-observed" onclick="openDriverModal('${escapeHtml(d.id)}', 'Observado')" style="padding:8px; font-size:0.8rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
               <i class="bi bi-exclamation-triangle-fill"></i> Novedad
             </button>
           </div>
         ` : `
-          <div style="background:#F1F5F9; padding:8px 12px; border-radius:6px; font-size:0.8rem; color:#475569; text-align:center; display:flex; justify-content:center; align-items:center; gap:8px;">
-            <i class="bi bi-check-circle-fill text-success"></i> Entrega finalizada en ${d.canton || 'destino'} y sincronizada con el servidor central
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; padding:10px 14px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span style="font-size:0.8rem; font-weight:700; color:#15803D; display:inline-flex; align-items:center; gap:6px;">
+              <i class="bi bi-check-circle-fill" style="font-size:1.1rem;"></i> Entrega finalizada y registrada en servidor
+            </span>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-fragama" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" style="padding:5px 10px; font-size:0.75rem; background:#0284C7; color:#FFF; font-weight:700; border:none; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="bi bi-printer-fill"></i> Reimprimir Factura
+              </button>
+            </div>
           </div>
         `}
       </div>
@@ -9475,7 +10226,52 @@ function renderSuppliersGrid(searchTerm = '', categoryFilter = 'ALL') {
 // ==============================================================================
 // BANDEJA DEDICADA DE ALISTADO Y DESPACHO DE PEDIDOS WEB
 // ==============================================================================
-let _currentWebOrderFilter = 'ALL';
+let _currentWebOrderFilter = 'ACTIVE'; // 'ACTIVE' por defecto para NO mezclar con entregados
+let _currentCollabFilter = 'ALL';
+let _ordersViewMode = 'BOARD'; // 'BOARD' o 'TABLE'
+let _cachedStaffMembers = null;
+
+// Cambiar modo de vista: Tablero Ordenado por Colaborador vs Tabla Compacta
+window.switchOrdersViewMode = function(mode) {
+  _ordersViewMode = mode;
+  const boardEl = document.getElementById('webOrdersBoardContainer');
+  const tableEl = document.getElementById('webOrdersTableContainer');
+  const btnBoard = document.getElementById('btnViewModeBoard');
+  const btnTable = document.getElementById('btnViewModeTable');
+
+  if (mode === 'BOARD') {
+    if (boardEl) boardEl.style.display = 'block';
+    if (tableEl) tableEl.style.display = 'none';
+    if (btnBoard) {
+      btnBoard.classList.add('active');
+      btnBoard.style.background = '#FFF';
+      btnBoard.style.color = '#0F172A';
+      btnBoard.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnTable) {
+      btnTable.classList.remove('active');
+      btnTable.style.background = 'transparent';
+      btnTable.style.color = '#64748B';
+      btnTable.style.boxShadow = 'none';
+    }
+  } else {
+    if (boardEl) boardEl.style.display = 'none';
+    if (tableEl) tableEl.style.display = 'block';
+    if (btnTable) {
+      btnTable.classList.add('active');
+      btnTable.style.background = '#FFF';
+      btnTable.style.color = '#0F172A';
+      btnTable.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnBoard) {
+      btnBoard.classList.remove('active');
+      btnBoard.style.background = 'transparent';
+      btnBoard.style.color = '#64748B';
+      btnBoard.style.boxShadow = 'none';
+    }
+  }
+  renderWebOrdersCurrentView();
+};
 
 window.filterWebOrdersView = function(filterVal, btnElement) {
   _currentWebOrderFilter = filterVal;
@@ -9487,29 +10283,198 @@ window.filterWebOrdersView = function(filterVal, btnElement) {
     btnElement.classList.add('btn-primary-fragama', 'active');
     btnElement.classList.remove('btn-outline-fragama');
   }
-  renderWebOrdersFullTable();
+  renderWebOrdersCurrentView();
+};
+
+window.filterByCollaboratorSelect = function(val) {
+  _currentCollabFilter = val;
+  updateCollabChipsActiveState();
+  renderWebOrdersCurrentView();
+};
+
+window.filterByCollaboratorChip = function(collabId) {
+  _currentCollabFilter = String(collabId);
+  const sel = document.getElementById('collabFilterSelect');
+  if (sel) sel.value = String(collabId);
+  updateCollabChipsActiveState();
+  renderWebOrdersCurrentView();
+};
+
+function updateCollabChipsActiveState() {
+  document.querySelectorAll('.collab-chip').forEach(ch => {
+    const cid = ch.getAttribute('data-collab-id');
+    if (cid === String(_currentCollabFilter)) {
+      ch.classList.add('active');
+    } else {
+      ch.classList.remove('active');
+    }
+  });
+}
+
+// Carga lista de staff para selectores y asignaciones
+async function getStaffMembersList(force = false) {
+  if (!force && _cachedStaffMembers && _cachedStaffMembers.length > 0) return _cachedStaffMembers;
+  try {
+    const res = await fetch('/api/staff');
+    if (res.ok) {
+      const data = await res.json();
+      _cachedStaffMembers = data.all || [];
+      return _cachedStaffMembers;
+    }
+  } catch(e) {}
+  _cachedStaffMembers = AppState.systemUsers || [
+    { id: 9, name: "Carlos Calvo (Bodega Central)", role: "Bodeguero" },
+    { id: 2, name: "Esteban Quirós (Bodeguero)", role: "Bodeguero" },
+    { id: 11, name: "Minor Coto (Chofer Rutas)", role: "Chofer" },
+    { id: 4, name: "Mauricio Brenes (Chofer)", role: "Chofer" },
+    { id: 7, name: "Leonardo Reyes Hernández", role: "Administrador" },
+    { id: 1, name: "Christian Reyes (Administrador)", role: "Administrador" },
+    { id: 6, name: "Carlos Piedra (Ventas / Despacho)", role: "Vendedor" }
+  ];
+  return _cachedStaffMembers;
+}
+
+// Renderiza las píldoras de colaboradores y su carga en tiempo real (SOLO ACTIVOS)
+window.renderCollaboratorWorkloadChips = async function() {
+  const container = document.getElementById('collabWorkloadChipsContainer');
+  const sel = document.getElementById('collabFilterSelect');
+  const staff = await getStaffMembersList();
+  const allOrders = (AppState.salesOrders || []).filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
+
+  // Pedidos activos (excluye finalizados y entregados para no estorbar el día a día)
+  const isOrderActive = o => {
+    const st = String(o.status || '').toUpperCase().trim();
+    return st !== 'ENTREGADO' && st !== 'FACTURADO' && st !== 'CANCELADO' && st !== 'NO_ENTREGADO' && st !== 'RECHAZADO';
+  };
+  const activeOrders = allOrders.filter(isOrderActive);
+
+  // Calcular carga activa
+  const unassignedCount = activeOrders.filter(o => {
+    const noResp = !o.preparedByName || o.preparedByName.trim() === '' || o.preparedByName === 'Sin asignar';
+    return noResp;
+  }).length;
+
+  const curU = AppState.currentUser || {};
+  const uName = (curU.name || '').toLowerCase();
+  const uFirst = uName.split(' ')[0] || '';
+
+  const myOrdersCount = activeOrders.filter(o => {
+    const ordDriver = (o.driverName || '').toLowerCase();
+    const ordResp = (o.assignedUserName || o.preparedByName || '').toLowerCase();
+    const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && o.driverUserId && Number(o.driverUserId) === Number(curU.id));
+    const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && o.assignedUserId && Number(o.assignedUserId) === Number(curU.id));
+    return (isMyDriver || isMyResp);
+  }).length;
+
+  // Actualizar selector desplegable
+  if (sel) {
+    const currentVal = sel.value || 'ALL';
+    sel.innerHTML = `
+      <option value="ALL">🌐 Todos los Colaboradores (${activeOrders.length} activos)</option>
+      <option value="MY_ASSIGNED">🎯 Mis Trabajos Asignados (${myOrdersCount})</option>
+      <option value="UNASSIGNED">⚠️ Sin Asignar (Nuevos: ${unassignedCount})</option>
+    ` + staff.map(u => {
+      const uFirstCollab = (u.name || '').split(' ')[0].toLowerCase();
+      const uCount = activeOrders.filter(o => {
+        const pName = (o.preparedByName || '').toLowerCase();
+        const dName = (o.driverName || '').toLowerCase();
+        const match = (uFirstCollab && (pName.includes(uFirstCollab) || dName.includes(uFirstCollab))) ||
+                      (Number(o.preparedByUserId) === Number(u.id)) ||
+                      (Number(o.driverUserId) === Number(u.id));
+        return match;
+      }).length;
+      return `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.role)}: ${uCount} activos)</option>`;
+    }).join('');
+    sel.value = currentVal;
+  }
+
+  // Renderizar chips interactivos
+  if (container) {
+    let chipsHtml = `
+      <div class="collab-chip ${_currentCollabFilter === 'ALL' ? 'active' : ''}" data-collab-id="ALL" onclick="filterByCollaboratorChip('ALL')" title="Mostrar todos los colaboradores">
+        <i class="bi bi-grid-fill"></i> Todos <span class="badge-chip-count">${activeOrders.length}</span>
+      </div>
+      <div class="collab-chip ${_currentCollabFilter === 'MY_ASSIGNED' ? 'active' : ''}" data-collab-id="MY_ASSIGNED" onclick="filterByCollaboratorChip('MY_ASSIGNED')" style="border-color:#8B5CF6; color:#6D28D9;" title="Mostrar únicamente mis pedidos pendientes">
+        <i class="bi bi-person-check-fill"></i> Mis Trabajos <span class="badge-chip-count" style="background:#EDE9FE; color:#5B21B6;">${myOrdersCount}</span>
+      </div>
+      <div class="collab-chip ${_currentCollabFilter === 'UNASSIGNED' ? 'active' : ''}" data-collab-id="UNASSIGNED" onclick="filterByCollaboratorChip('UNASSIGNED')" style="border-color:${unassignedCount > 0 ? '#F43F5E' : '#CBD5E1'}; color:${unassignedCount > 0 ? '#E11D48' : '#64748B'};" title="Pedidos pendientes de asignar alistador o chofer">
+        <i class="bi bi-exclamation-triangle-fill" style="color:${unassignedCount > 0 ? '#E11D48' : '#94A3B8'};"></i> Por Asignar <span class="badge-chip-count" style="background:${unassignedCount > 0 ? '#FFE4E6' : '#F1F5F9'}; color:${unassignedCount > 0 ? '#9F1239' : '#475569'};">${unassignedCount}</span>
+      </div>
+    `;
+
+    const activeStaff = staff.filter(u => u.role === 'Bodeguero' || u.role === 'Chofer' || u.role === 'Administrador');
+    chipsHtml += activeStaff.map(u => {
+      const uFirstCollab = (u.name || '').split(' ')[0].toLowerCase();
+      const uCount = activeOrders.filter(o => {
+        const pName = (o.preparedByName || '').toLowerCase();
+        const dName = (o.driverName || '').toLowerCase();
+        const match = (uFirstCollab && (pName.includes(uFirstCollab) || dName.includes(uFirstCollab))) ||
+                      (Number(o.preparedByUserId) === Number(u.id)) ||
+                      (Number(o.driverUserId) === Number(u.id));
+        return match;
+      }).length;
+      const isBod = u.role === 'Bodeguero';
+      const icon = isBod ? 'bi-box-seam' : (u.role === 'Chofer' ? 'bi-truck' : 'bi-shield-check');
+      const isCollabActive = _currentCollabFilter === String(u.id);
+
+      return `
+        <div class="collab-chip ${isCollabActive ? 'active' : ''}" data-collab-id="${u.id}" onclick="filterByCollaboratorChip('${u.id}')" title="${escapeHtml(u.name)} (${u.role}): ${uCount} pedidos en proceso">
+          <i class="bi ${icon}"></i> ${escapeHtml(u.name.split(' (')[0])}
+          <span class="badge-chip-count" style="${uCount > 0 ? 'background:#DBEAFE; color:#1E40AF;' : ''}">${uCount}</span>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = chipsHtml;
+  }
 };
 
 window.renderWebOrdersView = function() {
+  const curU = AppState.currentUser || {};
+  const isDriver = (curU.role === 'Chofer');
+
+  const autoBtn = document.getElementById('btnAutoAssignOrders');
+  const chipsStrip = document.getElementById('collabWorkloadChipsContainer');
+  const collabSelect = document.getElementById('collabFilterSelect');
+
+  if (isDriver) {
+    // Si un chofer accede a pedidos, restringir estrictamente a sus tareas de entrega asignadas
+    _currentCollabFilter = 'MY_ASSIGNED';
+    _currentWebOrderFilter = 'ACTIVE';
+    if (autoBtn) autoBtn.style.display = 'none';
+    if (chipsStrip) chipsStrip.style.display = 'none';
+    if (collabSelect && collabSelect.parentElement) collabSelect.parentElement.style.display = 'none';
+  } else {
+    if (autoBtn && (curU.role === 'Administrador' || curU.role === 'Bodeguero')) {
+      autoBtn.style.display = 'inline-flex';
+    }
+    if (chipsStrip) chipsStrip.style.display = 'flex';
+    if (collabSelect && collabSelect.parentElement) collabSelect.parentElement.style.display = 'inline-flex';
+  }
+
   updateWebOrdersBadges();
-  renderWebOrdersFullTable();
+  renderCollaboratorWorkloadChips();
+  renderWebOrdersCurrentView();
 };
 
-window.renderWebOrdersFullTable = function() {
-  const tbody = document.getElementById('webOrdersFullTableBody');
-  if (!tbody) return;
-
+function getFilteredWebOrdersList() {
   const searchInput = document.getElementById('webOrdersSearchInput');
   const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  const allOrders = (AppState.salesOrders || []).filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
 
-  // Obtener pedidos elegibles para alistado y despacho (Web y Bodega, excluyendo cotizaciones)
-  const allOrders = AppState.salesOrders.filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
-
-  const filtered = allOrders.filter(order => {
+  return allOrders.filter(order => {
     const isWeb = isWebOrder(order);
     const st = (order.status || 'PENDIENTE').toUpperCase().trim();
-    let matchFilter = true;
-    if (_currentWebOrderFilter === 'MY_ASSIGNED') {
+    const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
+    const isUndelivered = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+    const isActive = !isDelivered && !isUndelivered && st !== 'CANCELADO';
+    
+    // 1. Filtro por Estado Operativo
+    let matchState = true;
+    if (_currentWebOrderFilter === 'ACTIVE') {
+      // SOLO pedidos activos en proceso (Pendientes, En Alistado, Alistados, En Ruta)
+      matchState = isActive;
+    } else if (_currentWebOrderFilter === 'MY_ASSIGNED') {
       const curU = AppState.currentUser || {};
       const uName = (curU.name || '').toLowerCase();
       const uFirst = uName.split(' ')[0] || '';
@@ -9518,41 +10483,371 @@ window.renderWebOrdersFullTable = function() {
       const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && order.driverUserId && Number(order.driverUserId) === Number(curU.id));
       const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && order.assignedUserId && Number(order.assignedUserId) === Number(curU.id));
       const isDefaultChofer = (curU.username === 'chofer' && (ordDriver.includes('minor') || !ordDriver));
-      matchFilter = isMyDriver || isMyResp || isDefaultChofer;
+      // Mis asignados SOLO pendientes de procesar (excluye ya entregados)
+      matchState = (isMyDriver || isMyResp || isDefaultChofer) && isActive;
+    } else if (_currentWebOrderFilter === 'UNASSIGNED') {
+      const noResp = (!order.preparedByName || order.preparedByName.trim() === '' || order.preparedByName === 'Sin asignar');
+      matchState = noResp && isActive;
     } else if (_currentWebOrderFilter === 'WEB') {
-      matchFilter = isWeb;
+      matchState = isWeb && isActive;
     } else if (_currentWebOrderFilter === 'BODEGA') {
-      matchFilter = !isWeb;
+      matchState = !isWeb && isActive;
     } else if (_currentWebOrderFilter === 'PENDIENTE') {
-      matchFilter = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+      matchState = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
     } else if (_currentWebOrderFilter === 'ALISTADO') {
-      matchFilter = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+      matchState = (st === 'ALISTADO' || st === 'EN_ALISTADO');
     } else if (_currentWebOrderFilter === 'EN_RUTA') {
-      matchFilter = (st === 'EN_RUTA');
+      matchState = (st === 'EN_RUTA');
     } else if (_currentWebOrderFilter === 'ENTREGADO') {
-      matchFilter = (st === 'ENTREGADO' || st === 'FACTURADO');
+      // Filtro exclusivo para pedidos ya entregados/facturados (historial)
+      matchState = isDelivered;
     } else if (_currentWebOrderFilter === 'NO_ENTREGADO') {
-      matchFilter = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+      matchState = isUndelivered;
+    } else if (_currentWebOrderFilter === 'ALL') {
+      matchState = true;
     }
 
+    // 2. Filtro por Colaborador
+    let matchCollab = true;
+    if (_currentCollabFilter === 'MY_ASSIGNED') {
+      const curU = AppState.currentUser || {};
+      const uName = (curU.name || '').toLowerCase();
+      const uFirst = uName.split(' ')[0] || '';
+      const ordDriver = (order.driverName || '').toLowerCase();
+      const ordResp = (order.assignedUserName || order.preparedByName || '').toLowerCase();
+      const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && order.driverUserId && Number(order.driverUserId) === Number(curU.id));
+      const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && order.assignedUserId && Number(order.assignedUserId) === Number(curU.id));
+      matchCollab = isMyDriver || isMyResp;
+    } else if (_currentCollabFilter === 'UNASSIGNED') {
+      matchCollab = (!order.preparedByName || order.preparedByName.trim() === '' || order.preparedByName === 'Sin asignar');
+    } else if (_currentCollabFilter !== 'ALL') {
+      const targetId = Number(_currentCollabFilter);
+      const targetUser = (_cachedStaffMembers || []).find(u => Number(u.id) === targetId);
+      const uFirst = targetUser ? (targetUser.name || '').split(' ')[0].toLowerCase() : '';
+      const ordDriver = (order.driverName || '').toLowerCase();
+      const ordResp = (order.assignedUserName || order.preparedByName || '').toLowerCase();
+      
+      const isMatchId = (order.preparedByUserId && Number(order.preparedByUserId) === targetId) ||
+                        (order.driverUserId && Number(order.driverUserId) === targetId) ||
+                        (order.assignedUserId && Number(order.assignedUserId) === targetId);
+      const isMatchName = uFirst && (ordDriver.includes(uFirst) || ordResp.includes(uFirst));
+      matchCollab = isMatchId || isMatchName;
+    }
+
+    // 3. Búsqueda de texto
     const matchSearch = !searchTerm ||
       (order.orderCode && order.orderCode.toLowerCase().includes(searchTerm)) ||
       (order.customerName && order.customerName.toLowerCase().includes(searchTerm)) ||
       (order.customerPhone && order.customerPhone.toLowerCase().includes(searchTerm)) ||
       (order.deliveryRoute && order.deliveryRoute.toLowerCase().includes(searchTerm)) ||
+      (order.preparedByName && order.preparedByName.toLowerCase().includes(searchTerm)) ||
+      (order.driverName && order.driverName.toLowerCase().includes(searchTerm)) ||
       (order.customerTaxId && order.customerTaxId.toLowerCase().includes(searchTerm));
 
-    return matchFilter && matchSearch;
+    return matchState && matchCollab && matchSearch;
   });
+}
+
+window.renderWebOrdersCurrentView = function() {
+  const filtered = getFilteredWebOrdersList();
+  if (_ordersViewMode === 'BOARD') {
+    renderWebOrdersBoardView(filtered);
+  } else {
+    renderWebOrdersFullTable(filtered);
+  }
+};
+
+// ==============================================================================
+// 1. RENDERIZADO DEL TABLERO ORDENADO POR COLABORADOR (CERO DESORDEN)
+// ==============================================================================
+window.renderWebOrdersBoardView = async function(filteredOrders) {
+  const container = document.getElementById('collabBoardColumnsContainer');
+  if (!container) return;
+
+  const staff = await getStaffMembersList();
+  const bodegueros = staff.filter(u => u.role === 'Bodeguero' || u.id === 9 || u.id === 2);
+  const choferes = staff.filter(u => u.role === 'Chofer' || u.id === 11 || u.id === 4);
+  const admins = staff.filter(u => u.role === 'Administrador' && u.id !== 9 && u.id !== 2);
+
+  const isViewingDelivered = (_currentWebOrderFilter === 'ENTREGADO');
+
+  // Columnas base del tablero
+  const boardColumns = [
+    {
+      id: 'UNASSIGNED',
+      title: isViewingDelivered ? '⚠️ Sin Asignar (Historial)' : '⚠️ Por Asignar (Nuevos)',
+      subtitle: isViewingDelivered ? 'Entregados sin responsable' : 'Requieren alistador o chofer',
+      headerBg: '#FEF2F2',
+      headerBorder: '#FECACA',
+      titleColor: '#991B1B',
+      filterFn: o => {
+        const noResp = (!o.preparedByName || o.preparedByName.trim() === '' || o.preparedByName === 'Sin asignar');
+        const isDone = (o.status === 'ENTREGADO' || o.status === 'FACTURADO');
+        if (isViewingDelivered) return noResp && isDone;
+        return noResp && !isDone && o.status !== 'CANCELADO';
+      }
+    },
+    ...bodegueros.map(b => ({
+      id: String(b.id),
+      userId: b.id,
+      title: `📦 ${b.name.split(' (')[0]}`,
+      subtitle: isViewingDelivered ? 'Historial Entregados' : (b.name.includes('(') ? b.name.split('(')[1].replace(')', '') : 'Bodeguero'),
+      headerBg: '#EFF6FF',
+      headerBorder: '#BFDBFE',
+      titleColor: '#1E40AF',
+      filterFn: o => {
+        const uFirst = b.name.split(' ')[0].toLowerCase();
+        const pName = (o.preparedByName || '').toLowerCase();
+        const isMatch = (o.preparedByUserId && Number(o.preparedByUserId) === Number(b.id)) || (uFirst && pName.includes(uFirst));
+        const isDone = (o.status === 'ENTREGADO' || o.status === 'FACTURADO');
+        if (isViewingDelivered) return isMatch && isDone;
+        return isMatch && !isDone && o.status !== 'CANCELADO';
+      }
+    })),
+    ...choferes.map(c => ({
+      id: String(c.id),
+      userId: c.id,
+      title: `🚚 ${c.name.split(' (')[0]}`,
+      subtitle: isViewingDelivered ? 'Historial Entregados' : (c.name.includes('(') ? c.name.split('(')[1].replace(')', '') : 'Chofer de Ruta'),
+      headerBg: '#FAF5FF',
+      headerBorder: '#E9D5FF',
+      titleColor: '#6B21A8',
+      filterFn: o => {
+        const uFirst = c.name.split(' ')[0].toLowerCase();
+        const dName = (o.driverName || '').toLowerCase();
+        const isMatch = (o.driverUserId && Number(o.driverUserId) === Number(c.id)) || (uFirst && dName.includes(uFirst));
+        const isDone = (o.status === 'ENTREGADO' || o.status === 'FACTURADO');
+        if (isViewingDelivered) return isMatch && isDone;
+        return isMatch && !isDone && o.status !== 'CANCELADO';
+      }
+    }))
+  ];
+
+  // Si hay filtro de colaborador activo específico, mostramos solo esa columna
+  let activeColumns = boardColumns;
+  if (_currentCollabFilter !== 'ALL') {
+    if (_currentCollabFilter === 'UNASSIGNED') {
+      activeColumns = boardColumns.filter(c => c.id === 'UNASSIGNED');
+    } else if (_currentCollabFilter === 'MY_ASSIGNED') {
+      const curU = AppState.currentUser || {};
+      activeColumns = boardColumns.filter(c => c.userId && (Number(c.userId) === Number(curU.id) || (curU.name && c.title.toLowerCase().includes(curU.name.split(' ')[0].toLowerCase()))));
+      if (activeColumns.length === 0) activeColumns = boardColumns;
+    } else {
+      activeColumns = boardColumns.filter(c => c.id === String(_currentCollabFilter));
+      if (activeColumns.length === 0) activeColumns = boardColumns;
+    }
+  }
+
+  container.innerHTML = activeColumns.map(col => {
+    const colOrders = filteredOrders.filter(col.filterFn);
+    const count = colOrders.length;
+
+    const cardsHtml = count === 0 ? `
+      <div style="text-align:center; padding:2.5rem 1rem; color:#94A3B8;">
+        <i class="bi bi-check2-all" style="font-size:1.8rem; display:block; margin-bottom:6px; color:#CBD5E1;"></i>
+        <div style="font-weight:700; font-size:0.82rem; color:#64748B;">Al día</div>
+        <small style="font-size:0.72rem;">Sin tareas pendientes en esta columna</small>
+      </div>
+    ` : colOrders.map(o => renderBoardOrderCard(o, staff)).join('');
+
+    return `
+      <div class="collab-board-column">
+        <div class="collab-column-header" style="background:${col.headerBg}; border-color:${col.headerBorder};">
+          <div>
+            <div style="font-weight:800; font-size:0.86rem; color:${col.titleColor}; display:flex; align-items:center; gap:6px;">
+              <span>${col.title}</span>
+            </div>
+            <div style="font-size:0.7rem; color:#64748B; margin-top:1px;">${col.subtitle}</div>
+          </div>
+          <span style="background:#FFF; color:${col.titleColor}; font-weight:800; font-size:0.76rem; padding:2px 8px; border-radius:12px; border:1px solid ${col.headerBorder};">
+            ${count}
+          </span>
+        </div>
+        <div class="collab-cards-list">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+function renderBoardOrderCard(o, staff) {
+  const isWeb = isWebOrder(o);
+  const st = (o.status || 'PENDIENTE').toUpperCase().trim();
+  const isPending = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+  const isPrepared = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+  const isInRoute = (st === 'EN_RUTA');
+  const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
+  const targetCode = o.orderCode || o.id;
+
+  let badgeHtml = '';
+  if (isPending) {
+    badgeHtml = `<span class="badge-status badge-observed" style="background:#FEF3C7; color:#92400E; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-clock"></i> Pendiente</span>`;
+  } else if (isPrepared) {
+    badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-box-seam"></i> Alistado</span>`;
+  } else if (isInRoute) {
+    badgeHtml = `<span class="badge-status" style="background:#F3E8FF; color:#6B21A8; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-truck"></i> En Ruta</span>`;
+  } else if (isDelivered) {
+    badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-check-circle-fill"></i> Entregado</span>`;
+  } else {
+    badgeHtml = `<span class="badge-status" style="background:#F1F5F9; color:#475569; font-size:0.7rem; padding:2px 6px;">${st}</span>`;
+  }
+
+  const items = Array.isArray(o.items) ? o.items : [];
+  const totalUnits = items.reduce((s, it) => s + (Number(it.qty) || 1), 0);
+
+  const bodeguerosList = staff.filter(u => u.role === 'Bodeguero' || u.role === 'Administrador');
+  const choferesList = staff.filter(u => u.role === 'Chofer' || u.role === 'Administrador');
+
+  return `
+    <div class="collab-order-card" id="cardOrder_${targetCode}">
+      <!-- Encabezado de la Tarjeta -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span style="font-weight:800; font-family:'JetBrains Mono',monospace; font-size:0.86rem; color:#0F172A;">
+            ${escapeHtml(o.orderCode)}
+          </span>
+          <div style="margin-top:2px; display:flex; align-items:center; gap:4px;">
+            ${isWeb ? `
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;">
+                <i class="bi bi-globe2"></i> Web
+              </span>
+            ` : `
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE;">
+                <i class="bi bi-building"></i> Bodega
+              </span>
+            `}
+            ${o.wantsElectronicInvoice ? `
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#047857; border:1px solid #6EE7B7;" title="⚡ El cliente solicitó Factura Electrónica v4.3">
+                <i class="bi bi-file-earmark-check-fill text-success"></i> FE
+              </span>
+            ` : ''}
+            <span style="font-size:0.68rem; color:#94A3B8;">${escapeHtml(o.date || 'Hoy')}</span>
+          </div>
+        </div>
+        <div>${badgeHtml}</div>
+      </div>
+
+      <!-- Datos del Cliente y Ruta -->
+      <div style="font-size:0.78rem; line-height:1.3; border-top:1px dashed #E2E8F0; padding-top:6px;">
+        <div style="font-weight:700; color:#1E293B; display:flex; align-items:center; justify-content:space-between;">
+          <span>${escapeHtml(o.customerName || 'Cliente')}</span>
+          ${o.customerPhone ? `
+            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="color:#10B981; text-decoration:none; font-weight:800; font-size:0.72rem;" title="Escribir por WhatsApp">
+              <i class="bi bi-whatsapp"></i> Chat
+            </a>
+          ` : ''}
+        </div>
+        <div style="color:#0284C7; font-size:0.72rem; margin-top:2px;">
+          <i class="bi bi-geo-alt-fill"></i> ${escapeHtml(o.deliveryRoute || o.customerAddress || 'Cartago')}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; background:#F8FAFC; padding:4px 6px; border-radius:6px;">
+          <span style="color:#64748B; font-size:0.72rem;">${items.length} líneas (${totalUnits} uds)</span>
+          <strong style="color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace; font-size:0.84rem;">
+            ${formatCRC(o.total)}
+          </strong>
+        </div>
+      </div>
+
+      <!-- Asignación Rápida con Selectores -->
+      ${(AppState.currentUser && AppState.currentUser.role === 'Chofer') ? `
+        <div style="background:#F1F5F9; padding:6px 8px; border-radius:6px; font-size:0.75rem; color:#475569; display:flex; flex-direction:column; gap:2px;">
+          <div><i class="bi bi-box-seam text-primary"></i> <strong>Alistado por:</strong> ${escapeHtml(o.preparedByName || 'Bodega Central')}</div>
+          <div><i class="bi bi-truck text-warning"></i> <strong>Chofer:</strong> ${escapeHtml(o.driverName || 'Mi Camión')}</div>
+        </div>
+      ` : `
+        <div style="background:#F1F5F9; padding:6px 8px; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-box-seam"></i> Alisto:</span>
+            <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Cambiar bodeguero responsable">
+              <option value="">⚠️ Sin asignar</option>
+              ${bodeguerosList.map(b => `
+                <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
+                  ${escapeHtml(b.name.split(' (')[0])}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-truck"></i> Chofer:</span>
+            <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Cambiar chofer de ruta">
+              <option value="">⚠️ Sin asignar</option>
+              ${choferesList.map(c => `
+                <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
+                  ${escapeHtml(c.name.split(' (')[0])}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+        </div>
+      `}
+
+      <!-- Botones de Acción Sencillos de 1 Clic -->
+      <div style="display:flex; gap:4px; margin-top:2px;">
+        ${isDelivered ? `
+          <div style="flex:1; background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; padding:5px 8px; border-radius:6px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <i class="bi bi-check-circle-fill" style="color:#059669;"></i> Entregado & Facturado
+          </div>
+        ` : ''}
+
+        ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
+          <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#10B981; color:#FFF; font-weight:800; border-radius:6px; border:none;" onclick="takeOrderTask('${targetCode}')" title="Asignarme este pedido a mi nombre">
+            <i class="bi bi-hand-index-thumb"></i> ✋ Tomar Trabajo
+          </button>
+        ` : ''}
+
+        ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && isPending) ? `
+          <button class="btn-fragama btn-primary-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#0284C7; border-color:#0284C7; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido (Checklist)">
+            <i class="bi bi-box-seam"></i> Alistar
+          </button>
+        ` : ''}
+
+        ${(!isDelivered && isPrepared) ? `
+          <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#7C3AED; color:#FFF; font-weight:800; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta">
+            <i class="bi bi-truck"></i> A Ruta
+          </button>
+        ` : ''}
+
+        ${(!isDelivered && (isPrepared || isInRoute)) ? `
+          <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#059669; color:#FFF; font-weight:800; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Rebajar Kardex">
+            <i class="bi bi-check-circle-fill"></i> Entregar
+          </button>
+        ` : ''}
+
+        <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.72rem; border-color:#CBD5E1; color:#475569;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Trazabilidad">
+          <i class="bi bi-clock-history"></i>
+        </button>
+        <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.72rem; border-color:#CBD5E1; color:#475569;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante">
+          <i class="bi bi-printer"></i>
+        </button>
+        <button class="btn-fragama" style="padding:5px 7px; font-size:0.72rem; background:${o.invoiceSentAt ? '#ECFDF5' : (o.wantsElectronicInvoice ? '#FEF3C7' : '#F8FAFC')}; border:1px solid ${o.invoiceSentAt ? '#10B981' : (o.wantsElectronicInvoice ? '#F59E0B' : '#CBD5E1')}; color:${o.invoiceSentAt ? '#065F46' : (o.wantsElectronicInvoice ? '#B45309' : '#475569')}; border-radius:6px;" onclick="openSendElectronicInvoiceModal('${targetCode}')" title="${o.invoiceSentAt ? 'Factura Electrónica enviada el ' + o.invoiceSentAt : (o.wantsElectronicInvoice ? '⚡ El cliente solicitó Factura Electrónica' : 'Emitir y Enviar Factura Electrónica')}">
+          <i class="bi bi-file-earmark-check${o.invoiceSentAt ? '-fill' : ''}"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ==============================================================================
+// 2. RENDERIZADO DE LA VISTA TABLA COMPACTA (CON ASIGNACIÓN DIRECTA)
+// ==============================================================================
+window.renderWebOrdersFullTable = async function(optionalFiltered) {
+  const tbody = document.getElementById('webOrdersFullTableBody');
+  if (!tbody) return;
+
+  const filtered = optionalFiltered || getFilteredWebOrdersList();
+  const staff = await getStaffMembersList();
+  const bodeguerosList = staff.filter(u => u.role === 'Bodeguero' || u.role === 'Administrador');
+  const choferesList = staff.filter(u => u.role === 'Chofer' || u.role === 'Administrador');
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" style="text-align:center; padding:3rem 1rem; color:#64748B;">
           <i class="bi bi-inbox" style="font-size:2.2rem; color:#CBD5E1; display:block; margin-bottom:8px;"></i>
-          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos coincidentes con el filtro actual</span>
+          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos coincidentes con los filtros seleccionados</span>
           <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
-            Los pedidos de la tienda web y los generados en bodega ingresan automáticamente con trazabilidad completa.
+            Utilice el botón "⚡ Auto-Asignar Trabajos" para distribuir pedidos automáticamente.
           </p>
         </td>
       </tr>
@@ -9568,16 +10863,17 @@ window.renderWebOrdersFullTable = function() {
     const isInRoute = (st === 'EN_RUTA');
     const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
     const isUndelivered = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+    const targetCode = o.orderCode || o.id;
 
     let badgeHtml = '';
     if (isPending) {
       badgeHtml = `<span class="badge-status badge-observed" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; font-weight:800;"><i class="bi bi-clock"></i> Pendiente Alisto</span>`;
     } else if (isPrepared) {
-      badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:800;"><i class="bi bi-box-seam"></i> Alistado en Bodega</span>`;
+      badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:800;"><i class="bi bi-box-seam"></i> Alistado</span>`;
     } else if (isInRoute) {
       badgeHtml = `<span class="badge-status" style="background:#F3E8FF; color:#6B21A8; border:1px solid #DDD6FE; font-weight:800;"><i class="bi bi-truck"></i> En Ruta</span>`;
     } else if (isDelivered) {
-      badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-weight:800;"><i class="bi bi-check-circle-fill"></i> Entregado (Kardex Rebajado)</span>`;
+      badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-weight:800;"><i class="bi bi-check-circle-fill"></i> Entregado</span>`;
     } else if (isUndelivered) {
       badgeHtml = `<span class="badge-status" style="background:#FEF2F2; color:#991B1B; border:1px solid #FCA5A5; font-weight:800;" title="${escapeHtml(o.undeliveredReason || 'Rechazado')}"><i class="bi bi-x-circle-fill"></i> No Entregado</span>`;
     } else {
@@ -9587,127 +10883,136 @@ window.renderWebOrdersFullTable = function() {
     const items = Array.isArray(o.items) ? o.items : [];
     const itemsCount = items.length;
     const totalUnits = items.reduce((s, it) => s + (Number(it.qty) || 1), 0);
-    const targetCode = o.orderCode || o.id;
 
     const itemsSummary = items.length > 0 
-      ? `<div style="max-height:160px; overflow-y:auto; padding-right:4px;">` + items.map(it => `
-          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:4px; font-size:0.78rem;">
-            <span style="background:#E0F2FE; color:#0284C7; font-weight:800; padding:1px 6px; border-radius:4px; font-size:0.72rem; white-space:nowrap; border:1px solid #BAE6FD; flex-shrink:0;">
+      ? `<div style="max-height:140px; overflow-y:auto; padding-right:4px;">` + items.map(it => `
+          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:3px; font-size:0.76rem;">
+            <span style="background:#E0F2FE; color:#0284C7; font-weight:800; padding:1px 5px; border-radius:4px; font-size:0.7rem; white-space:nowrap; border:1px solid #BAE6FD; flex-shrink:0;">
               ${it.qty || 1}x
             </span>
-            <div style="line-height:1.25;">
+            <div style="line-height:1.2;">
               <span style="font-weight:700; color:#0F172A;">${escapeHtml(it.name || it.sku || 'Artículo')}</span>
-              ${it.sku ? `<span style="font-size:0.68rem; color:#64748B; font-family:'JetBrains Mono',monospace; margin-left:4px;">[${escapeHtml(it.sku)}]</span>` : ''}
+              ${it.sku ? `<span style="font-size:0.65rem; color:#64748B; font-family:'JetBrains Mono',monospace; margin-left:3px;">[${escapeHtml(it.sku)}]</span>` : ''}
             </div>
           </div>
         `).join('') + `</div>`
-      : '<span style="color:#94A3B8; font-style:italic;">Sin artículos detallados</span>';
+      : '<span style="color:#94A3B8; font-style:italic;">Sin detalle</span>';
 
     return `
       <tr style="border-bottom:1px solid #E2E8F0; ${isPending ? 'background:#F0FDF4;' : ''}">
-        <td style="padding:12px 14px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
-          ${o.orderCode}
-          ${isPending ? `<span style="display:inline-block; font-size:0.65rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:4px; font-weight:800; animation:pulse 2s infinite;">NUEVO</span>` : ''}
-          <div style="margin-top:4px;">
+        <td style="padding:10px 12px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
+          ${escapeHtml(o.orderCode)}
+          ${isPending ? `<span style="display:inline-block; font-size:0.62rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:800;">NUEVO</span>` : ''}
+          <div style="margin-top:3px;">
             ${isWeb ? `
-              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; display:inline-flex; align-items:center; gap:3px;">
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; display:inline-flex; align-items:center; gap:2px;">
                 <i class="bi bi-globe2"></i> Web
               </span>
             ` : `
-              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; display:inline-flex; align-items:center; gap:3px;">
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; display:inline-flex; align-items:center; gap:2px;">
                 <i class="bi bi-building"></i> Bodega
               </span>
             `}
           </div>
-          <div style="font-size:0.72rem; color:#64748B; font-family:inherit; font-weight:normal; margin-top:2px;">
-            ${o.date || 'Hoy'}
+          <div style="font-size:0.7rem; color:#64748B; margin-top:2px;">
+            ${escapeHtml(o.date || 'Hoy')}
           </div>
         </td>
-        <td style="padding:12px 14px;">
-          <div style="font-weight:700; color:#0B192C;">${escapeHtml(o.customerName || 'Cliente')}</div>
-          <div style="font-size:0.75rem; color:#64748B;">Céd: ${escapeHtml(o.customerTaxId || 'N/A')}</div>
+        <td style="padding:10px 12px;">
+          <div style="font-weight:700; color:#0B192C; font-size:0.82rem;">${escapeHtml(o.customerName || 'Cliente')}</div>
+          <div style="font-size:0.72rem; color:#64748B;">Céd: ${escapeHtml(o.customerTaxId || 'N/A')}</div>
           ${o.customerPhone ? `
-            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="font-size:0.75rem; color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; margin-top:2px;">
+            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="font-size:0.72rem; color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:3px; font-weight:700; margin-top:2px;">
               <i class="bi bi-whatsapp"></i> ${escapeHtml(o.customerPhone)}
             </a>
           ` : ''}
         </td>
-        <td style="padding:12px 14px;">
-          <div style="font-weight:700; color:#0284C7;"><i class="bi bi-truck"></i> ${escapeHtml(o.deliveryRoute || o.deliveryDate || 'Cartago')}</div>
-          ${o.customerAddress ? `<div style="font-size:0.74rem; color:#475569; margin-top:2px; max-width:200px;"><i class="bi bi-geo-alt"></i> ${escapeHtml(o.customerAddress)}</div>` : ''}
+        <td style="padding:10px 12px;">
+          <div style="font-weight:700; color:#0284C7; font-size:0.8rem;"><i class="bi bi-truck"></i> ${escapeHtml(o.deliveryRoute || o.deliveryDate || 'Cartago')}</div>
+          ${o.customerAddress ? `<div style="font-size:0.72rem; color:#475569; margin-top:2px; max-width:180px;"><i class="bi bi-geo-alt"></i> ${escapeHtml(o.customerAddress)}</div>` : ''}
         </td>
-        <td style="padding:12px 14px; font-size:0.78rem;">
-          <div style="font-weight:700; color:#0F172A; margin-bottom:3px;">
-            ${itemsCount} líneas (${totalUnits} unidades)
+        <td style="padding:10px 12px; font-size:0.76rem;">
+          <div style="font-weight:700; color:#0F172A; margin-bottom:2px;">
+            ${itemsCount} líneas (${totalUnits} uds)
           </div>
-          <div style="color:#475569; line-height:1.35;">
-            ${itemsSummary}
-          </div>
+          ${itemsSummary}
         </td>
-        <td style="padding:12px 14px; text-align:right; font-weight:800; color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace;">
+        <td style="padding:10px 12px; text-align:right; font-weight:800; color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace;">
           ${formatCRC(o.total)}
         </td>
-        <td style="padding:12px 14px;">
-          ${o.preparedByName ? `
-            <div style="font-size:0.75rem; color:#0369A1; font-weight:700;">
-              <i class="bi bi-box-seam-fill"></i> Alistó: ${escapeHtml(o.preparedByName)}
+        <td style="padding:10px 12px;">
+          <!-- Dropdowns directos de asignación o badges de lectura para chofer -->
+          ${(AppState.currentUser && AppState.currentUser.role === 'Chofer') ? `
+            <div style="font-size:0.75rem; color:#475569; display:flex; flex-direction:column; gap:2px;">
+              <div><i class="bi bi-box-seam text-primary"></i> ${escapeHtml(o.preparedByName || 'Bodega Taras')}</div>
+              <div><i class="bi bi-truck text-warning"></i> ${escapeHtml(o.driverName || 'Mi Camión')}</div>
             </div>
-          ` : `<span style="font-size:0.72rem; color:#94A3B8;">Alistador: Sin asignar</span>`}
-          ${o.driverName ? `
-            <div style="font-size:0.75rem; color:#6B21A8; font-weight:700; margin-top:2px;">
-              <i class="bi bi-truck"></i> Chofer: ${escapeHtml(o.driverName)}
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:4px; min-width:170px;">
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Alisto:</span>
+                <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Asignar bodeguero">
+                  <option value="">⚠️ Sin asignar</option>
+                  ${bodeguerosList.map(b => `
+                    <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
+                      ${escapeHtml(b.name.split(' (')[0])}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Chofer:</span>
+                <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Asignar chofer">
+                  <option value="">⚠️ Sin asignar</option>
+                  ${choferesList.map(c => `
+                    <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
+                      ${escapeHtml(c.name.split(' (')[0])}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
             </div>
-          ` : ''}
-          ${o.undeliveredReason ? `
-            <div style="font-size:0.72rem; color:#DC2626; font-weight:700; margin-top:2px; background:#FEF2F2; padding:2px 6px; border-radius:4px; border:1px solid #FECACA;">
-              <i class="bi bi-exclamation-circle-fill"></i> Motivo: ${escapeHtml(o.undeliveredReason)}
-            </div>
-          ` : ''}
+          `}
         </td>
-        <td style="padding:12px 14px; text-align:center;">
+        <td style="padding:10px 12px; text-align:center;">
           ${badgeHtml}
         </td>
-        <td style="padding:12px 14px; text-align:center;">
-          <div style="display:flex; justify-content:center; gap:5px; flex-wrap:wrap;">
-            
-            <!-- 1. ALISTAR (PENDIENTE -> ALISTADO) -->
-            ${isPending ? `
-              <button class="btn-fragama btn-primary-fragama" style="padding:5px 10px; font-size:0.75rem; background:#10B981; border-color:#10B981; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido y Asignar Responsables">
+        <td style="padding:10px 12px; text-align:center;">
+          <div style="display:flex; justify-content:center; gap:4px; flex-wrap:wrap;">
+            ${isDelivered ? `
+              <span style="font-size:0.75rem; color:#059669; font-weight:800; background:#ECFDF5; border:1px solid #A7F3D0; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="bi bi-check2-all"></i> Finalizado
+              </span>
+            ` : ''}
+
+            ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
+              <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#10B981; color:#FFF; font-weight:800; border-radius:6px; border:none;" onclick="takeOrderTask('${targetCode}')" title="Asignarme este pedido">
+                <i class="bi bi-hand-index-thumb"></i> ✋ Tomar
+              </button>
+            ` : ''}
+
+            ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && isPending) ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 9px; font-size:0.72rem; background:#0284C7; border-color:#0284C7; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido">
                 <i class="bi bi-box-seam"></i> Alistar
               </button>
             ` : ''}
 
-            <!-- 2. DESPACHAR / RUTA -->
-            ${isPrepared ? `
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#7C3AED; color:#FFF; font-weight:700; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta con Chofer">
+            ${(!isDelivered && isPrepared) ? `
+              <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#7C3AED; color:#FFF; font-weight:700; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta">
                 <i class="bi bi-truck"></i> A Ruta
               </button>
             ` : ''}
 
-            <!-- 3. ENTREGAR / CONFIRMAR KARDEX -->
-            ${(isPrepared || isInRoute) ? `
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#059669; color:#FFF; font-weight:700; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Rebajar Kardex">
+            ${(!isDelivered && (isPrepared || isInRoute)) ? `
+              <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#059669; color:#FFF; font-weight:700; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega">
                 <i class="bi bi-check-circle-fill"></i> Entregar
               </button>
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#DC2626; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderUndeliveredModal('${targetCode}')" title="Registrar Motivo de No Entrega">
-                <i class="bi bi-x-circle-fill"></i> No Entregado
-              </button>
             ` : ''}
 
-            <!-- 4. REPROGRAMAR / REINTENTAR ALISTADO SI FUE RECHAZADO -->
-            ${isUndelivered ? `
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#F59E0B; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderPickingModal('${targetCode}')" title="Reintentar Alistado y Reprogramar Despacho">
-                <i class="bi bi-arrow-repeat"></i> Reprogramar
-              </button>
-            ` : ''}
-
-            <!-- 5. TRAZABILIDAD / AUDITORÍA -->
-            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Bitácora de Trazabilidad y Tiempos">
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 6px; font-size:0.72rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Trazabilidad">
               <i class="bi bi-clock-history"></i>
             </button>
-
-            <!-- 6. IMPRIMIR COMPROBANTE -->
-            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante Oficial">
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 6px; font-size:0.72rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir">
               <i class="bi bi-printer"></i>
             </button>
           </div>
@@ -9715,6 +11020,134 @@ window.renderWebOrdersFullTable = function() {
       </tr>
     `;
   }).join('');
+};
+
+// ==============================================================================
+// 3. ACCIONES DE ASIGNACIÓN RÁPIDA (AUTO-ASIGNAR, TOMAR TRABAJO, REASIGNAR)
+// ==============================================================================
+window.takeOrderTask = async function(orderCode) {
+  const curUser = AppState.currentUser || { id: 9, name: "Carlos Calvo (Bodega Central)" };
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderCode)}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preparedByUserId: curUser.id || 9,
+        preparedByName: curUser.name || 'Colaborador Fragama',
+        status: 'EN_ALISTADO',
+        notes: `Trabajo tomado por ${curUser.name || 'Colaborador'}`
+      })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      const ord = AppState.salesOrders.find(o => String(o.orderCode) === String(orderCode) || String(o.id) === String(orderCode));
+      if (ord) {
+        ord.preparedByName = curUser.name;
+        ord.preparedByUserId = curUser.id;
+        ord.status = 'EN_ALISTADO';
+      }
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`✅ Trabajo ${orderCode} asignado a tu nombre.`, 'success');
+      }
+      renderCollaboratorWorkloadChips();
+      renderWebOrdersCurrentView();
+    }
+  } catch(e) {
+    alert("Error al tomar el trabajo: " + e.message);
+  }
+};
+
+window.quickAssignOrder = async function(orderCode, newBodId, newChofId) {
+  const staff = await getStaffMembersList();
+  const ord = AppState.salesOrders.find(o => String(o.orderCode) === String(orderCode) || String(o.id) === String(orderCode));
+  if (!ord) return;
+
+  let bodId = ord.preparedByUserId;
+  let bodName = ord.preparedByName;
+  let chofId = ord.driverUserId;
+  let chofName = ord.driverName;
+
+  if (newBodId !== null && newBodId !== undefined) {
+    if (!newBodId) {
+      bodId = null;
+      bodName = '';
+    } else {
+      bodId = Number(newBodId);
+      const u = staff.find(s => Number(s.id) === bodId);
+      bodName = u ? u.name : 'Colaborador Bodega';
+    }
+  }
+
+  if (newChofId !== null && newChofId !== undefined) {
+    if (!newChofId) {
+      chofId = null;
+      chofName = '';
+    } else {
+      chofId = Number(newChofId);
+      const u = staff.find(s => Number(s.id) === chofId);
+      chofName = u ? u.name : 'Chofer Ruta';
+    }
+  }
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderCode)}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preparedByUserId: bodId,
+        preparedByName: bodName,
+        driverUserId: chofId,
+        driverName: chofName,
+        notes: `Asignación actualizada: Alistador ${bodName || 'Sin asignar'}, Chofer ${chofName || 'Sin asignar'}`
+      })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      ord.preparedByName = bodName;
+      ord.preparedByUserId = bodId;
+      ord.driverName = chofName;
+      ord.driverUserId = chofId;
+
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`✅ Pedido ${orderCode} asignado a ${bodName || chofName}.`, 'success');
+      }
+      renderCollaboratorWorkloadChips();
+      renderWebOrdersCurrentView();
+    }
+  } catch(e) {
+    console.error("Error en asignación rápida:", e);
+  }
+};
+
+window.triggerAutoAssignOrders = async function() {
+  const btn = document.getElementById('btnAutoAssignOrders');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Asignando equitativamente...`;
+  }
+
+  try {
+    const res = await fetch('/api/orders/auto-assign', { method: 'POST' });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`⚡ ${result.message}`, 'success');
+      }
+      await performOrderSync(true);
+      renderCollaboratorWorkloadChips();
+      renderWebOrdersCurrentView();
+    } else {
+      alert(result.message || 'Error en auto-asignación');
+    }
+  } catch(e) {
+    alert("Error al auto-asignar pedidos: " + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
 };
 
 window.triggerManualOrderSync = async function() {

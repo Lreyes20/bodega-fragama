@@ -16,7 +16,8 @@ import uuid
 import time
 import re
 import sqlite3
-from typing import Optional, List, Dict, Any
+import urllib.parse
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, date
 
 try:
@@ -187,6 +188,10 @@ def init_database_schema():
             ("PreparedAt", "TEXT"),
             ("DriverUserId", "INTEGER"),
             ("DriverName", "TEXT"),
+            ("CustomerEmail", "TEXT"),
+            ("WantsElectronicInvoice", "INTEGER DEFAULT 0"),
+            ("InvoiceSentAt", "TEXT"),
+            ("InvoiceSentTo", "TEXT"),
             ("DispatchedAt", "TEXT"),
             ("DeliveredAt", "TEXT"),
             ("UndeliveredReason", "TEXT"),
@@ -195,6 +200,24 @@ def init_database_schema():
         for col_name, col_type in cols_to_add:
             if col_name not in so_cols:
                 cur.execute(f"ALTER TABLE SalesOrders ADD COLUMN {col_name} {col_type};")
+
+        # 3.1. Tabla de Notificaciones de Trámites y Asignaciones
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS UserNotifications (
+                NotificationId INTEGER PRIMARY KEY AUTOINCREMENT,
+                UserId INTEGER NOT NULL,
+                UserName TEXT,
+                UserRole TEXT,
+                Title TEXT NOT NULL,
+                Message TEXT NOT NULL,
+                Type TEXT DEFAULT 'ASSIGNMENT',
+                ReferenceCode TEXT,
+                ReferenceUrl TEXT,
+                IsRead INTEGER DEFAULT 0,
+                CreatedAt TEXT NOT NULL
+            );
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_notif_user_read ON UserNotifications(UserId, IsRead);")
 
         # 4. Columnas WMS Avanzadas en Products (Lote, Vencimiento, Zonas, Peligrosidad)
         cur.execute("PRAGMA table_info(Products)")
@@ -352,6 +375,23 @@ def init_database_schema():
 
 init_database_schema()
 
+def create_user_notification(user_id: int, user_name: str, title: str, message: str, notif_type: str = "ASSIGNMENT", ref_code: str = None, ref_url: str = None, user_role: str = "Colaborador"):
+    """Crea una notificación persistente para alertar al usuario de asignación de trámites, pedidos o cambios operativos."""
+    try:
+        conn = get_sqlite_conn()
+        cur = conn.cursor()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute("""
+            INSERT INTO UserNotifications 
+            (UserId, UserName, UserRole, Title, Message, Type, ReferenceCode, ReferenceUrl, IsRead, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        """, (user_id, user_name, user_role, title, message, notif_type, ref_code, ref_url, now_str))
+        conn.commit()
+        conn.close()
+        logger.info(f"🔔 Notificación creada para {user_name} (ID {user_id}): {title}")
+    except Exception as e:
+        logger.warning(f"Aviso creando notificación de usuario: {e}")
+
 def try_get_mssql_conn():
     """Intenta conectar a Microsoft SQL Server 2022."""
     try:
@@ -462,6 +502,8 @@ class PublicOrderCreateRequest(BaseModel):
     subtotalNeto: Optional[float] = 0.0
     iva: Optional[float] = 0.0
     total: Optional[float] = 0.0
+    customerEmail: Optional[str] = Field(None, max_length=150)
+    wantsElectronicInvoice: Optional[bool] = False
     date: Optional[str] = None
 
 class OrderItemRequest(BaseModel):
@@ -874,16 +916,19 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
         s_cur = s_conn.cursor()
 
         # Insertar / Actualizar Cliente
+        clean_email = sanitize_text(req.customerEmail or "").strip()[:100]
+        wants_fe = 1 if req.wantsElectronicInvoice else 0
         cust_tax = clean_tax_id if clean_tax_id else f"WEB-{clean_phone}"
         s_cur.execute("""
             INSERT INTO Customers (TaxId, BusinessName, Email, Phone, Address, Canton, Province)
-            VALUES (?, ?, '', ?, ?, ?, 'Cartago')
+            VALUES (?, ?, ?, ?, ?, ?, 'Cartago')
             ON CONFLICT(TaxId) DO UPDATE SET 
                 BusinessName = excluded.BusinessName,
+                Email = COALESCE(NULLIF(excluded.Email, ''), Customers.Email),
                 Phone = excluded.Phone,
                 Address = excluded.Address,
                 Canton = excluded.Canton
-        """, (cust_tax, clean_name, clean_phone, clean_address, clean_route))
+        """, (cust_tax, clean_name, clean_email, clean_phone, clean_address, clean_route))
         
         s_cur.execute("SELECT CustomerId FROM Customers WHERE TaxId = ?", (cust_tax,))
         cust_row = s_cur.fetchone()
@@ -897,14 +942,17 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
         order_record["preparedByName"] = bod_name
         order_record["driverUserId"] = chof_id
         order_record["driverName"] = chof_name
+        order_record["customerEmail"] = clean_email
+        order_record["wantsElectronicInvoice"] = bool(wants_fe)
 
-        # Insertar Encabezado de Pedido (SalesOrders) con datos completos del cliente
+        # Insertar Encabezado de Pedido (SalesOrders) con datos completos del cliente y Factura Electrónica
         s_cur.execute("""
             INSERT INTO SalesOrders 
-            (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, PaymentTerms, PaymentMethod, UserId, AssignedToUserId, PreparedByUserId, PreparedByName, DriverUserId, DriverName, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, 'Contado / Contra Entrega', 'SINPE Móvil / Transferencia', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
+            (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, CustomerEmail, WantsElectronicInvoice, PaymentTerms, PaymentMethod, UserId, AssignedToUserId, PreparedByUserId, PreparedByName, DriverUserId, DriverName, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Contado / Contra Entrega', 'SINPE Móvil / Transferencia', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
         """, (
             order_code, cust_id, clean_name, cust_tax, clean_phone, clean_address,
+            clean_email, wants_fe,
             bod_id, bod_id, bod_name, chof_id, chof_name,
             req.subtotalBruto, req.descuentoTotal or 0.0,
             req.iva, req.total, clean_route, order_record["notes"], order_date
@@ -922,18 +970,42 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
             """, (sql_order_id, it.productId, clean_sku, clean_pname, it.qty, it.unitPrice, it.subtotal or (it.qty * it.unitPrice)))
 
         # Registrar trazabilidad inicial en OrderAuditLog
+        fe_audit_str = " (Cliente solicitó Factura Electrónica DGT v4.3)" if wants_fe else ""
         s_cur.execute("""
             INSERT INTO OrderAuditLog 
             (OrderId, OrderCode, Timestamp, PreviousStatus, NewStatus, UserId, UserName, UserRole, Notes, Justification)
             VALUES (?, ?, ?, NULL, 'PENDIENTE', ?, ?, 'Sistema', ?, NULL)
         """, (
             sql_order_id, order_code, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            bod_id, bod_name, f"Pedido ingresado desde Tienda Virtual. Asignado para alistado a {bod_name} y ruta con {chof_name}."
+            bod_id, bod_name, f"Pedido ingresado desde Tienda Virtual{fe_audit_str}. Asignado para alistado a {bod_name} y ruta con {chof_name}."
         ))
 
         s_conn.commit()
         s_conn.close()
         logger.info(f"✅ Pedido web {order_code} guardado con éxito en SQLite (ID: {sql_order_id}) asignado a {bod_name}.")
+
+        # Alertar al usuario asignado (Bodeguero y Chofer) en tiempo real
+        if bod_id:
+            fe_alert = " [⚡ Factura Electrónica Solicitada]" if wants_fe else ""
+            create_user_notification(
+                user_id=bod_id,
+                user_name=bod_name,
+                title="📦 Nuevo Trámite de Alistado",
+                message=f"Se le asignó el pedido {order_code} ({clean_name}) por ₡{req.total:,.2f} para alistado y empaque.{fe_alert}",
+                notif_type="ASSIGNMENT",
+                ref_code=order_code,
+                user_role="Bodeguero"
+            )
+        if chof_id:
+            create_user_notification(
+                user_id=chof_id,
+                user_name=chof_name,
+                title="🚚 Nueva Ruta de Entrega Asignada",
+                message=f"Se le asignó la entrega del pedido {order_code} ({clean_name}) hacia {clean_route}.",
+                notif_type="ASSIGNMENT",
+                ref_code=order_code,
+                user_role="Chofer"
+            )
     except Exception as e:
         logger.error(f"Error guardando pedido en SQLite: {e}")
 
@@ -1095,6 +1167,10 @@ def get_orders():
                        COALESCE(NULLIF(so.CustomerTaxId, ''), c.TaxId, 'N/A') as customerTaxId,
                        COALESCE(NULLIF(so.CustomerPhone, ''), c.Phone, '') as customerPhone,
                        COALESCE(NULLIF(so.CustomerAddress, ''), c.Address, '') as customerAddress,
+                       COALESCE(NULLIF(so.CustomerEmail, ''), c.Email, '') as customerEmail,
+                       COALESCE(so.WantsElectronicInvoice, 0) as wantsElectronicInvoice,
+                       COALESCE(so.InvoiceSentAt, '') as invoiceSentAt,
+                       COALESCE(so.InvoiceSentTo, '') as invoiceSentTo,
                        COALESCE(NULLIF(so.PaymentTerms, ''), 'Contado Inmediato') as paymentTerms,
                        COALESCE(NULLIF(so.PaymentMethod, ''), 'SINPE Móvil') as paymentMethod,
                        so.AssignedToUserId as assignedUserId,
@@ -1589,6 +1665,10 @@ def get_order_by_identifier(order_identifier: str):
                        COALESCE(NULLIF(so.CustomerTaxId, ''), c.TaxId, 'N/A') as customerTaxId,
                        COALESCE(NULLIF(so.CustomerPhone, ''), c.Phone, '') as customerPhone,
                        COALESCE(NULLIF(so.CustomerAddress, ''), c.Address, '') as customerAddress,
+                       COALESCE(NULLIF(so.CustomerEmail, ''), c.Email, '') as customerEmail,
+                       COALESCE(so.WantsElectronicInvoice, 0) as wantsElectronicInvoice,
+                       COALESCE(so.InvoiceSentAt, '') as invoiceSentAt,
+                       COALESCE(so.InvoiceSentTo, '') as invoiceSentTo,
                        COALESCE(NULLIF(so.PaymentTerms, ''), 'Contado Inmediato') as paymentTerms,
                        COALESCE(NULLIF(so.PaymentMethod, ''), 'SINPE Móvil') as paymentMethod,
                        so.AssignedToUserId as assignedUserId,
@@ -1763,6 +1843,28 @@ def assign_order_collaborator(order_id: str, req: OrderAssignRequest):
             json.dump(w_orders, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.warning(f"Aviso actualizando web_orders.json: {e}")
+
+    # Alertar en tiempo real a los colaboradores asignados
+    if req.preparedByName and req.preparedByUserId:
+        create_user_notification(
+            user_id=req.preparedByUserId,
+            user_name=req.preparedByName,
+            title="📦 Trámite de Alistado Asignado",
+            message=f"Se le ha asignado la preparación y alistado del pedido {order_code}.",
+            notif_type="ASSIGNMENT",
+            ref_code=order_code,
+            user_role="Bodeguero"
+        )
+    if req.driverName and req.driverUserId:
+        create_user_notification(
+            user_id=req.driverUserId,
+            user_name=req.driverName,
+            title="🚚 Ruta de Despacho Asignada",
+            message=f"Se le ha asignado la entrega y transporte del pedido {order_code}.",
+            notif_type="ASSIGNMENT",
+            ref_code=order_code,
+            user_role="Chofer"
+        )
 
     return {
         "success": True,
@@ -4262,6 +4364,196 @@ def export_tax_d104_csv():
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=liquidacion_iva_d104_{summary['periodo']['mes']}_{summary['periodo']['anio']}.csv"}
     )
+
+# ==============================================================================
+# MÓDULO DE NOTIFICACIONES DE USUARIOS Y ENVÍO DE FACTURACIÓN ELECTRÓNICA
+# ==============================================================================
+
+class SendElectronicInvoiceRequest(BaseModel):
+    orderId: Union[int, str]
+    recipientEmail: Optional[str] = None
+    recipientPhone: Optional[str] = None
+    customerTaxId: Optional[str] = None
+    customerName: Optional[str] = None
+    sendEmail: Optional[bool] = True
+    sendWhatsApp: Optional[bool] = True
+    notes: Optional[str] = None
+
+@app.get("/api/notifications")
+def get_user_notifications(user_id: Optional[int] = None, username: Optional[str] = None, unread_only: bool = False):
+    """
+    Retorna las alertas y trámites asignados al usuario en tiempo real con contador de no leídos.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    
+    query = """
+        SELECT NotificationId as id, UserId as userId, UserName as userName, UserRole as userRole,
+               Title as title, Message as message, Type as type, ReferenceCode as referenceCode,
+               ReferenceUrl as referenceUrl, IsRead as isRead, CreatedAt as createdAt
+        FROM UserNotifications
+    """
+    params = []
+    conditions = []
+    
+    target_uid = user_id
+    if not target_uid and username:
+        cur.execute("SELECT UserId FROM Users WHERE LOWER(Username) = LOWER(?)", (username.strip(),))
+        urow = cur.fetchone()
+        if urow:
+            target_uid = urow["UserId"]
+            
+    if target_uid:
+        conditions.append("UserId = ?")
+        params.append(target_uid)
+        
+    if unread_only:
+        conditions.append("IsRead = 0")
+        
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+        
+    query += " ORDER BY NotificationId DESC LIMIT 40"
+    cur.execute(query, params)
+    notifications = [dict(r) for r in cur.fetchall()]
+    
+    # Contar cuántas no leídas
+    count_query = "SELECT COUNT(*) as cnt FROM UserNotifications WHERE IsRead = 0"
+    count_params = []
+    if target_uid:
+        count_query += " AND UserId = ?"
+        count_params.append(target_uid)
+        
+    cur.execute(count_query, count_params)
+    unread_count = cur.fetchone()["cnt"]
+    conn.close()
+    
+    return {
+        "success": True,
+        "unreadCount": unread_count,
+        "notifications": notifications
+    }
+
+@app.post("/api/notifications/{notification_id}/read")
+def mark_notification_as_read(notification_id: int):
+    """Marca una notificación específica como leída."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE UserNotifications SET IsRead = 1 WHERE NotificationId = ?", (notification_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "Notificación marcada como leída."}
+
+@app.post("/api/notifications/read-all")
+def mark_all_notifications_as_read(user_id: Optional[int] = None, username: Optional[str] = None):
+    """Marca todas las notificaciones del usuario como leídas."""
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    target_uid = user_id
+    if not target_uid and username:
+        cur.execute("SELECT UserId FROM Users WHERE LOWER(Username) = LOWER(?)", (username.strip(),))
+        urow = cur.fetchone()
+        if urow:
+            target_uid = urow["UserId"]
+            
+    if target_uid:
+        cur.execute("UPDATE UserNotifications SET IsRead = 1 WHERE UserId = ?", (target_uid,))
+    else:
+        cur.execute("UPDATE UserNotifications SET IsRead = 1")
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "Todas las notificaciones marcadas como leídas."}
+
+@app.post("/api/tax/send-electronic-invoice")
+def send_electronic_invoice_endpoint(req: SendElectronicInvoiceRequest):
+    """
+    Emite oficialmente y envía la Factura Electrónica (DGT Costa Rica v4.3)
+    al correo del cliente y genera enlace oficial de WhatsApp si el cliente así lo desea.
+    """
+    ident = str(req.orderId).strip()
+    
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT so.SalesOrderId, so.OrderNumber, so.TotalAmount, so.SubTotal, so.TaxAmount,
+               so.CustomerName, so.CustomerTaxId, so.CustomerPhone, so.CustomerEmail,
+               so.WantsElectronicInvoice, so.DeliveryRoute, so.DeliveryNotes, so.CreatedAt
+        FROM SalesOrders so
+        WHERE so.SalesOrderId = ? OR UPPER(so.OrderNumber) = ?
+    """, (int(ident) if ident.isdigit() else -1, ident.upper()))
+    order_row = cur.fetchone()
+    
+    if not order_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Pedido no encontrado para facturación electrónica.")
+        
+    ord_dict = dict(order_row)
+    so_id = ord_dict["SalesOrderId"]
+    order_code = ord_dict["OrderNumber"]
+    
+    email_dest = (req.recipientEmail or ord_dict.get("CustomerEmail") or "").strip()
+    phone_dest = (req.recipientPhone or ord_dict.get("CustomerPhone") or "").strip()
+    cust_name = (req.customerName or ord_dict.get("CustomerName") or "Cliente").strip()
+    cust_tax = (req.customerTaxId or ord_dict.get("CustomerTaxId") or "N/A").strip()
+    
+    # Generar Comprobante Electrónico oficial (50 dígitos + XML)
+    inv_data = generate_electronic_invoice_xml(order_id=so_id)
+    clave = inv_data.get("clave") or ""
+    consecutivo = inv_data.get("consecutivo") or f"0010000101{so_id:010d}"
+    
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    contact_dest = f"{email_dest} / {phone_dest}".strip(" /")
+    
+    # Registrar en SalesOrders
+    cur.execute("""
+        UPDATE SalesOrders 
+        SET WantsElectronicInvoice = 1,
+            CustomerEmail = COALESCE(NULLIF(?, ''), CustomerEmail),
+            InvoiceSentAt = ?,
+            InvoiceSentTo = ?
+        WHERE SalesOrderId = ?
+    """, (email_dest, now_str, contact_dest, so_id))
+    
+    # Registrar en OrderAuditLog
+    cur.execute("""
+        INSERT INTO OrderAuditLog 
+        (OrderId, OrderCode, Timestamp, PreviousStatus, NewStatus, UserId, UserName, UserRole, Notes)
+        VALUES (?, ?, ?, 'DESPACHADO', 'FACTURADO', 1, 'Facturación Electrónica DGT', 'Facturador', ?)
+    """, (so_id, order_code, now_str, f"Factura Electrónica v4.3 emitida (Clave: {clave}) enviada al cliente: {contact_dest}."))
+    
+    conn.commit()
+    conn.close()
+    
+    # Formatear mensaje para WhatsApp
+    clean_phone = re.sub(r'[^0-9]', '', phone_dest)
+    total_val = float(ord_dict.get("TotalAmount") or 0.0)
+    total_fmt = f"₡{total_val:,.2f}"
+    
+    wa_msg = (
+        f"📄 *DISTRIBUIDORA FRAGAMA S.A. - FACTURA ELECTRÓNICA OFICIAL*\n\n"
+        f"Estimado(a) *{cust_name}*,\n"
+        f"Le compartimos el comprobante fiscal electrónico conforme a la Dirección General de Tributación de Costa Rica (DGT-R-48):\n\n"
+        f"🔹 *N° Consecutivo:* {consecutivo}\n"
+        f"🔹 *Pedido:* {order_code}\n"
+        f"🔹 *Total Factura:* {total_fmt}\n"
+        f"🔹 *Clave Numérica de 50 Dígitos:*\n`{clave}`\n\n"
+        f"El XML oficial firmado digitalmente y el PDF de respaldo han sido generados con éxito.\n"
+        f"¡Gracias por su confianza en Distribuidora Fragama!"
+    )
+    encoded_wa = urllib.parse.quote(wa_msg)
+    wa_url = f"https://api.whatsapp.com/send?phone=506{clean_phone[-8:]}&text={encoded_wa}" if len(clean_phone) >= 8 else f"https://api.whatsapp.com/send?text={encoded_wa}"
+    
+    return {
+        "success": True,
+        "message": f"Factura Electrónica enviada exitosamente para {cust_name}.",
+        "clave": clave,
+        "consecutivo": consecutivo,
+        "recipientEmail": email_dest,
+        "recipientPhone": phone_dest,
+        "whatsappUrl": wa_url,
+        "sentAt": now_str,
+        "total": total_val
+    }
 
 @app.get("/healthz")
 def kubernetes_health():

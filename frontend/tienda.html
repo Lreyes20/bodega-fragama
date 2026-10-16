@@ -2290,6 +2290,40 @@
             <input type="text" id="custNotes" class="form-input-custom" placeholder="Ej. Entregar en horario matutino / factura electrónica al correo...">
           </div>
 
+          <!-- OPCIÓN FACTURA ELECTRÓNICA OFICIAL CR (v4.3) -->
+          <div style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin-bottom:0; font-weight:800; color:#0F172A; font-size:0.88rem;">
+              <input type="checkbox" id="custWantsElectronicInvoice" style="width:18px; height:18px; accent-color:#0284C7; cursor:pointer;" onchange="toggleElectronicInvoiceFields(this.checked)">
+              <span><i class="bi bi-file-earmark-text-fill text-primary"></i> ¿Desea Factura Electrónica con Hacienda CR?</span>
+            </label>
+            <div style="font-size:0.75rem; color:#64748B; margin-left:28px; margin-top:2px;">
+              Activado si requiere comprobante tributario deducible con clave de 50 dígitos y archivo XML oficial.
+            </div>
+
+            <!-- Campos desplegables de Factura Electrónica -->
+            <div id="electronicInvoiceFieldsContainer" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed #CBD5E1;">
+              <div class="form-row-2">
+                <div class="form-group-custom">
+                  <label style="font-size:0.78rem;">Tipo de Cédula</label>
+                  <select id="custTaxType" class="form-input-custom" style="font-size:0.82rem;">
+                    <option value="01">01 - Cédula Física</option>
+                    <option value="02" selected>02 - Cédula Jurídica (Empresa / Sociedad)</option>
+                    <option value="03">03 - DIMEX (Extranjero)</option>
+                    <option value="04">04 - NITE</option>
+                  </select>
+                </div>
+                <div class="form-group-custom">
+                  <label style="font-size:0.78rem;">Correo para Envío de Factura Electrónica *</label>
+                  <input type="email" id="custBillingEmail" class="form-input-custom" placeholder="facturacion@suempresa.cr" style="font-size:0.82rem;">
+                </div>
+              </div>
+              <div class="form-group-custom" style="margin-bottom:0;">
+                <label style="font-size:0.78rem;">Razón Social / Nombre Fiscal</label>
+                <input type="text" id="custBillingName" class="form-input-custom" placeholder="Nombre legal registrado ante Hacienda" style="font-size:0.82rem;">
+              </div>
+            </div>
+          </div>
+
           <div style="background:var(--bg-light); border:1px solid var(--border-color); border-radius:8px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
             <span style="font-weight:700; color:var(--text-dark);">Total Estimado a Pagar:</span>
             <span id="modalCheckoutTotal" style="font-size:1.3rem; font-weight:900; color:var(--accent-orange); font-family:'JetBrains Mono';">₡0.00</span>
@@ -2958,6 +2992,17 @@
       const custAddress = document.getElementById('custAddress').value.trim() || 'Cartago / Dirección a confirmar';
       const custNotes = document.getElementById('custNotes').value.trim();
 
+      const wantsFE = document.getElementById('custWantsElectronicInvoice')?.checked || false;
+      const billingEmail = document.getElementById('custBillingEmail')?.value.trim() || '';
+      const billingName = document.getElementById('custBillingName')?.value.trim() || custName;
+
+      if (wantsFE && !billingEmail) {
+        alert("Por favor ingrese el correo electrónico donde desea recibir su Factura Electrónica.");
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="bi bi-cloud-arrow-up-fill"></i> <span>Confirmar y Enviar Pedido a Bodega</span>`;
+        return;
+      }
+
       let subtotalBruto = 0;
       const orderItems = cart.map(item => {
         const lineTotal = item.product.price * item.qty;
@@ -2980,12 +3025,14 @@
         orderCode: generatedCode,
         docType: 'PEDIDO_WEB',
         source: 'TIENDA_WEB',
-        customerName: custName,
+        customerName: wantsFE ? billingName : custName,
         customerPhone: custPhone,
         customerTaxId: custTaxId,
         customerAddress: custAddress,
+        customerEmail: billingEmail,
+        wantsElectronicInvoice: wantsFE,
         deliveryRoute: custRoute,
-        notes: `Ruta: ${custRoute}. ${custNotes ? 'Notas: ' + custNotes : ''}`,
+        notes: `Ruta: ${custRoute}. ${custNotes ? 'Notas: ' + custNotes : ''}${wantsFE ? ' [Requiere Factura Electrónica a ' + billingEmail + ']' : ''}`,
         items: orderItems,
         subtotalBruto: subtotalBruto,
         descuentoTotal: 0,
@@ -3062,6 +3109,11 @@
 
       const detailsDiv = document.getElementById('confirmedDetailsContent');
       detailsDiv.innerHTML = `
+        ${order.wantsElectronicInvoice ? `
+        <div style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:10px 12px; margin-bottom:12px; color:#065F46; font-size:0.82rem; font-weight:700; display:flex; align-items:center; gap:8px; text-align:left;">
+          <i class="bi bi-shield-check text-success" style="font-size:1.25rem;"></i>
+          <span><strong>Factura Electrónica v4.3 Solicitada:</strong> Se emitirá con su cédula y se enviará automáticamente a <u>${escapeHtml(order.customerEmail || 'su correo')}</u> una vez preparado el pedido.</span>
+        </div>` : ''}
         <div style="margin-bottom:6px;"><strong>Cliente:</strong> ${escapeHtml(order.customerName)} (${escapeHtml(order.customerPhone)})</div>
         <div style="margin-bottom:6px;"><strong>Ruta de Entrega:</strong> ${escapeHtml(order.deliveryRoute)}</div>
         <div style="margin-bottom:6px;"><strong>Dirección:</strong> ${escapeHtml(order.customerAddress)}</div>
@@ -3077,6 +3129,23 @@
 
       document.getElementById('orderSuccessModalBackdrop').classList.add('active');
     }
+
+    function toggleElectronicInvoiceFields(checked) {
+      const el = document.getElementById('electronicInvoiceFieldsContainer');
+      const emailInput = document.getElementById('custBillingEmail');
+      if (el) {
+        el.style.display = checked ? 'block' : 'none';
+        if (emailInput) {
+          if (checked) {
+            emailInput.setAttribute('required', 'required');
+            emailInput.focus();
+          } else {
+            emailInput.removeAttribute('required');
+          }
+        }
+      }
+    }
+    window.toggleElectronicInvoiceFields = toggleElectronicInvoiceFields;
 
     function closeSuccessModalAndReset() {
       document.getElementById('orderSuccessModalBackdrop').classList.remove('active');

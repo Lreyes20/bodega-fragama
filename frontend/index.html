@@ -577,6 +577,36 @@
           <span class="d-none d-sm-inline" style="font-weight:700;">Lector de Barras</span>
         </button>
 
+        <!-- Campanita de Alertas de Trámites y Asignaciones Personales -->
+        <div style="position:relative; display:inline-block;" id="userNotifContainer">
+          <button class="btn-fragama" id="topBtnNotifications" onclick="toggleUserNotificationsDropdown(event)" style="background:#FFFFFF; color:#0F172A; border:1px solid #CBD5E1; padding:6px 12px; font-size:0.8rem; display:flex; align-items:center; gap:6px; border-radius:8px; font-weight:700; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.05);" title="Ver mis trámites y pedidos asignados">
+            <i class="bi bi-bell-fill" id="topNotifBellIcon" style="color:#F59E0B; font-size:1.05rem; transition:transform 0.3s;"></i>
+            <span class="d-none d-md-inline" style="font-weight:700;">Mis Trámites</span>
+            <span id="userNotifBadgeCount" style="display:none; background:#EF4444; color:#FFF; font-size:0.68rem; font-weight:800; padding:1px 6px; border-radius:12px; margin-left:2px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">0</span>
+          </button>
+
+          <!-- Bandeja Flotante de Notificaciones -->
+          <div id="userNotificationsTray" style="display:none; position:absolute; right:0; top:42px; width:380px; max-width:92vw; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:12px; box-shadow:0 15px 35px rgba(0,0,0,0.18); z-index:99999; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#0F172A; color:#FFF;">
+              <div style="font-weight:800; font-size:0.88rem; display:flex; align-items:center; gap:8px;">
+                <i class="bi bi-bell-fill text-warning"></i> Mis Trámites Asignados
+              </div>
+              <button type="button" onclick="markAllNotificationsAsRead()" style="background:transparent; border:none; color:#94A3B8; font-size:0.75rem; cursor:pointer; text-decoration:underline; font-weight:600;" title="Marcar todas como leídas">
+                Marcar leídas
+              </button>
+            </div>
+            <div id="userNotificationsList" style="max-height:380px; overflow-y:auto; padding:8px 0;">
+              <div style="text-align:center; padding:24px 16px; color:#64748B; font-size:0.85rem;">
+                <i class="bi bi-check-circle-fill text-success" style="font-size:1.8rem; display:block; margin-bottom:8px;"></i>
+                No tiene trámites pendientes.
+              </div>
+            </div>
+            <div style="padding:10px 14px; background:#F8FAFC; border-top:1px solid #E2E8F0; text-align:center;">
+              <small style="color:#64748B; font-size:0.75rem;">Sistema de asignación en tiempo real • Bodega Fragama</small>
+            </div>
+          </div>
+        </div>
+
         <!-- Bloque de Usuario y Rol Oficial Asignado (.user-info) -->
         <div class="user-info" style="cursor:pointer;" onclick="openSelfPasswordModal()" title="Haga clic para cambiar su contraseña">
           <i class="bi bi-person-circle"></i>
@@ -4104,7 +4134,10 @@
 
       <div class="modal-footer-custom" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <button class="btn-fragama btn-outline-fragama" id="dismissOrderPrintBtn">Cerrar</button>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-fragama" id="btnSendFEToCustomer" style="background:#0284C7; color:#FFF; font-weight:700; border:none; display:inline-flex; align-items:center; gap:6px;" onclick="openSendElectronicInvoiceModalFromPrint()">
+            <i class="bi bi-send-check-fill"></i> Enviar Factura Electrónica (DGT)
+          </button>
           <button class="btn-fragama" id="btnShareOrderWhatsApp" style="background:#25D366; color:#FFF; font-weight:700; border:none; display:inline-flex; align-items:center; gap:6px;" onclick="shareCurrentOrderWhatsApp()">
             <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
           </button>
@@ -4113,6 +4146,67 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ENVIAR FACTURA ELECTRÓNICA AL CLIENTE (DGT CR v4.3) -->
+  <div class="modal-overlay" id="sendElectronicInvoiceModal">
+    <div class="modal-box" style="max-width:540px;">
+      <div class="modal-header-custom" style="background:#0F172A; color:#FFF; padding:1rem 1.25rem;">
+        <h3 style="font-size:1.05rem; font-weight:800; color:#FFF; margin:0; display:flex; align-items:center; gap:8px;">
+          <i class="bi bi-file-earmark-check-fill text-info"></i> Enviar Factura Electrónica (Hacienda CR v4.3)
+        </h3>
+        <button onclick="closeSendElectronicInvoiceModal()" style="background:none; border:none; font-size:1.4rem; color:#FFF; cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="sendElectronicInvoiceForm" onsubmit="executeSendElectronicInvoice(event)">
+        <div class="modal-body-custom" style="padding:1.25rem;">
+          <input type="hidden" id="feSendOrderId">
+
+          <!-- Resumen del Pedido y Solicitud del Cliente -->
+          <div id="feCustomerRequestedBanner" style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px;">
+            <i class="bi bi-shield-check text-success" style="font-size:1.3rem;"></i>
+            <div style="font-size:0.82rem; color:#065F46;">
+              <strong id="feSendOrderCodeDisplay">PED-WEB-00000</strong> &bull; <span id="feSendCustomerNameDisplay">Cliente</span><br>
+              <span id="feSendCustomerStatusBadge" style="font-weight:700;">⚡ El cliente solicitó Factura Electrónica</span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-weight:700; font-size:0.82rem; color:#1E293B; display:block; margin-bottom:4px;">
+              <i class="bi bi-envelope-at text-primary"></i> Correo Electrónico del Cliente (para XML y PDF) *:
+            </label>
+            <input type="email" id="feSendRecipientEmail" placeholder="cliente@ejemplo.cr" required style="width:100%; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:0.88rem;">
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-weight:700; font-size:0.82rem; color:#1E293B; display:block; margin-bottom:4px;">
+              <i class="bi bi-whatsapp text-success"></i> WhatsApp de Notificación Inmediata:
+            </label>
+            <input type="tel" id="feSendRecipientPhone" placeholder="8888-8888" style="width:100%; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:0.88rem;">
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="font-weight:700; font-size:0.82rem; color:#1E293B; display:block; margin-bottom:4px;">
+              <i class="bi bi-card-text text-secondary"></i> Cédula Física / Jurídica (Receptor):
+            </label>
+            <input type="text" id="feSendRecipientTaxId" placeholder="Ej. 3-101-123456" style="width:100%; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:0.88rem;">
+          </div>
+
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 14px; font-size:0.78rem; color:#475569; line-height:1.4;">
+            <i class="bi bi-info-circle text-primary"></i> El sistema generará la <strong>Clave Numérica de 50 dígitos</strong>, el <strong>Consecutivo Oficial</strong> y el <strong>XML conforme a la versión 4.3 de Hacienda</strong>.
+          </div>
+        </div>
+
+        <div class="modal-footer-custom" style="display:flex; justify-content:space-between; align-items:center; padding:0.85rem 1.25rem; background:#F8FAFC; border-top:1px solid #E2E8F0;">
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeSendElectronicInvoiceModal()">Cancelar</button>
+          <div style="display:flex; gap:8px;">
+            <button type="submit" class="btn-fragama" id="btnExecuteSendFE" style="background:#0284C7; color:#FFF; font-weight:700; display:inline-flex; align-items:center; gap:6px;">
+              <i class="bi bi-send-fill"></i> Emitir y Enviar Factura
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 

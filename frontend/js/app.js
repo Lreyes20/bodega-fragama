@@ -850,6 +850,9 @@ async function performOrderSync(isManual = false) {
         }
       }
     }
+
+    // Sincronizar notificaciones de trámites asignados al usuario en tiempo real
+    fetchUserNotifications();
   } catch (err) {
     console.warn("Falla en sincronización de pedidos:", err);
   } finally {
@@ -860,6 +863,7 @@ async function performOrderSync(isManual = false) {
 
 function initRealtimeOrderSync() {
   updateWebOrdersBadges();
+  fetchUserNotifications();
   _syncCountdown = 4;
   
   if (_orderSyncInterval) clearInterval(_orderSyncInterval);
@@ -895,6 +899,281 @@ function playOrderChime() {
     osc.stop(audioCtx.currentTime + 0.4);
   } catch (e) {}
 }
+
+// ==============================================================================
+// SISTEMA DE NOTIFICACIONES Y ALERTAS EN TIEMPO REAL PARA COLABORADORES
+// ==============================================================================
+let _lastSeenNotificationId = 0;
+
+async function fetchUserNotifications() {
+  const curUser = (window.AppState && AppState.currentUser) ? AppState.currentUser : {};
+  const uname = curUser.username || '';
+  if (!uname) return;
+
+  try {
+    const url = `/api/notifications?username=${encodeURIComponent(uname)}&unread_only=false`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.success) return;
+
+    const unreadCount = data.unreadCount || 0;
+    const notifs = data.notifications || [];
+
+    // Actualizar badge en la campanita
+    const badgeEl = document.getElementById('userNotifBadgeCount');
+    const bellIcon = document.getElementById('topNotifBellIcon');
+    if (badgeEl) {
+      badgeEl.textContent = unreadCount > 9 ? '9+' : unreadCount;
+      badgeEl.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
+
+    if (bellIcon) {
+      if (unreadCount > 0) {
+        bellIcon.style.color = '#EF4444';
+        bellIcon.style.transform = 'scale(1.15)';
+      } else {
+        bellIcon.style.color = '#F59E0B';
+        bellIcon.style.transform = 'scale(1)';
+      }
+    }
+
+    // Si hay una notificación no leída nueva con ID mayor al último visto
+    const newestUnread = notifs.find(n => !n.isRead && n.id > _lastSeenNotificationId);
+    if (newestUnread) {
+      _lastSeenNotificationId = Math.max(...notifs.map(n => n.id));
+      playOrderChime();
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`🔔 ${newestUnread.title}: ${newestUnread.message}`, 'success');
+      }
+    } else if (notifs.length > 0 && _lastSeenNotificationId === 0) {
+      _lastSeenNotificationId = Math.max(...notifs.map(n => n.id));
+    }
+
+    renderUserNotificationsList(notifs);
+  } catch (err) {
+    console.debug('Aviso consultando notificaciones:', err);
+  }
+}
+
+function renderUserNotificationsList(notifs) {
+  const container = document.getElementById('userNotificationsList');
+  if (!container) return;
+
+  if (!notifs || notifs.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:24px 16px; color:#64748B; font-size:0.85rem;">
+        <i class="bi bi-check-circle-fill text-success" style="font-size:1.8rem; display:block; margin-bottom:8px;"></i>
+        No tiene trámites o asignaciones pendientes.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = notifs.map(n => {
+    const isUnread = !n.isRead;
+    const isDispatch = String(n.title).includes('Ruta') || String(n.userRole).toLowerCase().includes('chofer');
+    const targetView = isDispatch ? 'view-driver-dispatches' : 'view-alistado-web';
+
+    return `
+      <div style="padding:10px 14px; border-bottom:1px solid #F1F5F9; background:${isUnread ? '#FEF3C7' : '#FFFFFF'}; display:flex; gap:10px; align-items:flex-start; transition:background 0.2s;">
+        <div style="font-size:1.25rem; line-height:1; padding-top:2px;">
+          ${n.type === 'ASSIGNMENT' ? (isDispatch ? '🚚' : '📦') : '🔔'}
+        </div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <strong style="font-size:0.8rem; color:#0F172A;">${escapeHtml(n.title)}</strong>
+            <span style="font-size:0.68rem; color:#64748B;">${escapeHtml(n.createdAt ? n.createdAt.slice(11, 16) : '')}</span>
+          </div>
+          <p style="margin:0 0 6px 0; font-size:0.77rem; color:#334155; line-height:1.35;">
+            ${escapeHtml(n.message)}
+          </p>
+          <div style="display:flex; gap:8px; align-items:center;">
+            ${n.referenceCode ? `
+              <button type="button" class="btn-fragama" onclick="switchViewDirectly('${targetView}'); closeUserNotificationsDropdown();" style="padding:2px 8px; font-size:0.72rem; background:#0284C7; color:#FFF; border:none; border-radius:4px; font-weight:700;">
+                <i class="bi bi-arrow-right-circle"></i> Atender Pedido
+              </button>
+            ` : ''}
+            ${isUnread ? `
+              <button type="button" onclick="markNotificationAsRead(${n.id})" style="background:none; border:none; color:#64748B; font-size:0.72rem; cursor:pointer; text-decoration:underline;">
+                Marcar leída
+              </button>
+            ` : '<span style="font-size:0.7rem; color:#10B981;"><i class="bi bi-check2"></i> Leída</span>'}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleUserNotificationsDropdown(event) {
+  if (event) event.stopPropagation();
+  const tray = document.getElementById('userNotificationsTray');
+  if (tray) {
+    const isShowing = tray.style.display === 'block';
+    tray.style.display = isShowing ? 'none' : 'block';
+    if (!isShowing) {
+      fetchUserNotifications();
+    }
+  }
+}
+
+function closeUserNotificationsDropdown() {
+  const tray = document.getElementById('userNotificationsTray');
+  if (tray) tray.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('userNotifContainer');
+  if (container && !container.contains(e.target)) {
+    closeUserNotificationsDropdown();
+  }
+});
+
+async function markNotificationAsRead(id) {
+  try {
+    await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+    fetchUserNotifications();
+  } catch (e) {
+    console.debug('Error marcando notificación:', e);
+  }
+}
+
+async function markAllNotificationsAsRead() {
+  const curUser = (window.AppState && AppState.currentUser) ? AppState.currentUser : {};
+  try {
+    await fetch(`/api/notifications/read-all?username=${encodeURIComponent(curUser.username || '')}`, { method: 'POST' });
+    fetchUserNotifications();
+  } catch (e) {
+    console.debug('Error marcando todas las notificaciones:', e);
+  }
+}
+
+window.fetchUserNotifications = fetchUserNotifications;
+window.toggleUserNotificationsDropdown = toggleUserNotificationsDropdown;
+window.closeUserNotificationsDropdown = closeUserNotificationsDropdown;
+window.markNotificationAsRead = markNotificationAsRead;
+window.markAllNotificationsAsRead = markAllNotificationsAsRead;
+
+// ==============================================================================
+// GESTIÓN Y ENVÍO DE FACTURACIÓN ELECTRÓNICA CR DGT v4.3
+// ==============================================================================
+window.openSendElectronicInvoiceModalFromPrint = function() {
+  const order = window._currentPrintingOrder;
+  if (!order) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('No hay pedido activo para facturar.', 'warning');
+    }
+    return;
+  }
+  openSendElectronicInvoiceModal(order.orderCode || order.id);
+};
+
+window.openSendElectronicInvoiceModal = function(orderIdOrCode) {
+  const modal = document.getElementById('sendElectronicInvoiceModal');
+  if (!modal) return;
+
+  const order = (AppState.salesOrders || []).find(o => 
+    String(o.id) === String(orderIdOrCode) || String(o.orderCode).toUpperCase() === String(orderIdOrCode).toUpperCase()
+  ) || window._currentPrintingOrder || {};
+
+  const orderIdent = order.orderCode || order.id || orderIdOrCode;
+  document.getElementById('feSendOrderId').value = orderIdent;
+  document.getElementById('feSendOrderCodeDisplay').textContent = order.orderCode || `Pedido #${orderIdent}`;
+  document.getElementById('feSendCustomerNameDisplay').textContent = order.customerName || 'Cliente';
+  document.getElementById('feSendRecipientEmail').value = order.customerEmail || '';
+  document.getElementById('feSendRecipientPhone').value = order.customerPhone || '';
+  document.getElementById('feSendRecipientTaxId').value = order.customerTaxId && order.customerTaxId !== 'N/A' ? order.customerTaxId : '';
+
+  const badge = document.getElementById('feSendCustomerStatusBadge');
+  const banner = document.getElementById('feCustomerRequestedBanner');
+  if (order.wantsElectronicInvoice) {
+    if (badge) badge.textContent = '⚡ El cliente SOLICITÓ Factura Electrónica formal en su pedido';
+    if (banner) {
+      banner.style.background = '#ECFDF5';
+      banner.style.borderColor = '#A7F3D0';
+    }
+  } else {
+    if (badge) badge.textContent = 'ℹ️ Envío estándar de Comprobante / Factura Electrónica';
+    if (banner) {
+      banner.style.background = '#F8FAFC';
+      banner.style.borderColor = '#CBD5E1';
+    }
+  }
+
+  modal.classList.add('active');
+};
+
+window.closeSendElectronicInvoiceModal = function() {
+  const modal = document.getElementById('sendElectronicInvoiceModal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.executeSendElectronicInvoice = async function(event) {
+  if (event) event.preventDefault();
+
+  const orderId = document.getElementById('feSendOrderId').value;
+  const email = document.getElementById('feSendRecipientEmail').value.trim();
+  const phone = document.getElementById('feSendRecipientPhone').value.trim();
+  const taxId = document.getElementById('feSendRecipientTaxId').value.trim();
+  const btn = document.getElementById('btnExecuteSendFE');
+
+  if (!email && !phone) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast('Debe ingresar al menos un correo o WhatsApp para el envío.', 'warning');
+    }
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="bi bi-arrow-repeat spin-anim"></i> Emitiendo Comprobante Hacienda...`;
+  }
+
+  try {
+    const res = await fetch('/api/tax/send-electronic-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: orderId,
+        recipientEmail: email,
+        recipientPhone: phone,
+        customerTaxId: taxId,
+        sendEmail: Boolean(email),
+        sendWhatsApp: Boolean(phone)
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || data.message || 'Error al emitir y enviar la factura.');
+    }
+
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast(`✅ Factura Electrónica oficial emitida con éxito (Clave: ${data.clave.slice(0, 10)}...${data.clave.slice(-6)}).`, 'success');
+    }
+    closeSendElectronicInvoiceModal();
+
+    if (data.whatsappUrl) {
+      setTimeout(() => {
+        if (confirm(`Factura generada con éxito.\n¿Desea abrir WhatsApp para enviar el comprobante directamente al cliente (${phone})?`)) {
+          window.open(data.whatsappUrl, '_blank');
+        }
+      }, 350);
+    }
+
+    performOrderSync();
+  } catch (err) {
+    if (typeof showNotificationToast === 'function') {
+      showNotificationToast(`Error: ${err.message}`, 'error');
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="bi bi-send-fill"></i> Emitir y Enviar Factura`;
+    }
+  }
+};
 
 function isWebOrder(o) {
   if (!o) return false;
@@ -6353,6 +6632,26 @@ function openOrderPrintModal(order) {
       </div>
     </div>
 
+    <!-- BANNER DE SOLICITUD DE FACTURA ELECTRÓNICA POR EL CLIENTE -->
+    ${order.wantsElectronicInvoice ? `
+      <div style="background:#ECFDF5; border:1px solid #10B981; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px; color:#065F46; font-size:0.82rem; font-weight:800;">
+          <i class="bi bi-shield-check text-success" style="font-size:1.3rem;"></i>
+          <span>⚡ EL CLIENTE SOLICITÓ FACTURA ELECTRÓNICA V4.3 (${escapeHtml(order.customerEmail || 'Correo a confirmar')})</span>
+        </div>
+        <button type="button" class="btn-fragama no-print" onclick="openSendElectronicInvoiceModalFromPrint()" style="background:#0284C7; color:#FFF; padding:4px 12px; font-size:0.75rem; font-weight:700; border:none; border-radius:6px; cursor:pointer;">
+          <i class="bi bi-send-fill"></i> Enviar Factura Ahora
+        </button>
+      </div>
+    ` : ''}
+
+    ${order.invoiceSentAt ? `
+      <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:8px; padding:8px 12px; margin-bottom:14px; color:#0369A1; font-size:0.8rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+        <i class="bi bi-check2-all text-primary" style="font-size:1.2rem;"></i>
+        <span>Factura Electrónica enviada exitosamente a <strong>${escapeHtml(order.invoiceSentTo || '')}</strong> el ${escapeHtml(order.invoiceSentAt)}.</span>
+      </div>
+    ` : ''}
+
     <!-- BANNER DESTACADO DE CONDICIÓN DE PAGO (CONTADO, CRÉDITO A COBRAR EN TIEMPO O CONTRA ENTREGA) -->
     ${(() => {
       const termsStr = String(order.paymentTerms || order.terms || 'Contado Inmediato');
@@ -10418,6 +10717,11 @@ function renderBoardOrderCard(o, staff) {
                 <i class="bi bi-building"></i> Bodega
               </span>
             `}
+            ${o.wantsElectronicInvoice ? `
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#047857; border:1px solid #6EE7B7;" title="⚡ El cliente solicitó Factura Electrónica v4.3">
+                <i class="bi bi-file-earmark-check-fill text-success"></i> FE
+              </span>
+            ` : ''}
             <span style="font-size:0.68rem; color:#94A3B8;">${escapeHtml(o.date || 'Hoy')}</span>
           </div>
         </div>
@@ -10515,6 +10819,9 @@ function renderBoardOrderCard(o, staff) {
         </button>
         <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.72rem; border-color:#CBD5E1; color:#475569;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante">
           <i class="bi bi-printer"></i>
+        </button>
+        <button class="btn-fragama" style="padding:5px 7px; font-size:0.72rem; background:${o.invoiceSentAt ? '#ECFDF5' : (o.wantsElectronicInvoice ? '#FEF3C7' : '#F8FAFC')}; border:1px solid ${o.invoiceSentAt ? '#10B981' : (o.wantsElectronicInvoice ? '#F59E0B' : '#CBD5E1')}; color:${o.invoiceSentAt ? '#065F46' : (o.wantsElectronicInvoice ? '#B45309' : '#475569')}; border-radius:6px;" onclick="openSendElectronicInvoiceModal('${targetCode}')" title="${o.invoiceSentAt ? 'Factura Electrónica enviada el ' + o.invoiceSentAt : (o.wantsElectronicInvoice ? '⚡ El cliente solicitó Factura Electrónica' : 'Emitir y Enviar Factura Electrónica')}">
+          <i class="bi bi-file-earmark-check${o.invoiceSentAt ? '-fill' : ''}"></i>
         </button>
       </div>
     </div>
