@@ -7268,11 +7268,124 @@ function renderTimelineItems(logs) {
 }
 
 window.viewSavedOrderPrint = function(orderId) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === orderId);
+  if (!orderId) {
+    showNotificationToast("Indique un número de pedido o factura válido.", "warning");
+    return;
+  }
+  const cleanId = String(orderId).trim();
+
+  // 1. Buscar coincidencia en AppState.salesOrders
+  let order = (AppState.salesOrders || []).find(o => 
+    String(o.id) === cleanId || 
+    String(o.orderCode || '').toUpperCase() === cleanId.toUpperCase() ||
+    cleanId.toUpperCase().includes(String(o.orderCode || '').toUpperCase()) ||
+    (o.orderCode && String(o.orderCode).toUpperCase().includes(cleanId.toUpperCase()))
+  );
+
+  // 2. Si no se encontró en salesOrders, buscar en despachos unificados
+  if (!order) {
+    const allDispatches = (typeof getUnifiedDriverDispatches === 'function') 
+      ? getUnifiedDriverDispatches() 
+      : (AppState.dispatches || []);
+    const d = allDispatches.find(item => 
+      String(item.id) === cleanId || 
+      String(item.code || '').toUpperCase() === cleanId.toUpperCase() ||
+      String(item.orderCode || '').toUpperCase() === cleanId.toUpperCase() ||
+      String(item.invoice || '').toUpperCase() === cleanId.toUpperCase()
+    );
+
+    if (d) {
+      if (d.originalOrder) {
+        order = d.originalOrder;
+      } else {
+        const totalAmount = Number(d.total) || 48500;
+        const subNeto = Math.round(totalAmount / 1.13);
+        const ivaAmount = totalAmount - subNeto;
+
+        let parsedItems = [];
+        if (Array.isArray(d.rawItems) && d.rawItems.length > 0) {
+          parsedItems = d.rawItems;
+        } else if (Array.isArray(d.packages) && d.packages.length > 0) {
+          parsedItems = d.packages.map((pkg, idx) => ({
+            sku: `FRG-BULTO-${idx + 1}`,
+            cabys: '4669010000000',
+            name: pkg.desc || `Bulto logístico #${idx + 1}`,
+            qty: Number(pkg.qty) || 1,
+            unit: pkg.unit || 'Bulto',
+            unitPrice: Math.round(totalAmount / (d.packages.length || 1)),
+            discountPct: 0,
+            subtotal: Math.round(totalAmount / (d.packages.length || 1))
+          }));
+        } else if (typeof d.items === 'string' && d.items.length > 0) {
+          parsedItems = d.items.split(',').map((itStr, idx) => {
+            const parts = itStr.trim().split('x ');
+            const qty = parts.length > 1 ? parseInt(parts[0]) || 1 : 1;
+            const name = parts.length > 1 ? parts.slice(1).join('x ') : itStr.trim();
+            const lineTotal = Math.round(totalAmount / (d.items.split(',').length || 1));
+            return {
+              sku: `FRG-PROD-${idx + 1}`,
+              cabys: '4669010000000',
+              name: name,
+              qty: qty,
+              unit: 'UND',
+              unitPrice: Math.round(lineTotal / qty),
+              discountPct: 0,
+              subtotal: lineTotal
+            };
+          });
+        } else {
+          parsedItems = [{
+            sku: 'FRG-GEN-01',
+            cabys: '4669010000000',
+            name: 'Carga de Mercadería Fragama',
+            qty: 1,
+            unit: 'CARGA',
+            unitPrice: totalAmount,
+            discountPct: 0,
+            subtotal: totalAmount
+          }];
+        }
+
+        order = {
+          id: d.id,
+          orderCode: d.orderCode || d.invoice || d.code,
+          docType: 'PEDIDO',
+          status: d.status === 'Entregado' ? 'ENTREGADO' : (d.status === 'En Ruta' ? 'EN_RUTA' : 'ALISTADO'),
+          date: d.departureTime ? `2026-10-16 ${d.departureTime}` : new Date().toLocaleDateString('es-CR'),
+          customerName: d.customer || 'Cliente Fragama',
+          customerTaxId: '3-101-778899',
+          customerPhone: d.customerPhone || (d.contact ? (d.contact.match(/\((.*?)\)/)?.[1] || d.contact) : '+506 2551-0000'),
+          customerContact: d.contact ? d.contact.split(' (')[0] : 'Encargado de Compras',
+          customerEmail: 'facturacion@fragama.cr',
+          customerProvince: d.province || 'Cartago',
+          customerCanton: d.canton || 'Central',
+          customerAddress: d.address || 'Dirección de Entrega Registrada en Costa Rica',
+          deliveryRoute: d.province || 'Cartago',
+          driverName: d.driverName || (d.driver ? d.driver.split(' - ')[0] : 'Minor Coto (Chofer Logístico)'),
+          driverUserId: d.driverUserId || 5,
+          preparedByName: 'Supervisor de Despacho Fragama',
+          paymentTerms: d.paymentTerms || (d.isCredit ? 'Crédito 30 días' : (d.isCashOnDelivery ? 'Contra Entrega' : 'Contado')),
+          paymentMethod: d.paymentMethod || 'SINPE Móvil / Transferencia',
+          isCredit: Boolean(d.isCredit),
+          creditDays: d.creditDays || 30,
+          dueDate: d.dueDate || '30 días',
+          isCashOnDelivery: Boolean(d.isCashOnDelivery),
+          items: parsedItems,
+          total: totalAmount,
+          subtotalBruto: subNeto,
+          descuentoTotal: 0,
+          subtotalNeto: subNeto,
+          iva: ivaAmount,
+          notes: `Ruta de entrega programada para ${d.province || 'Costa Rica'}. Comprobante oficial de alisto y transporte.`
+        };
+      }
+    }
+  }
+
   if (order) {
     openOrderPrintModal(order);
   } else {
-    showNotificationToast("No se encontró el comprobante del pedido solicitado.", "warning");
+    showNotificationToast(`No se encontró el comprobante para "${cleanId}".`, "warning");
   }
 };
 
@@ -7429,50 +7542,115 @@ window.onAdminDriverFilterChange = function(driverVal) {
   renderDriverDispatches();
 };
 
-function getUnifiedDriverDispatches() {
-  const curUser = AppState.currentUser || {};
-  const list = [...AppState.dispatches];
-
-  // Integrar pedidos en ALISTADO o EN_RUTA desde AppState.salesOrders si aún no están en la lista
-  const activeOrders = (AppState.salesOrders || []).filter(o => {
-    const st = (o.status || '').toUpperCase();
-    return st === 'EN_RUTA' || st === 'ALISTADO' || st === 'ENTREGADO';
+window.setDriverStatusFilter = function(statusFilter) {
+  AppState.driverStatusFilter = statusFilter || 'ALL';
+  const pills = document.querySelectorAll('.driver-status-pill');
+  pills.forEach(p => {
+    if (p.getAttribute('data-status-filter') === (statusFilter || 'ALL')) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
   });
 
-  activeOrders.forEach(o => {
-    const code = o.orderCode || o.id;
-    const exists = list.some(d => d.orderCode === code || d.code === code);
-    if (!exists) {
-      const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(o) : 'Carga general';
-      const itemsList = Array.isArray(o.items) && o.items.length > 0
-        ? o.items.map(it => `${it.qty || 1}x ${it.name || it.productName || 'Producto'}`).join(', ')
-        : 'Carga de mercadería';
+  const badge = document.getElementById('driverStatusFilterSummaryBadge');
+  if (badge) {
+    if (statusFilter === 'EN_RUTA') badge.textContent = 'En Ruta (Activos)';
+    else if (statusFilter === 'LISTO') badge.textContent = 'Listos / Alistados';
+    else if (statusFilter === 'ENTREGADO') badge.textContent = 'Entregados';
+    else badge.textContent = 'Todos los pedidos';
+  }
 
+  renderDriverDispatches();
+};
+
+function getUnifiedDriverDispatches() {
+  const curUser = AppState.currentUser || {};
+  const list = [];
+  const registeredCodes = new Set();
+
+  // 1. PRIORIDAD MÁXIMA: Pedidos reales de AppState.salesOrders (desde la base de datos)
+  const allSalesOrders = Array.isArray(AppState.salesOrders) ? AppState.salesOrders : [];
+
+  // Ordenar los pedidos reales de forma que los activos aparezcan primero
+  const sortedOrders = [...allSalesOrders].sort((a, b) => {
+    const score = st => {
+      const s = (st || '').toUpperCase();
+      if (s === 'EN_RUTA') return 5;
+      if (s === 'ALISTADO') return 4;
+      if (s === 'EN_ALISTADO') return 3;
+      if (s === 'PENDIENTE') return 2;
+      if (s === 'ENTREGADO') return 1;
+      return 0;
+    };
+    return score(b.status) - score(a.status);
+  });
+
+  sortedOrders.forEach(o => {
+    const code = o.orderCode || o.id;
+    if (!code || registeredCodes.has(String(code).toUpperCase())) return;
+    registeredCodes.add(String(code).toUpperCase());
+
+    const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(o) : 'Carga general';
+    const itemsList = Array.isArray(o.items) && o.items.length > 0
+      ? o.items.map(it => `${it.qty || it.quantity || 1}x ${it.name || it.productName || 'Producto'}`).join(', ')
+      : 'Carga de mercadería Fragama';
+
+    const orderStatusUpper = (o.status || '').toUpperCase();
+    let displayStatus = 'Asignado';
+    if (orderStatusUpper === 'ENTREGADO') displayStatus = 'Entregado';
+    else if (orderStatusUpper === 'EN_RUTA') displayStatus = 'En Ruta';
+    else if (orderStatusUpper === 'ALISTADO') displayStatus = 'Listo para Despacho';
+    else if (orderStatusUpper === 'EN_ALISTADO') displayStatus = 'En Alisto Bodega';
+    else if (orderStatusUpper === 'PENDIENTE') displayStatus = 'Pendiente de Alisto';
+    else if (orderStatusUpper === 'RECHAZADO' || orderStatusUpper === 'NOVEDAD') displayStatus = 'Rechazado';
+
+    const cleanContact = o.customerContact || o.customerName || 'Cliente';
+    const contactStr = o.customerPhone ? `${cleanContact} (${o.customerPhone})` : cleanContact;
+
+    list.push({
+      id: 'ord_' + (o.id || code),
+      code: code,
+      orderCode: code,
+      customer: o.customerName || 'Cliente Fragama',
+      province: o.customerProvince || o.deliveryRoute || 'Cartago',
+      canton: o.customerCanton || 'Central',
+      address: o.customerAddress || 'Dirección registrada en pedido',
+      contact: contactStr,
+      customerPhone: o.customerPhone || '',
+      invoice: `FAC-${code}`,
+      items: itemsList,
+      rawItems: o.items || [],
+      packages: [{ qty: (Array.isArray(o.items) ? o.items.length : 1), unit: 'Bultos', desc: bultos }],
+      driver: o.driverName || 'Minor Coto - Isuzu CL-294012',
+      driverName: o.driverName || 'Minor Coto',
+      driverUserId: o.driverUserId || (o.driverName && o.driverName.includes('Mauricio') ? 6 : 5),
+      status: displayStatus,
+      rawStatus: orderStatusUpper,
+      verified: (orderStatusUpper === 'EN_RUTA' || orderStatusUpper === 'ENTREGADO' || orderStatusUpper === 'ALISTADO'),
+      paymentTerms: o.paymentTerms || o.terms || 'Contado',
+      paymentMethod: o.paymentMethod || 'SINPE Móvil / Transferencia',
+      total: Number(o.total) || 0,
+      isCredit: o.isCredit || String(o.paymentTerms || o.terms || '').toLowerCase().includes('crédito'),
+      creditDays: o.creditDays || 30,
+      dueDate: o.dueDate || '30 días',
+      isCashOnDelivery: o.isCashOnDelivery || String(o.paymentTerms || o.terms || '').toLowerCase().includes('contra entrega'),
+      departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM',
+      isRealOrder: true,
+      originalOrder: o
+    });
+  });
+
+  // 2. Mock Dispatches como respaldo si no colisionan
+  (AppState.dispatches || []).forEach(d => {
+    const code = d.orderCode || d.code;
+    if (code && !registeredCodes.has(String(code).toUpperCase())) {
+      registeredCodes.add(String(code).toUpperCase());
+      const rawSt = (d.status === 'Entregado' ? 'ENTREGADO' : (d.status === 'En Ruta' ? 'EN_RUTA' : 'ALISTADO'));
       list.push({
-        id: 'ord_' + o.id,
-        code: `DSP-${code}`,
-        orderCode: code,
-        customer: o.customerName || 'Cliente Fragama',
-        province: o.customerProvince || o.deliveryRoute || 'Cartago',
-        canton: o.customerCanton || 'Central',
-        address: o.customerAddress || 'Dirección registrada en pedido',
-        contact: `${o.customerContact || o.customerName || 'Cliente'} (${o.customerPhone || 'N/A'})`,
-        invoice: `FAC-${code}`,
-        items: itemsList,
-        packages: [{ qty: (Array.isArray(o.items) ? o.items.length : 1), unit: 'Bultos', desc: bultos }],
-        driver: o.driverName || 'Minor Coto - Isuzu CL-294012',
-        driverName: o.driverName || 'Minor Coto',
-        driverUserId: o.driverUserId || 5,
-        status: o.status === 'ENTREGADO' ? 'Entregado' : (o.status === 'EN_RUTA' ? 'En Ruta' : 'Asignado'),
-        verified: true,
-        paymentTerms: o.paymentTerms || o.terms || 'Contado',
-        paymentMethod: o.paymentMethod || 'SINPE Móvil / Transferencia',
-        total: o.total || 0,
-        isCredit: o.isCredit || String(o.paymentTerms || o.terms || '').toLowerCase().includes('crédito'),
-        creditDays: o.creditDays || 30,
-        dueDate: o.dueDate || '30 días',
-        isCashOnDelivery: o.isCashOnDelivery || String(o.paymentTerms || o.terms || '').toLowerCase().includes('contra entrega'),
-        departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM'
+        ...d,
+        rawStatus: rawSt,
+        isRealOrder: false
       });
     }
   });
@@ -7500,7 +7678,6 @@ function renderDriverDispatches() {
   if (isAdmin) {
     if (adminBar) adminBar.style.display = 'block';
     if (adminSelect) {
-      // Recopilar nombres únicos de choferes asignados
       const setDrivers = new Set();
       (AppState.systemUsers || []).filter(u => u.role === 'Chofer').forEach(u => setDrivers.add(u.name.split(' (')[0].trim()));
       allDispatches.forEach(d => {
@@ -7537,7 +7714,6 @@ function renderDriverDispatches() {
   // 2. SEGREGACIÓN DE DATOS POR ASIGNACIÓN (Row-Level Security)
   let visibleDispatches = allDispatches;
   if (!isAdmin) {
-    // Si no es Administrador (ej. Chofer), SOLO ve lo que tiene asignado
     const uNameLower = (curUser.name || '').toLowerCase();
     const uFirst = uNameLower.split(' ')[0] || '';
     visibleDispatches = allDispatches.filter(d => {
@@ -7557,58 +7733,117 @@ function renderDriverDispatches() {
     });
   }
 
-  // 3. Filtrado por provincia de Costa Rica
+  // 3. Conteo en vivo de los Tabs de Flujo de Trabajo (Status Tabs)
+  const countAll = visibleDispatches.length;
+  const countEnRuta = visibleDispatches.filter(d => d.rawStatus === 'EN_RUTA' || d.status === 'En Ruta').length;
+  const countListo = visibleDispatches.filter(d => 
+    ['ALISTADO', 'EN_ALISTADO', 'PENDIENTE'].includes(d.rawStatus) || 
+    ['Asignado', 'Listo para Despacho', 'En Alisto Bodega', 'Pendiente de Alisto'].includes(d.status)
+  ).length;
+  const countEntregado = visibleDispatches.filter(d => d.rawStatus === 'ENTREGADO' || d.status === 'Entregado').length;
+
+  const elCountAll = document.getElementById('countTabAll');
+  const elCountEnRuta = document.getElementById('countTabEnRuta');
+  const elCountListo = document.getElementById('countTabListo');
+  const elCountEntregado = document.getElementById('countTabEntregado');
+
+  if (elCountAll) elCountAll.textContent = countAll;
+  if (elCountEnRuta) elCountEnRuta.textContent = countEnRuta;
+  if (elCountListo) elCountListo.textContent = countListo;
+  if (elCountEntregado) elCountEntregado.textContent = countEntregado;
+
+  // 4. Filtrado por Estado Operativo
+  const currentStatusFilter = AppState.driverStatusFilter || 'ALL';
+  let statusFiltered = visibleDispatches;
+  if (currentStatusFilter === 'EN_RUTA') {
+    statusFiltered = visibleDispatches.filter(d => d.rawStatus === 'EN_RUTA' || d.status === 'En Ruta');
+  } else if (currentStatusFilter === 'LISTO') {
+    statusFiltered = visibleDispatches.filter(d => 
+      ['ALISTADO', 'EN_ALISTADO', 'PENDIENTE'].includes(d.rawStatus) || 
+      ['Asignado', 'Listo para Despacho', 'En Alisto Bodega', 'Pendiente de Alisto'].includes(d.status)
+    );
+  } else if (currentStatusFilter === 'ENTREGADO') {
+    statusFiltered = visibleDispatches.filter(d => d.rawStatus === 'ENTREGADO' || d.status === 'Entregado');
+  }
+
+  // 5. Filtrado por provincia de Costa Rica
   const currentProv = AppState.driverProvinceFilter || 'ALL';
-  const filtered = visibleDispatches.filter(d => {
+  const filtered = statusFiltered.filter(d => {
     if (currentProv === 'ALL') return true;
     return d.province === currentProv;
   });
 
-  // 4. Métricas superiores calculadas con las entregas asignadas visibles
+  // 6. Métricas superiores
   const totalPkgsEl = document.getElementById('driverTotalPackages');
   const covProvsEl = document.getElementById('driverCoveredProvinces');
   const deliveredRatioEl = document.getElementById('driverDeliveredRatio');
   const navBadgeEl = document.getElementById('navDispatchCount');
 
-  if (navBadgeEl) navBadgeEl.textContent = visibleDispatches.length;
+  if (navBadgeEl) navBadgeEl.textContent = countEnRuta + countListo;
 
   let totalBultos = 0;
   visibleDispatches.forEach(d => {
     if (d.packages && Array.isArray(d.packages)) {
-      d.packages.forEach(p => totalBultos += (p.qty || 0));
+      d.packages.forEach(p => totalBultos += (Number(p.qty) || 0));
     } else {
       totalBultos += 3;
     }
   });
 
   const uniqueProvs = new Set(visibleDispatches.map(d => d.province || 'Cartago')).size;
-  const deliveredCount = visibleDispatches.filter(d => d.status === 'Entregado').length;
-
   if (totalPkgsEl) totalPkgsEl.textContent = `${totalBultos} bultos`;
   if (covProvsEl) covProvsEl.textContent = `${uniqueProvs} Zonas`;
-  if (deliveredRatioEl) deliveredRatioEl.textContent = `${deliveredCount} / ${visibleDispatches.length}`;
+  if (deliveredRatioEl) deliveredRatioEl.textContent = `${countEntregado} / ${visibleDispatches.length}`;
 
   if (filtered.length === 0) {
+    const filterDesc = currentStatusFilter === 'ALL' ? 'en su ruta' : (currentStatusFilter === 'EN_RUTA' ? 'en ruta' : (currentStatusFilter === 'LISTO' ? 'listos para cargar' : 'entregados'));
     container.innerHTML = `
       <div style="background:#FFF; border:1px dashed #CBD5E1; border-radius:12px; padding:2rem; text-align:center; color:#64748B;">
-        <i class="bi bi-geo-alt-fill" style="font-size:2rem; color:#CBD5E1;"></i>
-        <div style="font-weight:700; margin-top:8px;">No hay despachos asignados para ${currentProv === 'ALL' ? 'su ruta actual' : currentProv}</div>
-        <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
-          ${!isAdmin ? 'Usted solo visualiza los paquetes y pedidos asignados específicamente a su usuario/camión.' : 'No hay despachos con el filtro seleccionado.'}
+        <i class="bi bi-inbox-fill" style="font-size:2.2rem; color:#94A3B8;"></i>
+        <div style="font-weight:800; margin-top:8px; font-size:1rem; color:#1E293B;">No hay pedidos ${filterDesc} ${currentProv === 'ALL' ? '' : 'en ' + currentProv}</div>
+        <p style="font-size:0.82rem; color:#94A3B8; margin-top:4px;">
+          ${!isAdmin ? 'Usted solo visualiza los pedidos asignados específicamente a su usuario/camión.' : 'No hay pedidos con el filtro actual.'}
         </p>
-        <button class="btn-fragama btn-outline-fragama" style="margin-top:12px; padding:6px 14px; font-size:0.8rem;" onclick="setDriverProvinceFilter('ALL')">
-          Ver todas las provincias
-        </button>
+        <div style="display:flex; justify-content:center; gap:8px; margin-top:12px;">
+          <button class="btn-fragama btn-outline-fragama" style="padding:6px 14px; font-size:0.8rem;" onclick="setDriverStatusFilter('ALL'); setDriverProvinceFilter('ALL');">
+            Ver Todos los Pedidos Asignados
+          </button>
+        </div>
       </div>
     `;
     return;
   }
 
   container.innerHTML = filtered.map(d => {
+    const isDelivered = (d.rawStatus === 'ENTREGADO' || d.status === 'Entregado');
+    const isInRoute = (d.rawStatus === 'EN_RUTA' || d.status === 'En Ruta');
+    const isReady = (d.rawStatus === 'ALISTADO' || d.status === 'Listo para Despacho');
+    const isPending = (d.rawStatus === 'PENDIENTE' || d.status === 'Pendiente de Alisto');
+
     let badgeClass = 'badge-in-route';
-    if (d.status === 'Entregado') badgeClass = 'badge-delivered';
-    if (d.status === 'Rechazado') badgeClass = 'badge-rejected';
-    if (d.status === 'Observado') badgeClass = 'badge-observed';
+    let badgeText = d.status;
+    let badgeBg = '#E0F2FE';
+    let badgeColor = '#0369A1';
+    let badgeIcon = 'bi-truck';
+
+    if (isDelivered) {
+      badgeClass = 'badge-delivered';
+      badgeBg = '#DCFCE7';
+      badgeColor = '#15803D';
+      badgeIcon = 'bi-check-circle-fill';
+    } else if (isInRoute) {
+      badgeBg = '#FEF3C7';
+      badgeColor = '#B45309';
+      badgeIcon = 'bi-cursor-fill';
+    } else if (isReady) {
+      badgeBg = '#F0FDF4';
+      badgeColor = '#166534';
+      badgeIcon = 'bi-box-seam-fill';
+    } else if (isPending) {
+      badgeBg = '#F1F5F9';
+      badgeColor = '#475569';
+      badgeIcon = 'bi-clock-history';
+    }
 
     let provClass = 'prov-cartago';
     const pLower = (d.province || '').toLowerCase();
@@ -7620,14 +7855,20 @@ function renderDriverDispatches() {
 
     const bultosStr = d.items || (d.packages ? d.packages.map(p => `${p.qty}x ${p.unit}`).join(', ') : 'Varios bultos');
     const assignedDriverName = d.driverName || (d.driver ? d.driver.split(' - ')[0] : 'Chofer');
+    const targetOrderCode = d.orderCode || d.code;
+    const cleanPhoneDigits = String(d.customerPhone || d.contact || '').replace(/\D/g, '');
+    const cleanPhone = cleanPhoneDigits.length >= 8 ? cleanPhoneDigits.slice(-8) : '';
+    const fullAddress = `${d.address || ''}, ${d.canton || ''}, ${d.province || 'Cartago'}, Costa Rica`;
 
     return `
-      <div class="dispatch-card ${d.status === 'En Ruta' ? 'highlight' : ''}">
-        <div class="dispatch-card-header">
+      <div class="dispatch-card ${isInRoute ? 'highlight' : ''}" style="border-radius:14px; box-shadow:0 3px 10px rgba(0,0,0,0.06); border:1.5px solid ${isDelivered ? '#86EFAC' : (isInRoute ? '#0284C7' : '#E2E8F0')}; margin-bottom:14px; background:#FFFFFF;">
+        
+        <!-- ENCABEZADO DE LA TARJETA: CÓDIGO, PROVINCIA Y ACCIÓN DE IMPRESIÓN DIRECTA -->
+        <div class="dispatch-card-header" style="border-bottom:1px solid #F1F5F9; padding-bottom:10px; margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span class="dispatch-code">${d.code}</span>
+            <span class="dispatch-code" style="font-size:0.95rem; font-weight:800; color:#0B192C;">${d.code}</span>
             <span class="badge-province ${provClass}">
-              <i class="bi bi-pin-map-fill"></i> ${d.province || 'Costa Rica'} &bull; ${d.canton || 'Central'}
+              <i class="bi bi-pin-map-fill"></i> ${escapeHtml(d.province || 'Costa Rica')} &bull; ${escapeHtml(d.canton || 'Central')}
             </span>
             ${isAdmin ? `
               <span style="background:#0F172A; color:#E2E8F0; font-size:0.72rem; padding:2px 8px; border-radius:12px; font-weight:700;">
@@ -7635,64 +7876,103 @@ function renderDriverDispatches() {
               </span>
             ` : ''}
           </div>
-          <span class="badge-status ${badgeClass}"><i class="bi bi-circle-fill" style="font-size:6px"></i> ${d.status}</span>
+          
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:${badgeBg}; color:${badgeColor}; font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; border:1px solid rgba(0,0,0,0.06);">
+              <i class="bi ${badgeIcon}"></i> ${escapeHtml(d.status)}
+            </span>
+          </div>
         </div>
 
-        <div class="dispatch-customer">${d.customer}</div>
-        <div class="dispatch-address">
-          <i class="bi bi-geo-alt-fill text-danger"></i>
-          <span>${d.address}</span>
+        <!-- DATOS DEL CLIENTE Y DIRECCIÓN -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px;">
+          <div>
+            <div class="dispatch-customer" style="font-size:1.05rem; font-weight:900; color:#0B192C; margin-bottom:2px;">
+              ${escapeHtml(d.customer)}
+            </div>
+            <div class="dispatch-address" style="font-size:0.84rem; color:#475569; display:flex; align-items:flex-start; gap:6px;">
+              <i class="bi bi-geo-alt-fill text-danger" style="font-size:1rem; margin-top:2px;"></i>
+              <span>${escapeHtml(d.address)}</span>
+            </div>
+          </div>
+
+          <!-- BOTÓN DESTACADO: IMPRIMIR FACTURA ELECTRÓNICA DIRECTO -->
+          <button type="button" class="btn-fragama" style="background:#0284C7; color:#FFF; font-weight:700; padding:8px 12px; font-size:0.78rem; border-radius:8px; border:none; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; box-shadow:0 2px 6px rgba(2,132,199,0.25);" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" title="Imprimir Factura / Comprobante Oficial">
+            <i class="bi bi-printer-fill" style="font-size:0.95rem;"></i> Imprimir Factura
+          </button>
         </div>
         
-        <div class="dispatch-contact">
-          <span><i class="bi bi-person-fill text-primary"></i> ${d.contact}</span>
-          <span><i class="bi bi-clock-history"></i> Salida: ${d.departureTime}</span>
+        <!-- ENLACES RÁPIDOS: WAZE, GOOGLE MAPS Y WHATSAPP CLIENTE -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
+          <a href="https://waze.com/ul?q=${encodeURIComponent(fullAddress)}" target="_blank" class="btn-contact-pill" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-cursor-fill text-primary"></i> Navegar en Waze
+          </a>
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}" target="_blank" class="btn-contact-pill" style="background:#F1F5F9; color:#475569; border:1px solid #CBD5E1; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+            <i class="bi bi-geo-alt text-danger"></i> Google Maps
+          </a>
+          ${cleanPhone ? `
+            <a href="https://wa.me/506${cleanPhone}?text=${encodeURIComponent('Hola estimado cliente de Distribuidora Fragama, le saluda su chofer de ruta respecto al pedido ' + targetOrderCode)}" target="_blank" class="btn-contact-pill" style="background:#DCFCE7; color:#15803D; border:1px solid #86EFAC; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+              <i class="bi bi-whatsapp"></i> WhatsApp (${cleanPhone})
+            </a>
+          ` : `
+            <span style="font-size:0.75rem; color:#94A3B8;"><i class="bi bi-telephone-x"></i> Sin teléfono</span>
+          `}
         </div>
 
         <!-- CAJA DE BULTOS ESPECÍFICOS PARA EL CHOFER -->
-        <div class="dispatch-items-box" style="border-left:4px solid #0284C7; background:#F0F9FF;">
+        <div class="dispatch-items-box" style="border-left:4px solid #0284C7; background:#F0F9FF; margin-bottom:10px; border-radius:8px; padding:8px 12px;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
-              <strong style="color:#0369A1;"><i class="bi bi-box-seam"></i> Carga a Entregar (Bultos):</strong>
-              <div style="font-weight:700; color:#0B192C; font-size:0.85rem; margin-top:3px;">
-                ${bultosStr}
+              <strong style="color:#0369A1; font-size:0.8rem;"><i class="bi bi-box-seam"></i> Detalle de Carga / Bultos:</strong>
+              <div style="font-weight:700; color:#0B192C; font-size:0.85rem; margin-top:2px;">
+                ${escapeHtml(bultosStr)}
               </div>
             </div>
-            <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch('${d.id}')" title="Ver Código QR de estos bultos">
-              <i class="bi bi-qr-code"></i> Ver QR
-            </button>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" title="Ver Factura Completa">
+                <i class="bi bi-file-earmark-text"></i> Factura
+              </button>
+              <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch('${escapeHtml(d.id)}')" title="Ver Código QR de estos bultos">
+                <i class="bi bi-qr-code"></i> QR
+              </button>
+            </div>
           </div>
-          <div style="margin-top:6px; color:${d.verified ? '#10B981' : '#F59E0B'}; font-weight:600; font-size:0.75rem; display:flex; align-items:center; gap:4px;">
+          <div style="margin-top:4px; color:${d.verified ? '#10B981' : '#F59E0B'}; font-weight:600; font-size:0.74rem; display:flex; align-items:center; gap:4px;">
             <i class="bi ${d.verified ? 'bi-shield-check' : 'bi-exclamation-circle'}"></i>
-            <span>${d.verified ? 'Bultos auditados y verificados con QR en rampa' : 'Pendiente de escaneo con celular'}</span>
+            <span>${d.verified ? 'Bultos auditados y verificados con QR en rampa' : 'Pendiente de escaneo / verificación en camión'}</span>
           </div>
         </div>
 
-        <!-- INSTRUCCIÓN DE COBRO EN RUTA PARA EL CHOFER -->
+        <!-- INSTRUCCIÓN CLARA DE COBRO EN RUTA PARA EL CHOFER -->
         ${(() => {
           const termsStr = String(d.paymentTerms || d.terms || 'Contado');
           const isCred = d.isCredit || termsStr.toLowerCase().includes('crédito');
           const isContra = d.isCashOnDelivery || termsStr.toLowerCase().includes('contra entrega');
           const meth = d.paymentMethod || 'SINPE Móvil / Efectivo';
-          const totAmount = d.total ? formatCRC(d.total) : 'Ver Comprobante';
+          const totAmount = d.total ? formatCRC(d.total) : 'Ver Factura';
 
           if (isContra) {
             return `
-              <div style="margin-top:8px; background:#FFFBEB; border:1.5px solid #F59E0B; border-radius:8px; padding:8px 10px; font-size:0.8rem;">
-                <div style="font-weight:900; color:#B45309; display:flex; align-items:center; gap:6px;">
-                  <i class="bi bi-cash-stack"></i> ⚠️ COBRAR CONTRA ENTREGA AL CLIENTE
+              <div style="margin-bottom:10px; background:#FFFBEB; border:1.5px solid #F59E0B; border-radius:8px; padding:8px 12px; font-size:0.8rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:900; color:#B45309; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-cash-stack"></i> ⚠️ COBRAR CONTRA ENTREGA:
+                  </span>
+                  <span style="font-size:1.05rem; font-weight:900; color:#B45309;">${totAmount}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3px;">
-                  <span style="font-size:0.75rem; color:#78350F;">Método: <strong>${escapeHtml(meth)}</strong></span>
-                  <span style="font-size:0.95rem; font-weight:900; color:#B45309;">${totAmount}</span>
+                <div style="font-size:0.75rem; color:#78350F; margin-top:2px;">
+                  Método pactado: <strong>${escapeHtml(meth)}</strong> &bull; Cobrar antes de bajar la mercadería.
                 </div>
               </div>
             `;
           } else if (isCred) {
             return `
-              <div style="margin-top:8px; background:#EFF6FF; border:1px solid #93C5FD; border-radius:8px; padding:6px 10px; font-size:0.78rem;">
-                <div style="font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:6px;">
-                  <i class="bi bi-calendar-check-fill"></i> FACTURA A COBRAR EN TIEMPO (CRÉDITO ${d.creditDays || 30} DÍAS)
+              <div style="margin-bottom:10px; background:#EFF6FF; border:1.5px solid #93C5FD; border-radius:8px; padding:8px 12px; font-size:0.78rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-calendar-check-fill"></i> CRÉDITO COMERCIAL (${d.creditDays || 30} DÍAS)
+                  </span>
+                  <span style="font-size:0.85rem; font-weight:800; color:#1D4ED8;">${totAmount}</span>
                 </div>
                 <div style="font-size:0.74rem; color:#475569; margin-top:2px;">
                   <i class="bi bi-shield-check text-primary"></i> <strong>NO COBRAR EN RUTA:</strong> Se cobra en oficina/transferencia (Vence: ${escapeHtml(d.dueDate || '30 días')}).
@@ -7701,33 +7981,44 @@ function renderDriverDispatches() {
             `;
           } else {
             return `
-              <div style="margin-top:8px; background:#F0FDF4; border:1px solid #86EFAC; border-radius:8px; padding:6px 10px; font-size:0.78rem;">
-                <div style="font-weight:800; color:#15803D; display:flex; align-items:center; gap:6px;">
-                  <i class="bi bi-check-circle-fill"></i> VENTA DE CONTADO (YA CANCELADA)
+              <div style="margin-bottom:10px; background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:8px; padding:8px 12px; font-size:0.78rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:800; color:#15803D; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-check-circle-fill"></i> VENTA DE CONTADO (CANCELADA)
+                  </span>
+                  <span style="font-size:0.85rem; font-weight:800; color:#15803D;">${totAmount}</span>
                 </div>
                 <div style="font-size:0.74rem; color:#14532D; margin-top:2px;">
-                  Pagado previamente con <strong>${escapeHtml(meth)}</strong>. No cobrar nada al cliente.
+                  Pagado con <strong>${escapeHtml(meth)}</strong>. No solicitar dinero al cliente en ruta.
                 </div>
               </div>
             `;
           }
         })()}
 
-        ${d.status !== 'Entregado' && d.status !== 'Rechazado' ? `
-          <div class="driver-actions-grid" style="grid-template-columns: 1.2fr 1fr 1fr; gap:6px;">
-            <button class="btn-driver-action btn-delivered" onclick="openQrScannerModal('${d.orderCode || d.code}')" style="background:#0284C7; color:#FFF; border-color:#0284C7;">
-              <i class="bi bi-qr-code-scan"></i> Auditar QR
+        <!-- ACCIONES PRINCIPALES DEL CHOFER: IMPRIMIR, ENTREGAR, NOVEDAD -->
+        ${!isDelivered && d.status !== 'Rechazado' ? `
+          <div class="driver-actions-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:6px;">
+            <button class="btn-driver-action" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" style="background:#0284C7; color:#FFF; border:none; padding:8px; font-size:0.8rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
+              <i class="bi bi-printer"></i> Imprimir Factura
             </button>
-            <button class="btn-driver-action btn-delivered" onclick="openDriverModal('${d.id}', 'Entregado')">
+            <button class="btn-driver-action btn-delivered" onclick="openDriverModal('${escapeHtml(d.id)}', 'Entregado')" style="padding:8px; font-size:0.8rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
               <i class="bi bi-check-circle-fill"></i> Entregado
             </button>
-            <button class="btn-driver-action btn-observed" onclick="openDriverModal('${d.id}', 'Observado')">
+            <button class="btn-driver-action btn-observed" onclick="openDriverModal('${escapeHtml(d.id)}', 'Observado')" style="padding:8px; font-size:0.8rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
               <i class="bi bi-exclamation-triangle-fill"></i> Novedad
             </button>
           </div>
         ` : `
-          <div style="background:#F1F5F9; padding:8px 12px; border-radius:6px; font-size:0.8rem; color:#475569; text-align:center; display:flex; justify-content:center; align-items:center; gap:8px;">
-            <i class="bi bi-check-circle-fill text-success"></i> Entrega finalizada en ${d.canton || 'destino'} y sincronizada con el servidor central
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; padding:10px 14px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span style="font-size:0.8rem; font-weight:700; color:#15803D; display:inline-flex; align-items:center; gap:6px;">
+              <i class="bi bi-check-circle-fill" style="font-size:1.1rem;"></i> Entrega finalizada y registrada en servidor
+            </span>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-fragama" onclick="viewSavedOrderPrint('${escapeHtml(targetOrderCode)}')" style="padding:5px 10px; font-size:0.75rem; background:#0284C7; color:#FFF; font-weight:700; border:none; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="bi bi-printer-fill"></i> Reimprimir Factura
+              </button>
+            </div>
           </div>
         `}
       </div>

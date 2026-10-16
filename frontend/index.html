@@ -2987,6 +2987,32 @@
             </div>
           </div>
 
+          <!-- Filtro de Flujo de Trabajo / Estado de Entrega (Workflow Operativo Profesional) -->
+          <div style="margin-bottom:1rem; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-size:0.8rem; font-weight:800; color:#0B192C; text-transform:uppercase; letter-spacing:0.5px;">
+                <i class="bi bi-diagram-3-fill text-primary"></i> Estado de los Pedidos:
+              </span>
+              <span id="driverStatusFilterSummaryBadge" style="font-size:0.75rem; font-weight:800; color:#0284C7; background:#E0F2FE; padding:2px 10px; border-radius:12px;">
+                Todos los pedidos
+              </span>
+            </div>
+            <div class="driver-status-pills" id="driverStatusTabs">
+              <button type="button" class="driver-status-pill active" data-status-filter="ALL" onclick="setDriverStatusFilter('ALL')">
+                🌐 Todos (<span id="countTabAll">0</span>)
+              </button>
+              <button type="button" class="driver-status-pill" data-status-filter="EN_RUTA" onclick="setDriverStatusFilter('EN_RUTA')">
+                🚚 En Ruta (<span id="countTabEnRuta">0</span>)
+              </button>
+              <button type="button" class="driver-status-pill" data-status-filter="LISTO" onclick="setDriverStatusFilter('LISTO')">
+                📦 Listos / Alistados (<span id="countTabListo">0</span>)
+              </button>
+              <button type="button" class="driver-status-pill" data-status-filter="ENTREGADO" onclick="setDriverStatusFilter('ENTREGADO')">
+                ✅ Entregados (<span id="countTabEntregado">0</span>)
+              </button>
+            </div>
+          </div>
+
           <!-- Barra de Filtros por Provincia de Costa Rica -->
           <div style="margin-bottom:1rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">

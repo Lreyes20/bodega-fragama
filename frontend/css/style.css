@@ -1856,6 +1856,48 @@ body {
   color: #0B192C;
 }
 
+.driver-status-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+  scrollbar-width: thin;
+}
+
+.driver-status-pill {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  border: 1.5px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.driver-status-pill:hover {
+  border-color: #0284C7;
+  color: #0284C7;
+  background: #F0F9FF;
+}
+
+.driver-status-pill.active {
+  background: #0284C7;
+  border-color: #0284C7;
+  color: #FFFFFF;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.28);
+}
+
 .province-filter-pills {
   display: flex;
   gap: 6px;
