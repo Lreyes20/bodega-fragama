@@ -2699,3 +2699,26 @@ body {
   animation: spin 0.8s linear infinite !important;
 }
 
+/* ==============================================================================
+   MONITOR EJECUTIVO DE EXISTENCIAS EN BODEGA
+   ============================================================================== */
+.dashboard-stock-tab {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dashboard-stock-tab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+}
+
+.dashboard-stock-tab.active {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12) !important;
+}
+
+#dashboardStockTableView table tr:hover td {
+  background-color: #F8FAFC !important;
+}
+

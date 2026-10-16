@@ -3978,39 +3978,358 @@ function renderFamilyBreakdownTable(familiesMap, totalUnits) {
   }).join('');
 }
 
-function renderProductsTable() {
-  const tbody = document.getElementById('productsTableBody');
-  if (!tbody) return;
+// ==============================================================================
+// MONITOR EJECUTIVO DE EXISTENCIAS Y SALUD DE INVENTARIO WMS
+// ==============================================================================
+window._dashboardStockFilter = window._dashboardStockFilter || 'ALL';
+window._dashboardStockPage = window._dashboardStockPage || 1;
+window._dashboardStockPageSize = window._dashboardStockPageSize || 6;
+window._dashboardStockViewMode = window._dashboardStockViewMode || 'table';
 
-  tbody.innerHTML = AppState.products.map(p => {
-    const isLow = p.stock <= p.minStock;
-    return `
-      <tr>
-        <td style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#1E3E62;">${p.sku}</td>
-        <td>
-          <div style="font-weight:600;">${p.name}</div>
-          <small style="color:#64748B;">EAN: ${p.barcode} | Lote: ${p.batchNumber || 'N/A'}</small>
-        </td>
-        <td>
-          <span class="badge-status badge-in-route">${p.familyName}</span>
-          <div style="font-size:0.75rem; color:#64748B;">${p.subfamilyName}</div>
-        </td>
-        <td><i class="bi bi-geo-alt"></i> ${p.location}</td>
-        <td style="font-weight:700;">${formatCRC(p.price)}</td>
-        <td>
-          <span style="font-size:1.05rem; font-weight:800; color:${isLow ? '#EF4444' : '#0B192C'}">${p.stock}</span>
-          <small style="color:#64748B;">${p.unit}</small>
-          ${isLow ? '<span class="badge-status badge-low-stock ml-1"><i class="bi bi-exclamation-triangle-fill"></i> BAJO</span>' : ''}
-        </td>
-        <td>
-          <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="showBarcodeForProduct(${p.id})">
-            <i class="bi bi-upc-scan"></i> Código
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+function setDashboardStockFilter(filterType, btn) {
+  window._dashboardStockFilter = filterType;
+  window._dashboardStockPage = 1;
+  const tabs = document.querySelectorAll('.dashboard-stock-tab');
+  tabs.forEach(t => {
+    t.classList.remove('active');
+    t.style.background = '#FFF';
+    t.style.color = '#475569';
+    t.style.borderColor = '#CBD5E1';
+  });
+  if (btn) {
+    btn.classList.add('active');
+    if (filterType === 'ALL') {
+      btn.style.background = '#0B192C';
+      btn.style.color = '#FFF';
+      btn.style.borderColor = '#0B192C';
+    } else if (filterType === 'LOW') {
+      btn.style.background = '#FEF2F2';
+      btn.style.color = '#DC2626';
+      btn.style.borderColor = '#FECACA';
+    } else if (filterType === 'MODERATE') {
+      btn.style.background = '#FFF7ED';
+      btn.style.color = '#C2410C';
+      btn.style.borderColor = '#FED7AA';
+    } else if (filterType === 'OPTIMAL') {
+      btn.style.background = '#F0FDF4';
+      btn.style.color = '#15803D';
+      btn.style.borderColor = '#BBF7D0';
+    }
+  }
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
 }
+window.setDashboardStockFilter = setDashboardStockFilter;
+
+function setDashboardStockPage(page) {
+  window._dashboardStockPage = page;
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
+}
+window.setDashboardStockPage = setDashboardStockPage;
+
+function setDashboardStockPageSize(size) {
+  window._dashboardStockPageSize = parseInt(size, 10) || 6;
+  window._dashboardStockPage = 1;
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
+}
+window.setDashboardStockPageSize = setDashboardStockPageSize;
+
+function setDashboardStockView(mode) {
+  window._dashboardStockViewMode = mode;
+  const btnTable = document.getElementById('btnStockViewTable');
+  const btnGrid = document.getElementById('btnStockViewGrid');
+  const tableView = document.getElementById('dashboardStockTableView');
+  const gridView = document.getElementById('dashboardStockGridView');
+
+  if (mode === 'grid') {
+    if (tableView) tableView.style.display = 'none';
+    if (gridView) gridView.style.display = 'grid';
+    if (btnGrid) {
+      btnGrid.style.background = '#FFF';
+      btnGrid.style.color = '#0B192C';
+      btnGrid.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }
+    if (btnTable) {
+      btnTable.style.background = 'transparent';
+      btnTable.style.color = '#64748B';
+      btnTable.style.boxShadow = 'none';
+    }
+  } else {
+    if (tableView) tableView.style.display = 'block';
+    if (gridView) gridView.style.display = 'none';
+    if (btnTable) {
+      btnTable.style.background = '#FFF';
+      btnTable.style.color = '#0B192C';
+      btnTable.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }
+    if (btnGrid) {
+      btnGrid.style.background = 'transparent';
+      btnGrid.style.color = '#64748B';
+      btnGrid.style.boxShadow = 'none';
+    }
+  }
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
+}
+window.setDashboardStockView = setDashboardStockView;
+
+function renderProductsTable(searchTerm, family) {
+  const tbody = document.getElementById('productsTableBody');
+  const gridContainer = document.getElementById('dashboardStockGridView');
+  if (!tbody && !gridContainer) return;
+
+  const allProds = AppState.products || [];
+
+  // 1. Contadores de Salud de Stock
+  const lowProds = allProds.filter(p => Number(p.stock) <= Number(p.minStock));
+  const modProds = allProds.filter(p => Number(p.stock) > Number(p.minStock) && Number(p.stock) <= (Number(p.minStock) * 2.5));
+  const optProds = allProds.filter(p => Number(p.stock) > (Number(p.minStock) * 2.5));
+
+  const countAllEl = document.getElementById('stockCountAll');
+  const countLowEl = document.getElementById('stockCountLow');
+  const countModEl = document.getElementById('stockCountMod');
+  const countOptEl = document.getElementById('stockCountOpt');
+  const totalBadge = document.getElementById('dashboardStockTotalBadge');
+
+  if (countAllEl) countAllEl.textContent = allProds.length;
+  if (countLowEl) countLowEl.textContent = lowProds.length;
+  if (countModEl) countModEl.textContent = modProds.length;
+  if (countOptEl) countOptEl.textContent = optProds.length;
+  if (totalBadge) totalBadge.textContent = `${allProds.length} Referencias`;
+
+  // 2. Filtro Activo por Estado de Salud
+  let filtered = allProds;
+  const currentStockFilter = window._dashboardStockFilter || 'ALL';
+  if (currentStockFilter === 'LOW') {
+    filtered = lowProds;
+  } else if (currentStockFilter === 'MODERATE') {
+    filtered = modProds;
+  } else if (currentStockFilter === 'OPTIMAL') {
+    filtered = optProds;
+  }
+
+  // 3. Filtro por Familia
+  const famVal = (family !== undefined) ? family : (document.getElementById('dashboardFamilyFilter')?.value || 'ALL');
+  if (famVal && famVal !== 'ALL') {
+    filtered = filtered.filter(p => String(p.familyId) === String(famVal) || p.familyName === famVal);
+  }
+
+  // 4. Búsqueda Rápida por SKU, Nombre o Ubicación
+  const term = (searchTerm !== undefined ? searchTerm : (document.getElementById('dashboardProductSearch')?.value || '')).trim().toLowerCase();
+  if (term) {
+    filtered = filtered.filter(p => 
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(term)) ||
+      (p.location && p.location.toLowerCase().includes(term))
+    );
+  }
+
+  // 5. Paginación Compacta
+  const totalFiltered = filtered.length;
+  const pageSize = window._dashboardStockPageSize || 6;
+  const totalPages = Math.ceil(totalFiltered / pageSize) || 1;
+  if (window._dashboardStockPage > totalPages) window._dashboardStockPage = totalPages;
+  if (window._dashboardStockPage < 1) window._dashboardStockPage = 1;
+  const currentPage = window._dashboardStockPage;
+
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, totalFiltered);
+  const pagedProducts = filtered.slice(startIdx, endIdx);
+
+  // 6. Actualizar Texto de Paginación
+  const showingEl = document.getElementById('dashboardStockShowingText');
+  if (showingEl) {
+    if (totalFiltered === 0) {
+      showingEl.textContent = 'No se encontraron productos coincidentes con los filtros.';
+    } else {
+      showingEl.innerHTML = `Mostrando <strong>${startIdx + 1} &ndash; ${endIdx}</strong> de <strong>${totalFiltered}</strong> productos en bodega`;
+    }
+  }
+
+  // 7. Botones de Control de Paginación
+  const pageControls = document.getElementById('dashboardStockPageControls');
+  if (pageControls) {
+    if (totalPages <= 1) {
+      pageControls.innerHTML = '';
+    } else {
+      let btnsHtml = `
+        <button type="button" class="btn-fragama" style="padding:4px 9px; font-size:0.75rem; background:#FFF; border:1px solid #CBD5E1; color:#0B192C; border-radius:6px; cursor:${currentPage === 1 ? 'not-allowed' : 'pointer'}; opacity:${currentPage === 1 ? '0.4' : '1'};" ${currentPage === 1 ? 'disabled' : `onclick="setDashboardStockPage(${currentPage - 1})"`}>
+          <i class="bi bi-chevron-left"></i>
+        </button>
+      `;
+
+      let pStart = Math.max(1, currentPage - 2);
+      let pEnd = Math.min(totalPages, pStart + 4);
+      if (pEnd - pStart < 4) {
+        pStart = Math.max(1, pEnd - 4);
+      }
+
+      for (let pNum = pStart; pNum <= pEnd; pNum++) {
+        const isCurrent = pNum === currentPage;
+        btnsHtml += `
+          <button type="button" class="btn-fragama" style="padding:4px 9px; font-size:0.75rem; border-radius:6px; font-weight:700; cursor:pointer; ${isCurrent ? 'background:#0284C7; color:#FFF; border:1px solid #0284C7; box-shadow:0 2px 4px rgba(2,132,199,0.3);' : 'background:#FFF; color:#475569; border:1px solid #CBD5E1;'}" onclick="setDashboardStockPage(${pNum})">
+            ${pNum}
+          </button>
+        `;
+      }
+
+      btnsHtml += `
+        <button type="button" class="btn-fragama" style="padding:4px 9px; font-size:0.75rem; background:#FFF; border:1px solid #CBD5E1; color:#0B192C; border-radius:6px; cursor:${currentPage === totalPages ? 'not-allowed' : 'pointer'}; opacity:${currentPage === totalPages ? '0.4' : '1'};" ${currentPage === totalPages ? 'disabled' : `onclick="setDashboardStockPage(${currentPage + 1})"`}>
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      `;
+      pageControls.innerHTML = btnsHtml;
+    }
+  }
+
+  // 8. Render de la Tabla Compacta
+  if (tbody) {
+    if (pagedProducts.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align:center; padding:2rem; color:#64748B;">
+            <i class="bi bi-inbox" style="font-size:1.5rem; display:block; margin-bottom:6px; color:#94A3B8;"></i>
+            No se encontraron existencias coincidentes con los filtros seleccionados.
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = pagedProducts.map(p => {
+        const isLow = Number(p.stock) <= Number(p.minStock);
+        const isMod = !isLow && Number(p.stock) <= (Number(p.minStock) * 2.5);
+        const ratio = Math.min(100, Math.round((Number(p.stock) / (Number(p.minStock) * 3 || 30)) * 100));
+        
+        let barColor = '#10B981';
+        let statusBadge = '<span style="font-size:0.7rem; font-weight:800; background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:1px 6px; border-radius:4px;"><i class="bi bi-check-circle-fill"></i> Óptimo</span>';
+        if (isLow) {
+          barColor = '#EF4444';
+          statusBadge = `<span style="font-size:0.7rem; font-weight:800; background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:1px 6px; border-radius:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Bajo (Mín: ${p.minStock})</span>`;
+        } else if (isMod) {
+          barColor = '#F59E0B';
+          statusBadge = `<span style="font-size:0.7rem; font-weight:800; background:#FFFBEB; color:#D97706; border:1px solid #FDE68A; padding:1px 6px; border-radius:4px;">Seguridad (Mín: ${p.minStock})</span>`;
+        }
+
+        return `
+          <tr style="border-bottom:1px solid #F1F5F9; transition:background 0.15s;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='transparent'">
+            <td style="padding:10px 12px;">
+              <span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#0284C7; font-size:0.78rem; background:#F0F9FF; border:1px solid #BAE6FD; padding:3px 7px; border-radius:5px; display:inline-block;">
+                ${p.sku}
+              </span>
+            </td>
+            <td style="padding:10px 12px;">
+              <div style="font-weight:700; color:#0B192C; font-size:0.86rem; line-height:1.3;">${escapeHtml(p.name)}</div>
+              <div style="font-size:0.72rem; color:#64748B; display:flex; gap:6px; align-items:center; margin-top:2px;">
+                <span>EAN: ${p.barcode || 'N/A'}</span>
+                <span>&bull;</span>
+                <span>Lote: ${p.batchNumber || 'LOT-2026-CAT'}</span>
+              </div>
+            </td>
+            <td style="padding:10px 12px;">
+              <span class="badge-status badge-in-route" style="font-size:0.72rem; padding:2px 8px; font-weight:700;">${escapeHtml(p.familyName || 'General')}</span>
+              <div style="font-size:0.7rem; color:#64748B; margin-top:2px;">${escapeHtml(p.subfamilyName || '')}</div>
+            </td>
+            <td style="padding:10px 12px; font-size:0.8rem; color:#475569;">
+              <div style="display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+                <i class="bi bi-geo-alt-fill" style="color:var(--accent-orange); font-size:0.8rem;"></i>
+                ${p.location || 'BOD-CARTAGO'}
+              </div>
+            </td>
+            <td style="padding:10px 12px; font-weight:800; color:#0B192C; font-size:0.86rem;">
+              ${formatCRC(p.price)}
+            </td>
+            <td style="padding:10px 12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                <span style="font-weight:900; font-size:0.92rem; color:${isLow ? '#DC2626' : '#0B192C'}; font-family:'JetBrains Mono',monospace;">
+                  ${p.stock} <small style="font-weight:600; font-size:0.7rem; color:#64748B;">${p.unit || 'und'}</small>
+                </span>
+                ${statusBadge}
+              </div>
+              <div style="width:100%; height:5px; background:#E2E8F0; border-radius:999px; overflow:hidden;">
+                <div style="width:${Math.max(6, ratio)}%; height:100%; background:${barColor}; border-radius:999px; transition:width 0.3s ease;"></div>
+              </div>
+            </td>
+            <td style="padding:10px 12px; text-align:center;">
+              <div style="display:flex; gap:4px; justify-content:center;">
+                <button class="btn-fragama btn-primary-fragama" style="padding:4px 8px; font-size:0.72rem; border-radius:6px; font-weight:700;" onclick="openMovementModal(${p.id})" title="Registrar Asiento de Kardex">
+                  <i class="bi bi-arrow-left-right"></i> Kardex
+                </button>
+                <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.72rem; border-radius:6px;" onclick="showBarcodeForProduct(${p.id})" title="Ver Código de Barras">
+                  <i class="bi bi-upc-scan"></i> Código
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // 9. Render de la Cuadrícula Visual (Grid View)
+  if (gridContainer && window._dashboardStockViewMode === 'grid') {
+    if (pagedProducts.length === 0) {
+      gridContainer.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:2rem; color:#64748B;">No se encontraron productos coincidentes.</div>';
+    } else {
+      gridContainer.innerHTML = pagedProducts.map(p => {
+        const isLow = Number(p.stock) <= Number(p.minStock);
+        const isMod = !isLow && Number(p.stock) <= (Number(p.minStock) * 2.5);
+        const ratio = Math.min(100, Math.round((Number(p.stock) / (Number(p.minStock) * 3 || 30)) * 100));
+        let barColor = '#10B981';
+        let statusBadge = '<span style="font-size:0.68rem; font-weight:800; background:#ECFDF5; color:#059669; padding:2px 6px; border-radius:4px;">Óptimo</span>';
+        if (isLow) {
+          barColor = '#EF4444';
+          statusBadge = '<span style="font-size:0.68rem; font-weight:800; background:#FEF2F2; color:#DC2626; padding:2px 6px; border-radius:4px;">Bajo Stock</span>';
+        } else if (isMod) {
+          barColor = '#F59E0B';
+          statusBadge = '<span style="font-size:0.68rem; font-weight:800; background:#FFFBEB; color:#D97706; padding:2px 6px; border-radius:4px;">Seguridad</span>';
+        }
+
+        return `
+          <div style="background:#FFF; border:1px solid ${isLow ? '#FECACA' : '#E2E8F0'}; border-radius:10px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,0.03); display:flex; flex-direction:column; justify-content:space-between; transition:all 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 14px rgba(0,0,0,0.06)'" onmouseleave="this.style.transform='none'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.03)'">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; font-weight:800; background:#F0F9FF; color:#0284C7; padding:2px 6px; border-radius:4px; border:1px solid #BAE6FD;">${p.sku}</span>
+                ${statusBadge}
+              </div>
+              <div style="font-weight:700; font-size:0.86rem; color:#0B192C; margin-bottom:4px; line-height:1.3; min-height:36px;">${escapeHtml(p.name)}</div>
+              <div style="font-size:0.72rem; color:#64748B; margin-bottom:10px;"><i class="bi bi-geo-alt"></i> ${p.location} &bull; ${p.familyName}</div>
+              
+              <div style="background:#F8FAFC; border-radius:8px; padding:8px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px;">
+                  <span style="color:#64748B;">Existencias:</span>
+                  <span style="font-weight:800; color:${isLow ? '#DC2626' : '#0B192C'}; font-family:'JetBrains Mono',monospace;">${p.stock} ${p.unit}</span>
+                </div>
+                <div style="width:100%; height:5px; background:#E2E8F0; border-radius:999px; overflow:hidden;">
+                  <div style="width:${Math.max(6, ratio)}%; height:100%; background:${barColor}; border-radius:999px;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#94A3B8; margin-top:3px;">
+                  <span>Mín: ${p.minStock}</span>
+                  <span style="font-weight:700; color:#0B192C;">${formatCRC(p.price)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button class="btn-fragama btn-primary-fragama" style="flex:1; padding:4px 8px; font-size:0.72rem; border-radius:6px; font-weight:700;" onclick="openMovementModal(${p.id})">
+                <i class="bi bi-arrow-left-right"></i> Kardex
+              </button>
+              <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.72rem; border-radius:6px;" onclick="showBarcodeForProduct(${p.id})">
+                <i class="bi bi-upc-scan"></i> Código
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+window.renderProductsTable = renderProductsTable;
 
 function renderKardexTable() {
   const tbody = document.getElementById('kardexTableBody');
@@ -7698,12 +8017,14 @@ function setupDashboardControls() {
 
   if (search) {
     search.addEventListener('input', () => {
+      window._dashboardStockPage = 1;
       renderProductsTable(search.value.trim().toLowerCase(), familyFilter ? familyFilter.value : 'ALL');
     });
   }
 
   if (familyFilter) {
     familyFilter.addEventListener('change', () => {
+      window._dashboardStockPage = 1;
       renderProductsTable(search ? search.value.trim().toLowerCase() : '', familyFilter.value);
     });
   }

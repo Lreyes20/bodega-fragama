@@ -921,33 +921,100 @@
         </div>
 
         <!-- Tabla Maestra de Existencias Físicas en Bodega -->
-        <div class="content-card">
-          <div class="card-header-custom" style="flex-wrap:wrap; gap:10px;">
-            <div class="card-header-title">
-              <i class="bi bi-boxes text-primary"></i> Existencias Físicas en Bodega Central (Taras, Cartago)
+        <!-- MONITOR EJECUTIVO DE EXISTENCIAS Y SALUD DE INVENTARIO WMS -->
+        <div class="content-card" style="border-radius:12px; border:1px solid #E2E8F0; box-shadow:0 4px 16px rgba(11,25,44,0.05); overflow:hidden;">
+          
+          <!-- Encabezado Principal con Controles de Búsqueda y Acciones Rápidas -->
+          <div class="card-header-custom" style="padding:1rem 1.25rem; border-bottom:1px solid #E2E8F0; background:#FFFFFF; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
+            <div>
+              <div class="card-header-title" style="display:flex; align-items:center; gap:8px; font-size:1.05rem;">
+                <i class="bi bi-boxes" style="color:var(--accent-orange); font-size:1.2rem;"></i> 
+                <span>Existencias y Salud de Inventario WMS</span>
+                <span id="dashboardStockTotalBadge" style="font-size:0.75rem; font-weight:800; background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:999px; border:1px solid #E2E8F0;">
+                  220 Referencias
+                </span>
+              </div>
+              <div style="font-size:0.78rem; color:#64748B; margin-top:2px;">
+                Bodega Central Taras, Cartago &bull; Monitoreo y rotación en tiempo real
+              </div>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <select id="dashboardFamilyFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; font-family:inherit;">
+
+            <!-- Controles de Búsqueda, Familia y Botones -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <div style="position:relative;">
+                <i class="bi bi-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:0.8rem;"></i>
+                <input type="text" id="dashboardProductSearch" placeholder="Buscar por SKU o producto..." style="border:1px solid #CBD5E1; border-radius:8px; padding:6px 12px 6px 30px; font-size:0.82rem; width:190px; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='#0284C7'" onblur="this.style.borderColor='#CBD5E1'">
+              </div>
+
+              <select id="dashboardFamilyFilter" style="border:1px solid #CBD5E1; border-radius:8px; padding:6px 10px; font-size:0.82rem; font-family:inherit; background:#FFF; cursor:pointer;">
                 <option value="ALL">Todas las Familias</option>
               </select>
-              <input type="text" id="dashboardProductSearch" placeholder="Buscar por SKU o nombre..." style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; width:180px;">
-              <button class="btn-fragama btn-primary-fragama" id="btnNewMovement" style="padding:6px 12px; font-size:0.82rem;">
+
+              <button class="btn-fragama btn-primary-fragama" id="btnNewMovement" style="padding:6px 12px; font-size:0.82rem; border-radius:8px;">
                 <i class="bi bi-plus-circle"></i> + Asiento Kardex
+              </button>
+
+              <button class="btn-fragama btn-outline-fragama" onclick="switchViewDirectly('view-product-maintenance')" style="padding:6px 12px; font-size:0.82rem; border-radius:8px;" title="Ver Catálogo Completo de 220 Productos">
+                <i class="bi bi-arrow-up-right-square"></i> Ver Catálogo Completo
               </button>
             </div>
           </div>
+
+          <!-- Barra de Filtros Rápidos por Salud de Stock & Selector de Vista -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:8px 1.25rem; background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:0.82rem;">
+            
+            <!-- Pestañas de Salud -->
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#64748B; margin-right:4px;">ESTADO:</span>
+              <button type="button" class="dashboard-stock-tab active" id="stockTabAll" onclick="setDashboardStockFilter('ALL', this)" style="border:none; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#0B192C; color:#FFF; transition:all 0.2s;">
+                Todos (<span id="stockCountAll">220</span>)
+              </button>
+              <button type="button" class="dashboard-stock-tab" id="stockTabLow" onclick="setDashboardStockFilter('LOW', this)" style="border:1px solid #FECACA; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#FEF2F2; color:#DC2626; transition:all 0.2s;">
+                <i class="bi bi-exclamation-triangle-fill"></i> Bajo Stock (<span id="stockCountLow">0</span>)
+              </button>
+              <button type="button" class="dashboard-stock-tab" id="stockTabMod" onclick="setDashboardStockFilter('MODERATE', this)" style="border:1px solid #FED7AA; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#FFF7ED; color:#C2410C; transition:all 0.2s;">
+                <i class="bi bi-shield-check"></i> Stock Moderado (<span id="stockCountMod">0</span>)
+              </button>
+              <button type="button" class="dashboard-stock-tab" id="stockTabOpt" onclick="setDashboardStockFilter('OPTIMAL', this)" style="border:1px solid #BBF7D0; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#F0FDF4; color:#15803D; transition:all 0.2s;">
+                <i class="bi bi-check-circle-fill"></i> Óptimo (<span id="stockCountOpt">0</span>)
+              </button>
+            </div>
+
+            <!-- Conmutador de Vista (Tabla vs Cuadrícula) y Selector de Paginación -->
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="display:flex; align-items:center; gap:4px; font-size:0.75rem; color:#64748B;">
+                <span>Mostrar:</span>
+                <select id="dashboardStockPageSize" onchange="setDashboardStockPageSize(this.value)" style="border:1px solid #CBD5E1; border-radius:4px; padding:2px 6px; font-size:0.75rem; background:#FFF;">
+                  <option value="6" selected>6 / pág</option>
+                  <option value="12">12 / pág</option>
+                  <option value="24">24 / pág</option>
+                </select>
+              </div>
+
+              <div style="display:inline-flex; background:#E2E8F0; border-radius:6px; padding:2px;">
+                <button type="button" id="btnStockViewTable" onclick="setDashboardStockView('table')" title="Vista Tabla Compacta" style="border:none; background:#FFF; color:#0B192C; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.8rem; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <i class="bi bi-table"></i>
+                </button>
+                <button type="button" id="btnStockViewGrid" onclick="setDashboardStockView('grid')" title="Vista Tarjetas WMS" style="border:none; background:transparent; color:#64748B; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                  <i class="bi bi-grid-fill"></i>
+                </button>
+              </div>
+            </div>
+
+          </div>
           
-          <div style="overflow-x:auto;">
-            <table class="custom-table">
+          <!-- Vista 1: Tabla Compacta (Por Defecto) -->
+          <div id="dashboardStockTableView" style="overflow-x:auto;">
+            <table class="custom-table" style="margin:0; width:100%;">
               <thead>
                 <tr>
-                  <th>SKU</th>
+                  <th style="width:110px;">SKU</th>
                   <th>Producto / EAN</th>
-                  <th>Familia &amp; Subfamilia</th>
-                  <th>Ubicación Física</th>
+                  <th>Familia WMS</th>
+                  <th>Ubicación</th>
                   <th>Precio Venta</th>
-                  <th>Stock Actual</th>
-                  <th>Acciones</th>
+                  <th style="min-width:180px;">Nivel y Salud de Stock</th>
+                  <th style="width:140px; text-align:center;">Acciones</th>
                 </tr>
               </thead>
               <tbody id="productsTableBody">
@@ -955,6 +1022,30 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Vista 2: Cuadrícula Visual de Tarjetas WMS (Opcional) -->
+          <div id="dashboardStockGridView" style="display:none; padding:1.25rem; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+            <!-- Render dinámico vía JS -->
+          </div>
+
+          <!-- Barra de Paginación y Resumen Inferior -->
+          <div id="dashboardStockPagination" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:0.75rem 1.25rem; background:#F8FAFC; border-top:1px solid #E2E8F0; font-size:0.8rem; color:#64748B;">
+            <div id="dashboardStockShowingText">
+              Mostrando 1 - 6 de 220 existencias registradas
+            </div>
+            
+            <div id="dashboardStockPageControls" style="display:flex; align-items:center; gap:4px;">
+              <!-- Botones de página inyectados por JS -->
+            </div>
+
+            <div>
+              <a href="javascript:void(0)" onclick="switchViewDirectly('view-product-maintenance')" style="color:var(--accent-orange); font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                <span>Explorar Catálogo Completo (220)</span>
+                <i class="bi bi-arrow-right"></i>
+              </a>
+            </div>
+          </div>
+
         </div>
 
       </section>
