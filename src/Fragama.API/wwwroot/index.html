@@ -4414,7 +4414,7 @@
         <h3 style="font-size:1.05rem; font-weight:800; color:#0B192C;">
           <i class="bi bi-upc-scan text-primary"></i> Código de Barras &amp; QR de Despacho
         </h3>
-        <button onclick="document.getElementById('orderQrModal').classList.remove('active')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+        <button type="button" onclick="closeModalDirectly('orderQrModal')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
       </div>
       <div class="modal-body-custom" style="padding:1.5rem;">
         <div style="font-size:0.85rem; color:#64748B; margin-bottom:12px;" id="orderQrSubtitle">
@@ -4436,7 +4436,7 @@
           <button type="button" class="btn-fragama btn-outline-fragama" style="flex:1; justify-content:center;" onclick="window.print()">
             <i class="bi bi-printer"></i> Imprimir Viñeta
           </button>
-          <button type="button" class="btn-fragama btn-primary-fragama" style="flex:1; justify-content:center;" onclick="document.getElementById('orderQrModal').classList.remove('active')">
+          <button type="button" class="btn-fragama btn-primary-fragama" style="flex:1; justify-content:center;" onclick="closeModalDirectly('orderQrModal')">
             <i class="bi bi-check-lg"></i> Listo
           </button>
         </div>
@@ -4453,7 +4453,7 @@
         <h3 style="font-size:1.1rem; font-weight:800; color:#0B192C;">
           <i class="bi bi-signpost-2-fill text-primary"></i> Asignar Despacho a Ruta Nacional (Costa Rica)
         </h3>
-        <button onclick="document.getElementById('assignRouteModal').classList.remove('active')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
+        <button type="button" onclick="closeModalDirectly('assignRouteModal')" style="background:none; border:none; font-size:1.3rem; cursor:pointer;">&times;</button>
       </div>
 
       <form id="assignRouteForm" onsubmit="handleAssignRouteSubmit(event)">
@@ -4516,7 +4516,7 @@
         </div>
 
         <div class="modal-footer-custom">
-          <button type="button" class="btn-fragama btn-outline-fragama" onclick="document.getElementById('assignRouteModal').classList.remove('active')">Cancelar</button>
+          <button type="button" class="btn-fragama btn-outline-fragama" onclick="closeModalDirectly('assignRouteModal')">Cancelar</button>
           <button type="submit" class="btn-fragama btn-primary-fragama">
             <i class="bi bi-check2-circle"></i> Asignar y Generar Ruta con QR
           </button>

@@ -63,6 +63,21 @@ window.closeModalDirectly = function(modalIdOrEl) {
   modal.style.display = 'none';
 };
 
+// Listeners globales para cerrar modales al hacer clic en el backdrop o presionar Escape
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains('modal-overlay')) {
+    window.closeModalDirectly(e.target);
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    document.querySelectorAll('.modal-overlay.active, .modal-overlay[style*="display: flex"]').forEach(function(m) {
+      window.closeModalDirectly(m);
+    });
+  }
+});
+
 window.addToCart = function(productOrId) {
   const id = (typeof productOrId === 'object' && productOrId) ? productOrId.id : productOrId;
   if (typeof window.addToPosCart === 'function') {
@@ -9313,7 +9328,7 @@ window.handleAssignRouteSubmit = function(e) {
   AppState.dispatches.unshift(newDispatch);
   renderDriverDispatches();
 
-  document.getElementById('assignRouteModal').classList.remove('active');
+  closeModalDirectly('assignRouteModal');
   showNotificationToast(`Ruta a ${province} (${canton}) asignada con éxito. Código: ${newDispatch.code}`, 'success');
 };
 

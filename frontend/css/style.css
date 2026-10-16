@@ -1281,6 +1281,10 @@ body {
   display: flex !important;
 }
 
+.modal-overlay:not(.active) {
+  display: none !important;
+}
+
 .modal-box {
   background: #FFFFFF;
   border-radius: 16px;

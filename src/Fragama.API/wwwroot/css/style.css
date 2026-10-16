@@ -1281,6 +1281,10 @@ body {
   display: flex !important;
 }
 
+.modal-overlay:not(.active) {
+  display: none !important;
+}
+
 .modal-box {
   background: #FFFFFF;
   border-radius: 16px;
@@ -1854,6 +1858,48 @@ body {
   font-size: 1.05rem;
   font-weight: 800;
   color: #0B192C;
+}
+
+.driver-status-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+  scrollbar-width: thin;
+}
+
+.driver-status-pill {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  border: 1.5px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.driver-status-pill:hover {
+  border-color: #0284C7;
+  color: #0284C7;
+  background: #F0F9FF;
+}
+
+.driver-status-pill.active {
+  background: #0284C7;
+  border-color: #0284C7;
+  color: #FFFFFF;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.28);
 }
 
 .province-filter-pills {
@@ -2777,4 +2823,140 @@ body {
 #dashboardStockTableView table tr:hover td {
   background-color: #F8FAFC !important;
 }
+
+/* ==============================================================================
+   PANEL Y TABLERO DE ASIGNACIÓN ORDENADA DE TRABAJOS POR COLABORADOR
+   ============================================================================== */
+.collab-workload-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scrollbar-width: thin;
+}
+
+.collab-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.collab-chip:hover {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+  transform: translateY(-1px);
+}
+
+.collab-chip.active {
+  background: #0284C7;
+  color: #FFF;
+  border-color: #0284C7;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+
+.collab-chip .badge-chip-count {
+  background: #E2E8F0;
+  color: #0F172A;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.collab-chip.active .badge-chip-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFF;
+}
+
+.collab-board-grid {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 12px 2px 18px 2px;
+  align-items: flex-start;
+  min-height: 480px;
+  scrollbar-width: thin;
+}
+
+.collab-board-column {
+  flex: 0 0 310px;
+  max-width: 320px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.collab-board-column:hover {
+  border-color: #CBD5E1;
+}
+
+.collab-column-header {
+  padding: 12px 14px;
+  border-bottom: 2px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 12px 12px 0 0;
+}
+
+.collab-cards-list {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 720px;
+  overflow-y: auto;
+}
+
+.collab-order-card {
+  background: #FFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collab-order-card:hover {
+  border-color: #0284C7;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.12);
+  transform: translateY(-2px);
+}
+
+.collab-quick-select {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #CBD5E1;
+  background: #F8FAFC;
+  color: #1E293B;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.collab-quick-select:focus {
+  border-color: #0284C7;
+  outline: none;
+  background: #FFF;
+}
+
 
