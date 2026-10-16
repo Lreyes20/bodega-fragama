@@ -457,11 +457,11 @@ class PublicOrderCreateRequest(BaseModel):
     deliveryRoute: Optional[str] = Field("Cartago", max_length=100)
     notes: Optional[str] = Field("", max_length=600)
     items: List[PublicOrderItemRequest]
-    subtotalBruto: float = Field(..., ge=0)
+    subtotalBruto: Optional[float] = 0.0
     descuentoTotal: Optional[float] = 0.0
-    subtotalNeto: float = Field(..., ge=0)
-    iva: float = Field(..., ge=0)
-    total: float = Field(..., ge=0)
+    subtotalNeto: Optional[float] = 0.0
+    iva: Optional[float] = 0.0
+    total: Optional[float] = 0.0
     date: Optional[str] = None
 
 class OrderItemRequest(BaseModel):
@@ -898,13 +898,14 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
         order_record["driverUserId"] = chof_id
         order_record["driverName"] = chof_name
 
-        # Insertar Encabezado de Pedido (SalesOrders)
+        # Insertar Encabezado de Pedido (SalesOrders) con datos completos del cliente
         s_cur.execute("""
             INSERT INTO SalesOrders 
-            (OrderNumber, CustomerId, UserId, AssignedToUserId, PreparedByUserId, PreparedByName, DriverUserId, DriverName, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
-            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
+            (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, PaymentTerms, PaymentMethod, UserId, AssignedToUserId, PreparedByUserId, PreparedByName, DriverUserId, DriverName, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, 'Contado / Contra Entrega', 'SINPE Móvil / Transferencia', 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
         """, (
-            order_code, cust_id, bod_id, bod_id, bod_name, chof_id, chof_name,
+            order_code, cust_id, clean_name, cust_tax, clean_phone, clean_address,
+            bod_id, bod_id, bod_name, chof_id, chof_name,
             req.subtotalBruto, req.descuentoTotal or 0.0,
             req.iva, req.total, clean_route, order_record["notes"], order_date
         ))
@@ -1006,9 +1007,9 @@ def track_order(order_code: str):
                        so.CreatedAt as date,
                        so.TotalAmount as total,
                        so.Status as status,
-                       COALESCE(c.BusinessName, 'Cliente') as customer,
-                       COALESCE(c.Phone, '') as phone,
-                       COALESCE(c.Address, so.DeliveryNotes, '') as address,
+                       COALESCE(NULLIF(so.CustomerName, ''), c.BusinessName, 'Cliente') as customer,
+                       COALESCE(NULLIF(so.CustomerPhone, ''), c.Phone, '') as phone,
+                       COALESCE(NULLIF(so.CustomerAddress, ''), c.Address, so.DeliveryNotes, '') as address,
                        COALESCE(so.DeliveryRoute, 'Cartago') as route,
                        COALESCE(so.PreparedByName, '') as preparedByName,
                        COALESCE(so.DriverName, '') as driverName,
@@ -1554,6 +1555,86 @@ def get_order_audit_log(order_id: str):
         })
         
     return audit_list
+
+@app.get("/api/orders/{order_identifier}")
+def get_order_by_identifier(order_identifier: str):
+    """
+    Obtiene el detalle completo de un pedido individual por su ID numérico o código de pedido (ej: PED-WEB-84283).
+    Busca en SQLite con sus líneas de detalle y con fallback a web_orders.json si aplica.
+    """
+    ident = str(order_identifier).strip()
+    ident_clean = ident.upper()
+    
+    if os.path.exists(SQLITE_DB_PATH):
+        try:
+            conn = get_sqlite_conn()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT so.SalesOrderId as id,
+                       so.OrderNumber as orderCode,
+                       so.Status as status,
+                       so.DocType as docType,
+                       so.DeliveryDate as deliveryDate,
+                       so.DeliveryNotes as notes,
+                       so.DeliveryRoute as deliveryRoute,
+                       so.SubTotal as subtotalBruto,
+                       so.DiscountAmount as descuentoTotal,
+                       (so.SubTotal - so.DiscountAmount) as subtotalNeto,
+                       so.TaxAmount as iva,
+                       so.TotalAmount as total,
+                       so.Source as source,
+                       so.CreatedAt as date,
+                       COALESCE(c.CustomerId, so.CustomerId, 9999) as customerId,
+                       COALESCE(NULLIF(so.CustomerName, ''), c.BusinessName, 'Cliente Tienda Web') as customerName,
+                       COALESCE(NULLIF(so.CustomerTaxId, ''), c.TaxId, 'N/A') as customerTaxId,
+                       COALESCE(NULLIF(so.CustomerPhone, ''), c.Phone, '') as customerPhone,
+                       COALESCE(NULLIF(so.CustomerAddress, ''), c.Address, '') as customerAddress,
+                       COALESCE(NULLIF(so.PaymentTerms, ''), 'Contado Inmediato') as paymentTerms,
+                       COALESCE(NULLIF(so.PaymentMethod, ''), 'SINPE Móvil') as paymentMethod,
+                       so.AssignedToUserId as assignedUserId,
+                       COALESCE(u.FullName, 'Carlos Piedra (Ventas / Despacho)') as assignedUserName,
+                       COALESCE(r.Name, 'Vendedor') as assignedUserRole,
+                       COALESCE(so.PreparedByName, '') as preparedByName,
+                       COALESCE(so.PreparedByUserId, 0) as preparedByUserId,
+                       COALESCE(so.DriverName, '') as driverName,
+                       COALESCE(so.DriverUserId, 0) as driverUserId,
+                       COALESCE(so.UndeliveredReason, '') as undeliveredReason,
+                       COALESCE(so.StockDeducted, 0) as stockDeducted,
+                       so.PreparedAt as preparedAt,
+                       so.DeliveredAt as deliveredAt,
+                       so.DispatchedAt as dispatchedAt
+                FROM SalesOrders so
+                LEFT JOIN Customers c ON so.CustomerId = c.CustomerId
+                LEFT JOIN Users u ON so.AssignedToUserId = u.UserId
+                LEFT JOIN Roles r ON u.RoleId = r.RoleId
+                WHERE UPPER(so.OrderNumber) = ? OR UPPER(so.OrderNumber) = ? OR so.SalesOrderId = ?
+            """, (ident_clean, f"PED-{ident_clean}", int(ident) if ident.isdigit() else -1))
+            row = cur.fetchone()
+            if row:
+                order_dict = dict(row)
+                order_dict["terms"] = order_dict.get("paymentTerms") or "Contado / Contra Entrega"
+                order_dict["assignedUserHandle"] = "cpiedra"
+                
+                cur.execute("""
+                    SELECT sod.ProductId as productId, sod.Sku as sku, sod.ProductName as name,
+                           sod.Quantity as qty, sod.UnitPrice as unitPrice, sod.Subtotal as subtotal
+                    FROM SalesOrderDetails sod
+                    WHERE sod.SalesOrderId = ?
+                """, (order_dict["id"],))
+                order_dict["items"] = [dict(it) for it in cur.fetchall()]
+                conn.close()
+                return order_dict
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Error consultando pedido individual en SQLite: {e}")
+
+    # Fallback a web_orders.json
+    web_orders = load_local_web_orders()
+    for wo in web_orders:
+        if str(wo.get("id")) == ident or str(wo.get("orderCode", "")).strip().upper() == ident_clean:
+            return wo
+            
+    raise HTTPException(status_code=404, detail=f"Pedido '{order_identifier}' no encontrado en el sistema.")
 
 @app.get("/api/staff")
 def get_staff_members():
