@@ -96,10 +96,7 @@ const AppState = {
   sidebarCollapsed: false,
   invoiceCounter: 2140,
   customers: [],
-  posCart: [
-    { productId: 1, sku: 'FRAG-DES-001', name: 'Desengrasante Industrial Alcalino Galón (3.8L)', price: 6950, qty: 4, stock: 185 },
-    { productId: 3, sku: 'FRAG-PAP-001', name: 'Papel Higiénico Jumbo Roll 250m (Caja x6)', price: 13850, qty: 2, stock: 95 }
-  ],
+  posCart: [],
 
   // 1. ESTRUCTURA ROBUSTA DE FAMILIAS MACRO DE BODEGA
   families: [
@@ -398,15 +395,12 @@ const AppState = {
 
   // 5. ORDEN ACTUAL EN CURSO
   currentOrder: {
-    customerId: 1,
+    customerId: null,
     assignedUserId: 6, // Ana Mora (Ejecutiva Comercial) por defecto
     docType: 'PEDIDO',
     deliveryDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    notes: 'Entregar en horario matutino de 8am a 11am por el área de recibo.',
-    items: [
-      { productId: 1, qty: 4, discountPct: 5 },
-      { productId: 4, qty: 2, discountPct: 0 }
-    ]
+    notes: '',
+    items: []
   },
   orderCounter: 143,
 
@@ -5531,18 +5525,18 @@ window.adjustOrderCatalogQty = function(productId, delta) {
 };
 
 window.addOrderItemToCurrentOrder = function(productId) {
-  const product = AppState.products.find(p => p.id === productId);
+  const product = AppState.products.find(p => String(p.id) === String(productId));
   if (!product) return;
 
   const input = document.getElementById(`catQty_${productId}`);
   const qtyToAdd = input ? parseInt(input.value, 10) || 1 : 1;
 
-  if (product.stock <= 0) {
-    alert(`❌ No hay existencias disponibles para [${product.sku}].`);
+  if (Number(product.stock) <= 0) {
+    alert(`❌ No hay existencias disponibles para [${product.sku || product.name}].`);
     return;
   }
 
-  const existing = AppState.currentOrder.items.find(item => item.productId === productId);
+  const existing = AppState.currentOrder.items.find(item => String(item.productId) === String(productId));
   if (existing) {
     if (existing.qty + qtyToAdd > product.stock) {
       alert(`⚠️ Advertencia de Inventario: La cantidad solicitada (${existing.qty + qtyToAdd}) supera el stock físico disponible en bodega (${product.stock}).`);
@@ -5554,6 +5548,8 @@ window.addOrderItemToCurrentOrder = function(productId) {
     }
     AppState.currentOrder.items.push({
       productId: product.id,
+      sku: product.sku,
+      name: product.name,
       qty: qtyToAdd,
       discountPct: 0
     });
@@ -5567,6 +5563,16 @@ function renderOrderLines() {
   const tbody = document.getElementById('orderItemsTableBody');
   const countEl = document.getElementById('orderItemCount');
   if (!tbody) return;
+
+  // Filtrar artículos fantasmas que no existan en AppState.products para evitar errores de SKU fantasma
+  if (Array.isArray(AppState.currentOrder.items)) {
+    AppState.currentOrder.items = AppState.currentOrder.items.filter(item => {
+      return AppState.products.some(p => 
+        String(p.id) === String(item.productId) || 
+        (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+      );
+    });
+  }
 
   if (countEl) countEl.textContent = AppState.currentOrder.items.length;
 
@@ -5588,7 +5594,10 @@ function renderOrderLines() {
   let totalDescuentos = 0;
 
   tbody.innerHTML = AppState.currentOrder.items.map(item => {
-    const product = AppState.products.find(p => p.id === item.productId);
+    const product = AppState.products.find(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    );
     if (!product) return '';
 
     const lineBruto = product.price * item.qty;
@@ -5601,21 +5610,21 @@ function renderOrderLines() {
     return `
       <tr style="border-bottom:1px solid #E2E8F0;">
         <td style="padding:8px 10px;">
-          <div style="font-weight:700; color:#0B192C;">${product.name}</div>
-          <div style="font-size:0.72rem; color:#64748B; font-family:'JetBrains Mono',monospace;">${product.sku} | ${product.unit || 'UNIDAD'}</div>
+          <div style="font-weight:700; color:#0B192C;">${escapeHtml(product.name)}</div>
+          <div style="font-size:0.72rem; color:#64748B; font-family:'JetBrains Mono',monospace;">${escapeHtml(product.sku)} | ${escapeHtml(product.unit || 'UNIDAD')} &bull; <span style="color:#059669; font-weight:700;">Stock: ${product.stock}</span></div>
         </td>
         <td style="padding:6px; text-align:center;">
           <div style="display:inline-flex; align-items:center; border:1px solid #CBD5E1; border-radius:4px; overflow:hidden;">
-            <button type="button" style="background:#F1F5F9; border:none; width:20px; height:22px; cursor:pointer;" onclick="updateOrderItemQty(${item.productId}, -1)">-</button>
-            <span style="font-weight:700; min-width:26px; text-align:center; font-size:0.8rem;">${item.qty}</span>
-            <button type="button" style="background:#F1F5F9; border:none; width:20px; height:22px; cursor:pointer;" onclick="updateOrderItemQty(${item.productId}, 1)">+</button>
+            <button type="button" style="background:#F1F5F9; border:none; width:22px; height:24px; cursor:pointer;" onclick="updateOrderItemQty('${item.productId}', -1)">-</button>
+            <span style="font-weight:700; min-width:28px; text-align:center; font-size:0.82rem;">${item.qty}</span>
+            <button type="button" style="background:#F1F5F9; border:none; width:22px; height:24px; cursor:pointer;" onclick="updateOrderItemQty('${item.productId}', 1)">+</button>
           </div>
         </td>
         <td style="padding:6px; text-align:right; font-weight:600; color:#475569;">
           ${formatCRC(product.price)}
         </td>
         <td style="padding:6px; text-align:center;">
-          <select style="border:1px solid #CBD5E1; border-radius:4px; padding:2px 4px; font-size:0.75rem; font-weight:600;" onchange="setOrderItemDiscount(${item.productId}, this.value)">
+          <select style="border:1px solid #CBD5E1; border-radius:4px; padding:2px 4px; font-size:0.75rem; font-weight:600;" onchange="setOrderItemDiscount('${item.productId}', this.value)">
             <option value="0" ${item.discountPct === 0 ? 'selected' : ''}>0%</option>
             <option value="5" ${item.discountPct === 5 ? 'selected' : ''}>5%</option>
             <option value="8" ${item.discountPct === 8 ? 'selected' : ''}>8%</option>
@@ -5627,7 +5636,7 @@ function renderOrderLines() {
           ${formatCRC(lineNeto)}
         </td>
         <td style="padding:6px; text-align:center;">
-          <button type="button" style="background:none; border:none; color:#EF4444; cursor:pointer; font-size:0.9rem;" onclick="removeOrderItem(${item.productId})" title="Quitar item">
+          <button type="button" style="background:none; border:none; color:#EF4444; cursor:pointer; font-size:0.95rem;" onclick="removeOrderItem('${item.productId}')" title="Quitar item">
             <i class="bi bi-trash"></i>
           </button>
         </td>
@@ -5657,10 +5666,10 @@ function updateOrderFinancialTotals(subtotalBruto, totalDescuentos) {
 }
 
 window.updateOrderItemQty = function(productId, delta) {
-  const item = AppState.currentOrder.items.find(i => i.productId === productId);
+  const item = AppState.currentOrder.items.find(i => String(i.productId) === String(productId));
   if (!item) return;
 
-  const product = AppState.products.find(p => p.id === productId);
+  const product = AppState.products.find(p => String(p.id) === String(productId));
   const newQty = item.qty + delta;
 
   if (newQty <= 0) {
@@ -5677,7 +5686,7 @@ window.updateOrderItemQty = function(productId, delta) {
 };
 
 window.setOrderItemDiscount = function(productId, discountVal) {
-  const item = AppState.currentOrder.items.find(i => i.productId === productId);
+  const item = AppState.currentOrder.items.find(i => String(i.productId) === String(productId));
   if (item) {
     item.discountPct = parseFloat(discountVal) || 0;
     renderOrderLines();
@@ -5685,7 +5694,7 @@ window.setOrderItemDiscount = function(productId, discountVal) {
 };
 
 window.removeOrderItem = function(productId) {
-  AppState.currentOrder.items = AppState.currentOrder.items.filter(i => i.productId !== productId);
+  AppState.currentOrder.items = AppState.currentOrder.items.filter(i => String(i.productId) !== String(productId));
   renderOrderLines();
 };
 
@@ -5801,12 +5810,30 @@ async function saveOrder(isQuote = false) {
     return;
   }
 
-  // Si es pedido firme, validar stock estricto
+  // 1. Filtrar artículos inválidos o fantasmas que no existan en el catálogo maestro
+  AppState.currentOrder.items = AppState.currentOrder.items.filter(item => {
+    return AppState.products.some(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    );
+  });
+
+  if (AppState.currentOrder.items.length === 0) {
+    alert('❌ Por favor agregue al menos un producto a la orden desde el catálogo.');
+    return;
+  }
+
+  // 2. Si es pedido firme, validar stock estricto
   if (!isQuote) {
     for (const item of AppState.currentOrder.items) {
-      const product = AppState.products.find(p => p.id === item.productId);
-      if (!product || product.stock < item.qty) {
-        alert(`❌ ACCIÓN BLOQUEADA: Stock insuficiente para [${product ? product.sku : 'SKU'}]. Hay ${product ? product.stock : 0} en existencia y se solicitaron ${item.qty}.`);
+      const product = AppState.products.find(p => 
+        String(p.id) === String(item.productId) || 
+        (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+      );
+      if (!product) continue;
+      const availableStock = Number(product.stock) || 0;
+      if (availableStock < Number(item.qty)) {
+        alert(`❌ ACCIÓN BLOQUEADA: Stock insuficiente para [${product.sku || product.name}]. Hay ${availableStock} en existencia en bodega y se solicitaron ${item.qty}.`);
         return;
       }
     }
@@ -5859,8 +5886,12 @@ async function saveOrder(isQuote = false) {
   let totalDescuentos = 0;
 
   const orderItemsDetails = AppState.currentOrder.items.map(item => {
-    const product = AppState.products.find(p => p.id === item.productId);
-    const lineBruto = product.price * item.qty;
+    const product = AppState.products.find(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    ) || {};
+    const price = Number(product.price) || 0;
+    const lineBruto = price * item.qty;
     const lineDesc = (lineBruto * (item.discountPct || 0)) / 100;
     const lineNeto = lineBruto - lineDesc;
 
@@ -5868,12 +5899,13 @@ async function saveOrder(isQuote = false) {
     totalDescuentos += lineDesc;
 
     return {
-      productId: product.id,
-      sku: product.sku,
-      name: product.name,
+      productId: product.id || item.productId,
+      sku: product.sku || item.sku || 'N/A',
+      name: product.name || item.name || 'Producto Fragama',
+      cabys: product.cabys || item.cabys || '4669010000000',
       unit: product.unit || 'UNIDAD',
       qty: item.qty,
-      unitPrice: product.price,
+      unitPrice: price,
       discountPct: item.discountPct || 0,
       subtotal: lineNeto
     };
@@ -7393,12 +7425,18 @@ window.convertQuoteToSalesOrder = function(orderId) {
   const order = AppState.salesOrders.find(o => String(o.id) === String(orderId) || o.orderCode === orderId);
   if (!order) return;
 
-  // Validar stock
-  for (const item of order.items) {
-    const product = AppState.products.find(p => p.id === item.productId);
-    if (!product || product.stock < item.qty) {
-      alert(`❌ Stock insuficiente para [${product ? product.sku : 'SKU'}].`);
-      return;
+  // Validar stock con coincidencia flexible
+  for (const item of (order.items || [])) {
+    const product = AppState.products.find(p => 
+      String(p.id) === String(item.productId) || 
+      (item.sku && String(p.sku).toUpperCase() === String(item.sku).toUpperCase())
+    );
+    if (product) {
+      const avail = Number(product.stock) || 0;
+      if (avail < Number(item.qty)) {
+        alert(`❌ Stock insuficiente para [${product.sku || product.name}]. Hay ${avail} disponibles y se solicitaron ${item.qty}.`);
+        return;
+      }
     }
   }
 
