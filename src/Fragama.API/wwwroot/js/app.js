@@ -741,9 +741,9 @@ async function loadInitialDataFromSql() {
             expiryDate: '2028-12-31',
             hazardClass: (cp.category === 'quimicos_limpieza' && cp.name.toLowerCase().includes('cloro')) ? 'CORROSIVO' : 'NO_PELIGROSO',
             location: 'BOD-CENTRAL / PAB-A',
-            costPrice: Math.round(cp.price * 0.7),
+            costPrice: cp.costPrice || (cp.price ? Math.round(cp.price * 0.7) : 0),
             price: cp.price,
-            stock: 120,
+            stock: (cp.stock !== undefined ? cp.stock : 100),
             minStock: cp.minOrder || 10,
             maxStock: 500,
             unit: cp.unit || 'UNIDAD',
@@ -4698,9 +4698,41 @@ function executePosCheckout() {
     return;
   }
 
-  const customerName = document.getElementById('posCustomerName')?.value.trim() || 'Cliente Mostrador';
-  const customerId = document.getElementById('posCustomerId')?.value.trim() || 'CÉD-0000000';
+  const isFeRequested = document.getElementById('posRequestElectronicInvoice')?.checked || false;
+  let customerName = document.getElementById('posCustomerName')?.value.trim();
+  let customerId = document.getElementById('posCustomerId')?.value.trim();
+
+  if (isFeRequested) {
+    if (!customerName || customerName === 'Cliente Mostrador') {
+      alert('❌ Para emitir Factura Electrónica (FE v4.3 DGT) debe ingresar el Nombre o Razón Social del cliente.');
+      document.getElementById('posCustomerName')?.focus();
+      return;
+    }
+    if (!customerId || customerId === 'CÉD-0000000') {
+      alert('❌ Para emitir Factura Electrónica oficial ante Hacienda debe ingresar la Cédula Jurídica, Física o DIMEX del receptor.');
+      document.getElementById('posCustomerId')?.focus();
+      return;
+    }
+  } else {
+    if (!customerName) customerName = 'Cliente Mostrador';
+    if (!customerId) customerId = 'CÉD-0000000';
+  }
+
   const paymentMethod = document.querySelector('input[name="posPaymentMethod"]:checked')?.value || 'Efectivo';
+  const isCredit = (paymentMethod === 'Crédito a Cobrar');
+  const creditDays = isCredit ? (document.getElementById('posCreditDaysSelect')?.value || '30 días') : '0 días';
+  const now = new Date();
+  let dueDateFormatted = 'Inmediato';
+  if (isCredit) {
+    const daysNum = parseInt(creditDays, 10) || 30;
+    const dueD = new Date(now);
+    dueD.setDate(dueD.getDate() + daysNum);
+    dueDateFormatted = dueD.toLocaleDateString('es-CR');
+  }
+
+  const paymentTerms = isCredit 
+    ? `Crédito ${creditDays} (Factura a Cobrar en Tiempo - Vence: ${dueDateFormatted})`
+    : `Contado Inmediato (${paymentMethod})`;
 
   // Validar stock antes de rebajar
   for (const item of AppState.posCart) {
@@ -4713,8 +4745,8 @@ function executePosCheckout() {
 
   // Generar código de factura
   AppState.invoiceCounter += 1;
-  const invoiceNumber = `FAC-001-${String(AppState.invoiceCounter).padStart(6, '0')}`;
-  const now = new Date();
+  const docPrefix = isFeRequested ? 'FE-001' : 'FAC-001';
+  const invoiceNumber = `${docPrefix}-${String(AppState.invoiceCounter).padStart(6, '0')}`;
   const dateFormatted = now.toLocaleDateString('es-CR') + ' ' + now.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' });
 
   let subtotal = 0;
@@ -4736,12 +4768,12 @@ function executePosCheckout() {
       code: `SAL-20260929-${String(nextId).padStart(4, '0')}`,
       product: product.name,
       batch: product.batchNumber,
-      type: 'Salida Venta POS',
+      type: isCredit ? 'Salida Venta Crédito POS' : 'Salida Venta Contado POS',
       sign: -1,
       qty: item.qty,
       prev: prevStock,
       final: product.stock,
-      cost: product.costPrice,
+      cost: product.costPrice || (product.price * 0.7),
       doc: invoiceNumber,
       user: AppState.currentUser.name
     });
@@ -4750,7 +4782,7 @@ function executePosCheckout() {
   const iva = Math.round(subtotal * 0.13);
   const total = subtotal + iva;
 
-  // Crear despacho asignado a la ruta del chofer
+  // Crear despacho asignado a la ruta del chofer o entrega en bodega
   const newDispatchId = AppState.dispatches.length + 1;
   AppState.dispatches.unshift({
     id: newDispatchId,
@@ -4758,7 +4790,9 @@ function executePosCheckout() {
     invoice: invoiceNumber,
     orderCode: invoiceNumber,
     customer: customerName,
-    address: 'Cartago Centro / Entrega en caja o ruta',
+    province: 'Cartago',
+    canton: 'Central',
+    address: 'Cartago Centro / Entrega Mostrador Fragama',
     contact: `${customerName} (${customerId})`,
     items: itemsSummary.join(', '),
     packages: AppState.posCart.map(i => ({ qty: i.qty, unit: 'Und', desc: i.name })),
@@ -4766,7 +4800,12 @@ function executePosCheckout() {
     status: 'Facturado',
     departureTime: now.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' }),
     verified: true,
-    observation: `Venta emitida por caja. Pago: ${paymentMethod}`
+    paymentTerms: paymentTerms,
+    paymentMethod: paymentMethod,
+    isCredit: isCredit,
+    dueDate: dueDateFormatted,
+    total: total,
+    observation: `Venta emitida por caja. Condición: ${paymentTerms}. Método: ${paymentMethod}`
   });
 
   // Mostrar modal de factura impresa
@@ -4777,18 +4816,31 @@ function executePosCheckout() {
     receiptBody.innerHTML = `
       <div style="text-align:center; border-bottom:2px solid #0B192C; padding-bottom:12px; margin-bottom:12px;">
         <img src="img/logo.svg" style="height:36px; margin-bottom:6px;">
-        <div style="font-weight:900; font-size:1.1rem; color:#0B192C;">DISTRIBUIDORA FRAGAMA</div>
+        <div style="font-weight:900; font-size:1.1rem; color:#0B192C;">DISTRIBUIDORA FRAGAMA S.A.</div>
         <small style="color:#64748B;">Cédula Jurídica: 3-101-778899 • Actividad: 466901<br>Taras, San Nicolás, Cartago, Costa Rica<br>WhatsApp & Tel: +506 6267-7053 / 2551-0000</small>
-        <div style="font-size:0.85rem; font-weight:700; margin-top:6px; color:#0284C7;">FACTURA ELECTRÓNICA DE VENTA (v4.3 DGT)</div>
-        <div style="font-family:'JetBrains Mono',monospace; font-size:0.9rem; font-weight:800;">${invoiceNumber}</div>
+        <div style="font-size:0.85rem; font-weight:800; margin-top:6px; color:#0284C7;">
+          ${isFeRequested ? 'FACTURA ELECTRÓNICA DE VENTA (FE v4.3 DGT)' : 'TIQUETE ELECTRÓNICO DE VENTA (TE v4.3 DGT)'}
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:0.95rem; font-weight:800; color:#0B192C;">${invoiceNumber}</div>
         <div style="font-size:0.75rem; color:#64748B;">Fecha: ${dateFormatted}</div>
       </div>
 
-      <div style="font-size:0.82rem; margin-bottom:10px;">
-        <strong>Cliente:</strong> ${customerName}<br>
-        <strong>Cédula / Identificación:</strong> ${customerId}<br>
-        <strong>Condición de Pago:</strong> Contado (${paymentMethod})<br>
-        <strong>Cajero:</strong> ${AppState.currentUser.name}
+      <!-- BANNER DE CONDICIÓN Y MÉTODO DE PAGO IDENTIFICADO -->
+      <div style="background:${isCredit ? '#EFF6FF' : '#F0FDF4'}; border:1px solid ${isCredit ? '#93C5FD' : '#86EFAC'}; border-radius:8px; padding:8px 10px; margin-bottom:10px; font-size:0.82rem;">
+        <div style="font-weight:800; color:${isCredit ? '#1D4ED8' : '#15803D'}; display:flex; align-items:center; gap:6px;">
+          <i class="bi ${isCredit ? 'bi-calendar-check-fill' : 'bi-check-circle-fill'}"></i>
+          <span>${isCredit ? 'FACTURA A COBRAR EN TIEMPO' : 'VENTA DE CONTADO PAGADA'}</span>
+        </div>
+        <div style="font-size:0.78rem; color:#475569; margin-top:2px;">
+          <strong>Método de Pago:</strong> ${paymentMethod} &bull; 
+          <strong>Condición:</strong> ${isCredit ? `Crédito a ${creditDays} (Vence: ${dueDateFormatted})` : 'Cancelado Inmediato'}
+        </div>
+      </div>
+
+      <div style="font-size:0.82rem; margin-bottom:10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px;">
+        <strong>Receptor / Cliente:</strong> ${escapeHtml(customerName)}<br>
+        <strong>Cédula / Identificación:</strong> ${escapeHtml(customerId)}<br>
+        <strong>Cajero Autorizado:</strong> ${AppState.currentUser.name}
       </div>
 
       <table style="width:100%; border-collapse:collapse; font-size:0.8rem; margin-bottom:12px;">
@@ -5481,6 +5533,50 @@ window.removeOrderItem = function(productId) {
   renderOrderLines();
 };
 
+window.onOrderDocTypeChange = function(docType) {
+  const feFields = document.getElementById('orderElectronicInvoiceFields');
+  if (feFields) {
+    feFields.style.display = (docType === 'FACTURA_ELECTRONICA') ? 'block' : 'none';
+  }
+};
+
+window.onPaymentTermsChange = function(termsVal) {
+  const notice = document.getElementById('orderCreditDueDateNotice');
+  if (notice) {
+    if (termsVal && termsVal.includes('Crédito')) {
+      notice.style.display = 'block';
+      notice.innerHTML = `<i class="bi bi-calendar-event"></i> Factura a cobrar con vencimiento a plazo (${termsVal}). Genera CxC en Contabilidad.`;
+    } else if (termsVal && termsVal.includes('Contra Entrega')) {
+      notice.style.display = 'block';
+      notice.innerHTML = `<i class="bi bi-truck"></i> Chofer o repartidor cobrará el monto total en el momento de la entrega.`;
+    } else {
+      notice.style.display = 'none';
+    }
+  }
+};
+
+window.onPosPaymentMethodChange = function(methodVal) {
+  const box = document.getElementById('posCreditDetailsBox');
+  if (box) {
+    box.style.display = (methodVal === 'Crédito a Cobrar') ? 'block' : 'none';
+  }
+};
+
+window.onPosToggleFeCheckbox = function(isChecked) {
+  const nameInput = document.getElementById('posCustomerName');
+  const idInput = document.getElementById('posCustomerId');
+  if (isChecked) {
+    if (nameInput && nameInput.value === 'Cliente Mostrador') nameInput.value = '';
+    if (nameInput) nameInput.placeholder = 'Nombre o Razón Social Fiscal obligatoria';
+    if (idInput && idInput.value === 'CÉD-0000000') idInput.value = '';
+    if (idInput) idInput.placeholder = 'Cédula Jurídica / Física DGT obligatoria';
+    showNotificationToast('Modo Factura Electrónica FE v4.3 activado. Ingrese Cédula y Razón Social.', 'info');
+  } else {
+    if (nameInput && !nameInput.value) nameInput.value = 'Cliente Mostrador';
+    if (idInput && !idInput.value) idInput.value = 'CÉD-0000000';
+  }
+};
+
 async function saveOrder(isQuote = false) {
   if (AppState.currentOrder.items.length === 0) {
     alert('❌ La orden está vacía. Por favor agregue al menos un producto del catálogo.');
@@ -5560,12 +5656,48 @@ async function saveOrder(isQuote = false) {
     }
   }
 
-  const docType = isQuote ? 'COTIZACION' : 'PEDIDO';
-  const prefix = isQuote ? 'COT' : 'PED';
-  AppState.orderCounter += 1;
-  const orderCode = `${prefix}-2026-${String(AppState.orderCounter).padStart(5, '0')}`;
+  // Determinar Tipo de Documento y Términos de Pago DGT Costa Rica
+  const docTypeSelect = document.getElementById('orderDocTypeSelect');
+  const selectedDocType = isQuote ? 'COTIZACION' : (docTypeSelect ? docTypeSelect.value : 'PEDIDO');
+  const docType = selectedDocType;
+  const prefix = isQuote ? 'COT' : (docType === 'FACTURA_ELECTRONICA' ? 'FAC' : 'PED');
+
+  const paymentTermsSelect = document.getElementById('orderPaymentTermsSelect');
+  const paymentTerms = paymentTermsSelect ? paymentTermsSelect.value : (customer.terms || 'Contado Inmediato');
+
+  const paymentMethodSelect = document.getElementById('orderPaymentMethodSelect');
+  const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : 'SINPE Móvil';
+
+  const isCredit = paymentTerms.toLowerCase().includes('crédito');
+  const isCashOnDelivery = paymentTerms.toLowerCase().includes('contra entrega');
+  let creditDays = 0;
   const now = new Date();
   const dateFormatted = now.toISOString().split('T')[0];
+  let dueDate = dateFormatted;
+
+  if (isCredit) {
+    if (paymentTerms.includes('15')) creditDays = 15;
+    else if (paymentTerms.includes('30')) creditDays = 30;
+    else if (paymentTerms.includes('45')) creditDays = 45;
+    else if (paymentTerms.includes('60')) creditDays = 60;
+    else creditDays = 30;
+
+    const d = new Date();
+    d.setDate(d.getDate() + creditDays);
+    dueDate = d.toISOString().split('T')[0];
+  }
+
+  // Datos específicos si solicitó Factura Electrónica FE v4.3
+  const feNameInput = document.getElementById('orderFeCustomerName')?.value.trim();
+  const feTaxIdInput = document.getElementById('orderFeCustomerTaxId')?.value.trim();
+  const feEmailInput = document.getElementById('orderFeCustomerEmail')?.value.trim();
+
+  const finalCustomerName = feNameInput || customer.name;
+  const finalCustomerTaxId = feTaxIdInput || customer.taxId;
+  const finalCustomerEmail = feEmailInput || customer.email || 'facturacion@cliente.cr';
+
+  AppState.orderCounter += 1;
+  const orderCode = `${prefix}-2026-${String(AppState.orderCounter).padStart(5, '0')}`;
 
   let subtotalBruto = 0;
   let totalDescuentos = 0;
@@ -5605,13 +5737,16 @@ async function saveOrder(isQuote = false) {
     username: 'ventas'
   };
 
+  const deliveryDateInput = document.getElementById('orderDeliveryDateInput')?.value || AppState.currentOrder.deliveryDate || dateFormatted;
+
   const newOrder = {
     id: AppState.salesOrders.length + 1,
     orderCode: orderCode,
     docType: docType,
     customerId: customer.id,
-    customerName: customer.name,
-    customerTaxId: customer.taxId,
+    customerName: finalCustomerName,
+    customerTaxId: finalCustomerTaxId,
+    customerEmail: finalCustomerEmail,
     customerAddress: customer.address,
     customerPhone: customer.phone,
     customerContact: customer.contact,
@@ -5620,8 +5755,15 @@ async function saveOrder(isQuote = false) {
     assignedUserRole: assignedUser.role,
     assignedUserHandle: assignedUser.username,
     date: dateFormatted,
-    deliveryDate: AppState.currentOrder.deliveryDate || dateFormatted,
-    terms: customer.terms,
+    deliveryDate: deliveryDateInput,
+    terms: paymentTerms,
+    paymentTerms: paymentTerms,
+    paymentMethod: paymentMethod,
+    isCredit: isCredit,
+    creditDays: creditDays,
+    dueDate: dueDate,
+    isCashOnDelivery: isCashOnDelivery,
+    isElectronicInvoiceRequested: (docType === 'FACTURA_ELECTRONICA'),
     status: isQuote ? 'COTIZACION' : 'ALISTADO',
     notes: AppState.currentOrder.notes || '',
     items: orderItemsDetails,
@@ -5700,6 +5842,126 @@ window.copyClave50Digits = function(clave) {
   } else {
     prompt('Copie la clave numérica de 50 dígitos:', clave);
   }
+};
+
+window.downloadFacturaElectronicaXml = function(clave50) {
+  const order = window._currentPrintingOrder;
+  if (!order) {
+    showNotificationToast('No hay documento activo para generar el XML.', 'warning');
+    return;
+  }
+  const isCred = order.isCredit || String(order.paymentTerms || order.terms || '').toLowerCase().includes('crédito');
+  const creditDaysVal = order.creditDays || 30;
+  const totVal = order.total || 0;
+  const subNetoVal = order.subtotalNeto || Math.round(totVal / 1.13);
+  const ivaVal = order.iva || (totVal - subNetoVal);
+  const orderItems = Array.isArray(order.items) ? order.items : [];
+
+  let lineasXml = orderItems.map((it, idx) => {
+    const q = Number(it.qty || 1);
+    const p = Number(it.unitPrice || 0);
+    const sub = Number(it.subtotal || (q * p));
+    const cabys = it.cabys || '4669010000000';
+    return `    <LineaDetalle>
+      <NumeroLinea>${idx + 1}</NumeroLinea>
+      <CodigoCabys>${cabys}</CodigoCabys>
+      <Codigo>${escapeHtml(it.sku || 'SKU')}</Codigo>
+      <Cantidad>${q}.000</Cantidad>
+      <UnidadMedida>Unid</UnidadMedida>
+      <Detalle>${escapeHtml(it.name || 'Producto Fragama')}</Detalle>
+      <PrecioUnitario>${p.toFixed(2)}</PrecioUnitario>
+      <MontoTotal>${(q * p).toFixed(2)}</MontoTotal>
+      <SubTotal>${sub.toFixed(2)}</SubTotal>
+      <Impuesto>
+        <Codigo>01</Codigo>
+        <CodigoTarifa>08</CodigoTarifa>
+        <Tarifa>13.00</Tarifa>
+        <Monto>${Math.round(sub * 0.13).toFixed(2)}</Monto>
+      </Impuesto>
+      <MontoTotalLinea>${(sub * 1.13).toFixed(2)}</MontoTotalLinea>
+    </LineaDetalle>`;
+  }).join('\n');
+
+  if (!lineasXml) {
+    lineasXml = `    <LineaDetalle>
+      <NumeroLinea>1</NumeroLinea>
+      <CodigoCabys>4669010000000</CodigoCabys>
+      <Cantidad>1.000</Cantidad>
+      <UnidadMedida>Unid</UnidadMedida>
+      <Detalle>Mercancía y Productos de Limpieza Fragama</Detalle>
+      <PrecioUnitario>${subNetoVal.toFixed(2)}</PrecioUnitario>
+      <MontoTotal>${subNetoVal.toFixed(2)}</MontoTotal>
+      <SubTotal>${subNetoVal.toFixed(2)}</SubTotal>
+      <Impuesto>
+        <Codigo>01</Codigo>
+        <Tarifa>13.00</Tarifa>
+        <Monto>${ivaVal.toFixed(2)}</Monto>
+      </Impuesto>
+      <MontoTotalLinea>${totVal.toFixed(2)}</MontoTotalLinea>
+    </LineaDetalle>`;
+  }
+
+  const xmlContent = `<?xml version="1.0" encoding="utf-8"?>
+<FacturaElectronica xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica">
+  <Clave>${clave50}</Clave>
+  <CodigoActividad>466901</CodigoActividad>
+  <NumeroConsecutivo>${clave50.slice(21, 41)}</NumeroConsecutivo>
+  <FechaEmision>${new Date().toISOString()}</FechaEmision>
+  <Emisor>
+    <Nombre>DISTRIBUIDORA FRAGAMA S.A.</Nombre>
+    <Identificacion>
+      <Tipo>02</Tipo>
+      <Numero>3101778899</Numero>
+    </Identificacion>
+    <NombreComercial>Distribuidora Fragama</NombreComercial>
+    <Ubicacion>
+      <Provincia>3</Provincia>
+      <Canton>01</Canton>
+      <Distrito>08</Distrito>
+      <OtrasSenas>Bodega Central Taras 300m Oeste de la Iglesia, Cartago</OtrasSenas>
+    </Ubicacion>
+    <CorreoElectronico>facturacion@fragama.cr</CorreoElectronico>
+  </Emisor>
+  <Receptor>
+    <Nombre>${escapeHtml(order.customerName || 'Cliente General')}</Nombre>
+    <Identificacion>
+      <Tipo>01</Tipo>
+      <Numero>${String(order.customerTaxId || '100000000').replace(/\D/g, '') || '100000000'}</Numero>
+    </Identificacion>
+    <CorreoElectronico>${escapeHtml(order.customerEmail || 'facturacion@cliente.cr')}</CorreoElectronico>
+  </Receptor>
+  <CondicionVenta>${isCred ? '02' : '01'}</CondicionVenta>
+  ${isCred ? `<PlazoCredito>${creditDaysVal}</PlazoCredito>` : ''}
+  <MedioPago>${order.paymentMethod === 'Efectivo' ? '01' : (order.paymentMethod === 'Tarjeta' ? '02' : '04')}</MedioPago>
+  <DetalleServicio>
+${lineasXml}
+  </DetalleServicio>
+  <ResumenFactura>
+    <CodigoTipoMoneda>
+      <CodigoMoneda>CRC</CodigoMoneda>
+      <TipoCambio>1.00</TipoCambio>
+    </CodigoTipoMoneda>
+    <TotalServGravados>0.00</TotalServGravados>
+    <TotalMercanciasGravadas>${subNetoVal.toFixed(2)}</TotalMercanciasGravadas>
+    <TotalGravado>${subNetoVal.toFixed(2)}</TotalGravado>
+    <TotalVenta>${subNetoVal.toFixed(2)}</TotalVenta>
+    <TotalDescuentos>${(order.descuentoTotal || 0).toFixed(2)}</TotalDescuentos>
+    <TotalVentaNeta>${subNetoVal.toFixed(2)}</TotalVentaNeta>
+    <TotalImpuesto>${ivaVal.toFixed(2)}</TotalImpuesto>
+    <TotalComprobante>${totVal.toFixed(2)}</TotalComprobante>
+  </ResumenFactura>
+</FacturaElectronica>`;
+
+  const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+  const downloadUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = `FE_${order.orderCode || 'FRAGAMA'}_${clave50}.xml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(downloadUrl);
+  showNotificationToast('📄 Archivo XML oficial Hacienda v4.3 generado y descargado.', 'success');
 };
 
 window.shareCurrentOrderWhatsApp = function() {
@@ -5784,10 +6046,88 @@ function openOrderPrintModal(order) {
           ${formattedClave}
         </div>
       </div>
-      <button type="button" class="btn-fragama btn-outline-fragama no-print" onclick="copyClave50Digits('${clave50}')" style="padding:3px 9px; font-size:0.72rem; background:#FFF; border-color:#0284C7; color:#0284C7; font-weight:700;">
-        <i class="bi bi-clipboard-check"></i> Copiar Clave
-      </button>
+      <div style="display:flex; gap:6px;">
+        <button type="button" class="btn-fragama btn-outline-fragama no-print" onclick="copyClave50Digits('${clave50}')" style="padding:3px 9px; font-size:0.72rem; background:#FFF; border-color:#0284C7; color:#0284C7; font-weight:700;">
+          <i class="bi bi-clipboard-check"></i> Copiar Clave
+        </button>
+        <button type="button" class="btn-fragama btn-outline-fragama no-print" onclick="downloadFacturaElectronicaXml('${clave50}')" style="padding:3px 9px; font-size:0.72rem; background:#FFF; border-color:#059669; color:#059669; font-weight:700;">
+          <i class="bi bi-filetype-xml"></i> Descargar XML Hacienda v4.3
+        </button>
+      </div>
     </div>
+
+    <!-- BANNER DESTACADO DE CONDICIÓN DE PAGO (CONTADO, CRÉDITO A COBRAR EN TIEMPO O CONTRA ENTREGA) -->
+    ${(() => {
+      const termsStr = String(order.paymentTerms || order.terms || 'Contado Inmediato');
+      const isCred = order.isCredit || termsStr.toLowerCase().includes('crédito');
+      const isContra = order.isCashOnDelivery || termsStr.toLowerCase().includes('contra entrega');
+      const methodStr = order.paymentMethod || 'SINPE Móvil / Transferencia';
+      const dueStr = order.dueDate || '30 días';
+      const cDays = order.creditDays || 30;
+
+      if (isCred) {
+        return `
+          <div style="background:#EFF6FF; border:1.5px solid #3B82F6; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span style="background:#2563EB; color:#FFF; font-size:0.72rem; font-weight:800; padding:2px 8px; border-radius:4px; display:inline-block; margin-bottom:3px;">
+                <i class="bi bi-calendar-check-fill"></i> CONDICIÓN: FACTURA A COBRAR EN TIEMPO (CRÉDITO COMERCIAL)
+              </span>
+              <div style="font-size:0.95rem; font-weight:800; color:#1E40AF;">
+                Plazo Concedido: ${cDays} Días &bull; Fecha de Vencimiento: <span style="text-decoration:underline;">${escapeHtml(dueStr)}</span>
+              </div>
+              <div style="font-size:0.76rem; color:#475569; margin-top:2px;">
+                <strong>Forma de Pago Pactada:</strong> ${escapeHtml(methodStr)} &bull; 
+                <span style="color:#2563EB; font-weight:700;"><i class="bi bi-info-circle-fill"></i> Nota a Ruta: NO cobrar al chofer. Esta cuenta se cobra a plazo.</span>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:0.72rem; color:#64748B; font-weight:700; text-transform:uppercase;">Saldo a Cobrar:</span>
+              <div style="font-size:1.2rem; font-weight:900; color:#1E40AF;">${formatCRC(tot)}</div>
+            </div>
+          </div>
+        `;
+      } else if (isContra) {
+        return `
+          <div style="background:#FFFBEB; border:1.5px solid #F59E0B; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span style="background:#D97706; color:#FFF; font-size:0.72rem; font-weight:800; padding:2px 8px; border-radius:4px; display:inline-block; margin-bottom:3px;">
+                <i class="bi bi-cash-stack"></i> CONDICIÓN: COBRO CONTRA ENTREGA (OBLIGATORIO)
+              </span>
+              <div style="font-size:0.95rem; font-weight:800; color:#92400E;">
+                El Chofer / Repartidor DEBE cobrar el monto total al momento de entregar la mercadería
+              </div>
+              <div style="font-size:0.76rem; color:#78350F; margin-top:2px;">
+                <strong>Método de Cobro en Destino:</strong> ${escapeHtml(methodStr)} (SINPE Móvil Oficial: +506 6267-7053)
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:0.72rem; color:#B45309; font-weight:700; text-transform:uppercase;">Total a Cobrar al Cliente:</span>
+              <div style="font-size:1.25rem; font-weight:900; color:#B45309;">${formatCRC(tot)}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div style="background:#F0FDF4; border:1.5px solid #22C55E; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span style="background:#16A34A; color:#FFF; font-size:0.72rem; font-weight:800; padding:2px 8px; border-radius:4px; display:inline-block; margin-bottom:3px;">
+                <i class="bi bi-check-circle-fill"></i> CONDICIÓN: CONTADO INMEDIATO (CANCELADA)
+              </span>
+              <div style="font-size:0.95rem; font-weight:800; color:#166534;">
+                Comprobante Cancelado en Firme &bull; Método: ${escapeHtml(methodStr)}
+              </div>
+              <div style="font-size:0.76rem; color:#14532D; margin-top:2px;">
+                No genera cuentas por cobrar ni requiere recolección de dinero en ruta.
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:0.72rem; color:#15803D; font-weight:700; text-transform:uppercase;">Total Cancelado:</span>
+              <div style="font-size:1.2rem; font-weight:900; color:#15803D;">${formatCRC(tot)}</div>
+            </div>
+          </div>
+        `;
+      }
+    })()}
 
     <!-- DATOS DEL CLIENTE Y LOGÍSTICA -->
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.82rem;">
@@ -5804,7 +6144,7 @@ function openOrderPrintModal(order) {
         <div><strong>Chofer / Repartidor Asignado:</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-truck"></i> ${escapeHtml(order.driverName || 'Minor Coto (Chofer Logístico)')}</span></div>
         <div><strong>Responsable de Alisto:</strong> <span style="font-weight:700; color:#059669;">${escapeHtml(order.preparedByName || order.assignedUserName || 'Colaborador Fragama')}</span></div>
         <div><strong>Provincia / Cantón:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
-        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado (SINPE Móvil / Transferencia)')}</div>
+        <div><strong>Condición y Método:</strong> <span style="font-weight:700; color:#0B192C;">${escapeHtml(order.paymentTerms || order.terms || 'Contado')} &bull; ${escapeHtml(order.paymentMethod || 'SINPE Móvil')}</span></div>
         <div><strong>Dirección Exacta:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
         ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${escapeHtml(order.notes)}</div>` : ''}
       </div>
@@ -6860,6 +7200,13 @@ function getUnifiedDriverDispatches() {
         driverUserId: o.driverUserId || 5,
         status: o.status === 'ENTREGADO' ? 'Entregado' : (o.status === 'EN_RUTA' ? 'En Ruta' : 'Asignado'),
         verified: true,
+        paymentTerms: o.paymentTerms || o.terms || 'Contado',
+        paymentMethod: o.paymentMethod || 'SINPE Móvil / Transferencia',
+        total: o.total || 0,
+        isCredit: o.isCredit || String(o.paymentTerms || o.terms || '').toLowerCase().includes('crédito'),
+        creditDays: o.creditDays || 30,
+        dueDate: o.dueDate || '30 días',
+        isCashOnDelivery: o.isCashOnDelivery || String(o.paymentTerms || o.terms || '').toLowerCase().includes('contra entrega'),
         departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM'
       });
     }
@@ -7055,6 +7402,51 @@ function renderDriverDispatches() {
             <span>${d.verified ? 'Bultos auditados y verificados con QR en rampa' : 'Pendiente de escaneo con celular'}</span>
           </div>
         </div>
+
+        <!-- INSTRUCCIÓN DE COBRO EN RUTA PARA EL CHOFER -->
+        ${(() => {
+          const termsStr = String(d.paymentTerms || d.terms || 'Contado');
+          const isCred = d.isCredit || termsStr.toLowerCase().includes('crédito');
+          const isContra = d.isCashOnDelivery || termsStr.toLowerCase().includes('contra entrega');
+          const meth = d.paymentMethod || 'SINPE Móvil / Efectivo';
+          const totAmount = d.total ? formatCRC(d.total) : 'Ver Comprobante';
+
+          if (isContra) {
+            return `
+              <div style="margin-top:8px; background:#FFFBEB; border:1.5px solid #F59E0B; border-radius:8px; padding:8px 10px; font-size:0.8rem;">
+                <div style="font-weight:900; color:#B45309; display:flex; align-items:center; gap:6px;">
+                  <i class="bi bi-cash-stack"></i> ⚠️ COBRAR CONTRA ENTREGA AL CLIENTE
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3px;">
+                  <span style="font-size:0.75rem; color:#78350F;">Método: <strong>${escapeHtml(meth)}</strong></span>
+                  <span style="font-size:0.95rem; font-weight:900; color:#B45309;">${totAmount}</span>
+                </div>
+              </div>
+            `;
+          } else if (isCred) {
+            return `
+              <div style="margin-top:8px; background:#EFF6FF; border:1px solid #93C5FD; border-radius:8px; padding:6px 10px; font-size:0.78rem;">
+                <div style="font-weight:800; color:#1D4ED8; display:flex; align-items:center; gap:6px;">
+                  <i class="bi bi-calendar-check-fill"></i> FACTURA A COBRAR EN TIEMPO (CRÉDITO ${d.creditDays || 30} DÍAS)
+                </div>
+                <div style="font-size:0.74rem; color:#475569; margin-top:2px;">
+                  <i class="bi bi-shield-check text-primary"></i> <strong>NO COBRAR EN RUTA:</strong> Se cobra en oficina/transferencia (Vence: ${escapeHtml(d.dueDate || '30 días')}).
+                </div>
+              </div>
+            `;
+          } else {
+            return `
+              <div style="margin-top:8px; background:#F0FDF4; border:1px solid #86EFAC; border-radius:8px; padding:6px 10px; font-size:0.78rem;">
+                <div style="font-weight:800; color:#15803D; display:flex; align-items:center; gap:6px;">
+                  <i class="bi bi-check-circle-fill"></i> VENTA DE CONTADO (YA CANCELADA)
+                </div>
+                <div style="font-size:0.74rem; color:#14532D; margin-top:2px;">
+                  Pagado previamente con <strong>${escapeHtml(meth)}</strong>. No cobrar nada al cliente.
+                </div>
+              </div>
+            `;
+          }
+        })()}
 
         ${d.status !== 'Entregado' && d.status !== 'Rechazado' ? `
           <div class="driver-actions-grid" style="grid-template-columns: 1.2fr 1fr 1fr; gap:6px;">
@@ -7562,6 +7954,54 @@ function populateQuickProductSimList() {
 }
 
 // ------------------------------------------------------------------------------
+// BUSCADOR ESTRICTO Y ROBUSTO DE PRODUCTOS POR CÓDIGO ESCANEADO
+// Resuelve la discrepancia de datos entre computadora de escritorio y celular
+// ------------------------------------------------------------------------------
+function findProductByScannedCode(rawCode) {
+  if (!rawCode) return null;
+  const raw = String(rawCode).trim();
+  const clean = raw.toLowerCase();
+  const cleanNoLeadingZero = clean.replace(/^0+/, '');
+
+  // 1. Coincidencia exacta de código de barras
+  let match = AppState.products.find(p => p.barcode && String(p.barcode).trim().toLowerCase() === clean);
+  if (match) return match;
+
+  // 2. Coincidencia sin ceros a la izquierda (EAN-13 de 13 dígitos vs UPC-A de 12 dígitos)
+  if (cleanNoLeadingZero) {
+    match = AppState.products.find(p => {
+      if (!p.barcode) return false;
+      const bClean = String(p.barcode).trim().toLowerCase().replace(/^0+/, '');
+      return bClean === cleanNoLeadingZero;
+    });
+    if (match) return match;
+  }
+
+  // 3. Coincidencia exacta de SKU
+  match = AppState.products.find(p => p.sku && String(p.sku).trim().toLowerCase() === clean);
+  if (match) return match;
+
+  // 4. Coincidencia exacta por ID numérico
+  if (/^\d+$/.test(raw)) {
+    const numId = parseInt(raw, 10);
+    match = AppState.products.find(p => p.id === numId);
+    if (match) return match;
+  }
+
+  // 5. Fallback con coincidencia exacta de SKU sin guiones
+  const cleanNoDash = clean.replace(/[-_\s]/g, '');
+  if (cleanNoDash.length >= 4) {
+    match = AppState.products.find(p => {
+      if (!p.sku) return false;
+      return p.sku.toLowerCase().replace(/[-_\s]/g, '') === cleanNoDash;
+    });
+    if (match) return match;
+  }
+
+  return null;
+}
+
+// ------------------------------------------------------------------------------
 // MANEJADOR PRINCIPAL DE CÓDIGOS DE BARRA ESCANEADOS
 // ------------------------------------------------------------------------------
 window.handleScannedBarcode = function(rawCode) {
@@ -7588,12 +8028,8 @@ window.handleScannedBarcode = function(rawCode) {
 
   const clean = code.toLowerCase();
 
-  // 1. Buscar en Catálogo de PRODUCTOS por Código de Barras o SKU
-  const product = AppState.products.find(p => 
-    (p.barcode && p.barcode.toLowerCase() === clean) ||
-    (p.sku && p.sku.toLowerCase() === clean) ||
-    (p.barcode && p.barcode.includes(code))
-  );
+  // 1. Buscar en Catálogo de PRODUCTOS con motor estricto (PC y Celular idénticos)
+  const product = findProductByScannedCode(code);
 
   // 2. Buscar en PEDIDOS / GUÍAS DE DESPACHO
   const dispatch = AppState.dispatches.find(d => 
@@ -7639,25 +8075,37 @@ window.handleScannedBarcode = function(rawCode) {
 
 // Renderizar tarjeta interactiva de PRODUCTO IDENTIFICADO POR CÓDIGO DE BARRAS
 function displayScannedProduct(p, container) {
+  const costVal = (p.costPrice !== undefined && p.costPrice !== null) 
+    ? p.costPrice 
+    : ((p.cost !== undefined && p.cost !== null) ? p.cost : Math.round(p.price * 0.7));
+  const famVal = p.familyName || p.categoryLabel || p.category || 'Químicos y Limpieza';
+  const stockVal = (p.stock !== undefined) ? p.stock : 0;
+  const unitVal = p.unit || 'UNIDAD';
+
   container.innerHTML = `
     <div style="background:#FFFFFF; border:1px solid #BAE6FD; border-radius:12px; padding:16px;">
       
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
         <div>
-          <span class="badge-status badge-confirmed" style="font-size:0.75rem; background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD;">
-            <i class="bi bi-upc-scan"></i> CÓDIGO DE BARRAS IDENTIFICADO
-          </span>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:4px;">
+            <span class="badge-status badge-confirmed" style="font-size:0.75rem; background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD;">
+              <i class="bi bi-upc-scan"></i> CÓDIGO DE BARRAS IDENTIFICADO
+            </span>
+            <span style="font-size:0.7rem; background:#DCFCE7; color:#166534; font-weight:700; padding:2px 8px; border-radius:4px; display:inline-flex; align-items:center; gap:4px; border:1px solid #86EFAC;">
+              <i class="bi bi-shield-check"></i> Sincronizado en PC &amp; Móvil
+            </span>
+          </div>
           <h4 style="font-size:1.15rem; font-weight:800; color:#0B192C; margin:6px 0 2px 0;">
-            ${p.name}
+            ${escapeHtml(p.name)}
           </h4>
           <div style="font-size:0.8rem; color:#64748B;">
-            SKU: <strong style="color:#0284C7; font-family:'JetBrains Mono',monospace;">${p.sku}</strong> &bull; 
-            Familia: <strong>${p.category || 'Químicos'}</strong> &bull; Presentación: <strong>${p.unit || 'Unidad'}</strong>
+            SKU: <strong style="color:#0284C7; font-family:'JetBrains Mono',monospace;">${escapeHtml(p.sku)}</strong> &bull; 
+            Familia: <strong>${escapeHtml(famVal)}</strong> &bull; Presentación: <strong>${escapeHtml(unitVal)}</strong>
           </div>
         </div>
         <div style="text-align:right;">
           <span style="font-size:1.15rem; font-weight:800; color:#0B192C;">${formatCRC(p.price)}</span>
-          <div style="font-size:0.72rem; color:#64748B;">Costo: ${formatCRC(p.cost)}</div>
+          <div style="font-size:0.75rem; color:#64748B; font-weight:600;">Costo: ${formatCRC(costVal)}</div>
         </div>
       </div>
 
@@ -7666,19 +8114,19 @@ function displayScannedProduct(p, container) {
         <svg id="scannedProductBarcodeSvg"></svg>
       </div>
 
-      <!-- Métricas de Bodega & Lote -->
+      <!-- Métricas de Bodega & Lote Sincronizadas -->
       <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px;">
         <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:8px; text-align:center;">
           <div style="font-size:0.7rem; color:#166534; font-weight:700;">STOCK BODEGA</div>
-          <div style="font-size:1.15rem; font-weight:800; color:#15803D;">${p.stock} <small style="font-size:0.7rem;">${p.unit}</small></div>
+          <div style="font-size:1.15rem; font-weight:800; color:#15803D;">${stockVal} <small style="font-size:0.7rem;">${unitVal}</small></div>
         </div>
         <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:8px; text-align:center;">
           <div style="font-size:0.7rem; color:#475569; font-weight:700;">LOTE ACTIVO</div>
-          <div style="font-size:0.85rem; font-weight:800; color:#0B192C; font-family:'JetBrains Mono',monospace; margin-top:3px;">${p.batchNumber || 'LT-2026'}</div>
+          <div style="font-size:0.85rem; font-weight:800; color:#0B192C; font-family:'JetBrains Mono',monospace; margin-top:3px;">${escapeHtml(p.batchNumber || 'LT-2026')}</div>
         </div>
         <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:8px; text-align:center;">
           <div style="font-size:0.7rem; color:#475569; font-weight:700;">VENCIMIENTO</div>
-          <div style="font-size:0.82rem; font-weight:700; color:#0B192C; margin-top:4px;">${p.expiryDate || 'N/A'}</div>
+          <div style="font-size:0.82rem; font-weight:700; color:#0B192C; margin-top:4px;">${escapeHtml(p.expiryDate || 'N/A')}</div>
         </div>
       </div>
 
