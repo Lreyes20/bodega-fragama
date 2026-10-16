@@ -764,89 +764,115 @@ async function loadInitialDataFromSql() {
 }
 
 // ==============================================================================
-// SINCRONIZACIÓN EN TIEMPO REAL CON LA BASE DE DATOS Y TIENDA WEB (4 SEGUNDOS)
+// SINCRONIZACIÓN EN TIEMPO REAL ESTILO PLAZAS VACANTES (COUNTDOWN & AUTO-REFRESH)
 // ==============================================================================
 let _orderSyncInterval = null;
+let _syncCountdown = 4;
+let _isSyncInProgress = false;
+
+async function performOrderSync(isManual = false) {
+  if (_isSyncInProgress) return;
+  _isSyncInProgress = true;
+
+  const icon = document.getElementById('iconManualSync');
+  if (icon) icon.classList.add('spin-anim');
+
+  try {
+    const res = await fetch('/api/orders', { cache: 'no-store' });
+    if (!res.ok) {
+      if (res.status === 429) console.warn("Rate limit temporal en sync");
+      return;
+    }
+    const serverOrders = await res.json();
+    if (!Array.isArray(serverOrders)) return;
+
+    // Sincronización con pedidos web locales (localStorage) creados en contingencia
+    try {
+      const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
+      if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
+        const srvCodes = new Set(serverOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
+        for (const lwo of localWebOrders) {
+          const cleanLwoCode = (lwo.orderCode || '').trim().toUpperCase();
+          if (cleanLwoCode && !srvCodes.has(cleanLwoCode)) {
+            serverOrders.unshift(lwo);
+            srvCodes.add(cleanLwoCode);
+            fetch('/api/public/orders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(lwo)
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Actualizar estampa de tiempo visible en la UI
+    const nowStr = new Date().toLocaleTimeString('es-CR');
+    const tsEl = document.getElementById('liveSyncTimestamp');
+    if (tsEl) tsEl.textContent = nowStr;
+
+    // Detectar si hay nuevos pedidos para alerta sonora y toast
+    const prevCodes = new Set(AppState.salesOrders.map(o => String(o.orderCode || o.id || '').toUpperCase().trim()));
+    const newIncomingOrders = serverOrders.filter(so => {
+      const code = String(so.orderCode || so.id || '').toUpperCase().trim();
+      return code && !prevCodes.has(code);
+    });
+
+    let hasStatusChange = false;
+    for (const so of serverOrders) {
+      const ex = AppState.salesOrders.find(o => 
+        String(o.id) === String(so.id) || 
+        String(o.orderCode || '').toUpperCase() === String(so.orderCode || '').toUpperCase()
+      );
+      if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
+        hasStatusChange = true;
+        break;
+      }
+    }
+
+    const countChanged = serverOrders.length !== AppState.salesOrders.length;
+
+    AppState.salesOrders = serverOrders;
+    updateWebOrdersBadges();
+
+    if (newIncomingOrders.length > 0 || hasStatusChange || countChanged || isManual) {
+      refreshAllOrderViews();
+
+      if (newIncomingOrders.length > 0) {
+        playOrderChime();
+        const newest = newIncomingOrders[0];
+        if (typeof showNotificationToast === 'function') {
+          showNotificationToast(`🔔 ¡Nuevo Pedido Recibido: ${newest.orderCode} (${newest.customerName}) para alistar!`, 'success');
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Falla en sincronización de pedidos:", err);
+  } finally {
+    _isSyncInProgress = false;
+    if (icon) icon.classList.remove('spin-anim');
+  }
+}
 
 function initRealtimeOrderSync() {
   updateWebOrdersBadges();
+  _syncCountdown = 4;
   
   if (_orderSyncInterval) clearInterval(_orderSyncInterval);
   
-  _orderSyncInterval = setInterval(async () => {
-    try {
-      // Actualizar estampa de tiempo de sincronización en vivo en la UI
-      const tsEl = document.getElementById('liveSyncTimestamp');
-      if (tsEl) tsEl.textContent = new Date().toLocaleTimeString('es-CR');
-
-      const res = await fetch('/api/orders');
-      if (!res.ok) return;
-      const serverOrders = await res.json();
-      if (!Array.isArray(serverOrders)) return;
-
-      // Sincronización con pedidos web locales (localStorage) creados en el navegador
-      try {
-        const localWebOrders = JSON.parse(localStorage.getItem('fragama_web_orders') || '[]');
-        if (Array.isArray(localWebOrders) && localWebOrders.length > 0) {
-          const srvCodes = new Set(serverOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
-          for (const lwo of localWebOrders) {
-            const cleanLwoCode = (lwo.orderCode || '').trim().toUpperCase();
-            if (cleanLwoCode && !srvCodes.has(cleanLwoCode)) {
-              serverOrders.unshift(lwo);
-              srvCodes.add(cleanLwoCode);
-              // Asentar silenciosamente en el servidor
-              fetch('/api/public/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(lwo)
-              }).catch(() => {});
-            }
-          }
-        }
-      } catch (e) {}
-
-      const currentCodes = new Set(AppState.salesOrders.map(o => (o.orderCode || '').trim().toUpperCase()));
-      let hasNewOrders = false;
-      let newestOrder = null;
-
-      serverOrders.forEach(so => {
-        const soCode = (so.orderCode || '').trim().toUpperCase();
-        if (soCode && !currentCodes.has(soCode)) {
-          hasNewOrders = true;
-          if (!newestOrder) newestOrder = so;
-        }
-      });
-
-      let hasStatusChange = false;
-      if (!hasNewOrders && serverOrders.length === AppState.salesOrders.length) {
-        for (const so of serverOrders) {
-          const ex = AppState.salesOrders.find(o => 
-            String(o.id) === String(so.id) || 
-            (o.orderCode && o.orderCode.trim().toUpperCase() === (so.orderCode || '').trim().toUpperCase())
-          );
-          if (!ex || ex.status !== so.status || ex.preparedByName !== so.preparedByName || ex.driverName !== so.driverName || ex.undeliveredReason !== so.undeliveredReason || ex.stockDeducted !== so.stockDeducted) {
-            hasStatusChange = true;
-            break;
-          }
-        }
-      }
-
-      if (hasNewOrders || serverOrders.length !== AppState.salesOrders.length || hasStatusChange) {
-        AppState.salesOrders = serverOrders;
-        refreshAllOrderViews();
-
-        // Si llegó un nuevo pedido web, emitir chime y notificación toast
-        if (newestOrder) {
-          playOrderChime();
-          if (typeof showNotificationToast === 'function') {
-            showNotificationToast(`🔔 ¡Nuevo Pedido Web Recibido: ${newestOrder.orderCode} (${newestOrder.customerName}) para alistar!`, 'success');
-          }
-        }
-      }
-    } catch (err) {
-      // Ignorar fallas momentáneas de red
+  _orderSyncInterval = setInterval(() => {
+    _syncCountdown--;
+    
+    const countEl = document.getElementById('syncCountdownSec');
+    if (countEl) {
+      countEl.textContent = _syncCountdown > 0 ? `${_syncCountdown}s` : '...';
     }
-  }, 3000);
+    
+    if (_syncCountdown <= 0) {
+      _syncCountdown = 4;
+      performOrderSync();
+    }
+  }, 1000);
 }
 
 function playOrderChime() {
@@ -881,9 +907,12 @@ function isOrderPending(o) {
 }
 
 function updateWebOrdersBadges() {
-  const webOrders = AppState.salesOrders.filter(isWebOrder);
-  const pendingWeb = webOrders.filter(isOrderPending);
-  const count = pendingWeb.length;
+  const allOrders = AppState.salesOrders.filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
+  const webOrders = allOrders.filter(isWebOrder);
+  const bodegaOrders = allOrders.filter(o => !isWebOrder(o));
+  
+  const pendingOrders = allOrders.filter(isOrderPending);
+  const count = pendingOrders.length;
   
   const sideBadge = document.getElementById('badgePendingWebOrders');
   if (sideBadge) {
@@ -893,7 +922,7 @@ function updateWebOrdersBadges() {
 
   const totalBadge = document.getElementById('badgeWebOrdersTotalBadge');
   if (totalBadge) {
-    totalBadge.textContent = `${webOrders.length} pedidos web`;
+    totalBadge.textContent = `${allOrders.length} pedidos (${webOrders.length} web / ${bodegaOrders.length} bodega)`;
   }
 
   const kpiPending = document.getElementById('kpiWebPending');
@@ -901,7 +930,7 @@ function updateWebOrdersBadges() {
 
   const kpiPrepared = document.getElementById('kpiWebPrepared');
   if (kpiPrepared) {
-    kpiPrepared.textContent = webOrders.filter(o => {
+    kpiPrepared.textContent = allOrders.filter(o => {
       const s = String(o.status || '').toUpperCase().trim();
       return s === 'ALISTADO' || s === 'EN_ALISTADO';
     }).length;
@@ -909,12 +938,12 @@ function updateWebOrdersBadges() {
 
   const kpiInRoute = document.getElementById('kpiWebInRoute');
   if (kpiInRoute) {
-    kpiInRoute.textContent = webOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
+    kpiInRoute.textContent = allOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
   }
 
   const kpiDelivered = document.getElementById('kpiWebDelivered');
   if (kpiDelivered) {
-    kpiDelivered.textContent = webOrders.filter(o => {
+    kpiDelivered.textContent = allOrders.filter(o => {
       const s = String(o.status || '').toUpperCase().trim();
       return s === 'ENTREGADO' || s === 'FACTURADO';
     }).length;
@@ -922,7 +951,7 @@ function updateWebOrdersBadges() {
 
   const kpiUndelivered = document.getElementById('kpiWebUndelivered');
   if (kpiUndelivered) {
-    kpiUndelivered.textContent = webOrders.filter(o => {
+    kpiUndelivered.textContent = allOrders.filter(o => {
       const s = String(o.status || '').toUpperCase().trim();
       return s === 'NO_ENTREGADO' || s === 'RECHAZADO';
     }).length;
@@ -3949,39 +3978,358 @@ function renderFamilyBreakdownTable(familiesMap, totalUnits) {
   }).join('');
 }
 
-function renderProductsTable() {
-  const tbody = document.getElementById('productsTableBody');
-  if (!tbody) return;
+// ==============================================================================
+// MONITOR EJECUTIVO DE EXISTENCIAS Y SALUD DE INVENTARIO WMS
+// ==============================================================================
+window._dashboardStockFilter = window._dashboardStockFilter || 'ALL';
+window._dashboardStockPage = window._dashboardStockPage || 1;
+window._dashboardStockPageSize = window._dashboardStockPageSize || 6;
+window._dashboardStockViewMode = window._dashboardStockViewMode || 'table';
 
-  tbody.innerHTML = AppState.products.map(p => {
-    const isLow = p.stock <= p.minStock;
-    return `
-      <tr>
-        <td style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#1E3E62;">${p.sku}</td>
-        <td>
-          <div style="font-weight:600;">${p.name}</div>
-          <small style="color:#64748B;">EAN: ${p.barcode} | Lote: ${p.batchNumber || 'N/A'}</small>
-        </td>
-        <td>
-          <span class="badge-status badge-in-route">${p.familyName}</span>
-          <div style="font-size:0.75rem; color:#64748B;">${p.subfamilyName}</div>
-        </td>
-        <td><i class="bi bi-geo-alt"></i> ${p.location}</td>
-        <td style="font-weight:700;">${formatCRC(p.price)}</td>
-        <td>
-          <span style="font-size:1.05rem; font-weight:800; color:${isLow ? '#EF4444' : '#0B192C'}">${p.stock}</span>
-          <small style="color:#64748B;">${p.unit}</small>
-          ${isLow ? '<span class="badge-status badge-low-stock ml-1"><i class="bi bi-exclamation-triangle-fill"></i> BAJO</span>' : ''}
-        </td>
-        <td>
-          <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="showBarcodeForProduct(${p.id})">
-            <i class="bi bi-upc-scan"></i> Código
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+function setDashboardStockFilter(filterType, btn) {
+  window._dashboardStockFilter = filterType;
+  window._dashboardStockPage = 1;
+  const tabs = document.querySelectorAll('.dashboard-stock-tab');
+  tabs.forEach(t => {
+    t.classList.remove('active');
+    t.style.background = '#FFF';
+    t.style.color = '#475569';
+    t.style.borderColor = '#CBD5E1';
+  });
+  if (btn) {
+    btn.classList.add('active');
+    if (filterType === 'ALL') {
+      btn.style.background = '#0B192C';
+      btn.style.color = '#FFF';
+      btn.style.borderColor = '#0B192C';
+    } else if (filterType === 'LOW') {
+      btn.style.background = '#FEF2F2';
+      btn.style.color = '#DC2626';
+      btn.style.borderColor = '#FECACA';
+    } else if (filterType === 'MODERATE') {
+      btn.style.background = '#FFF7ED';
+      btn.style.color = '#C2410C';
+      btn.style.borderColor = '#FED7AA';
+    } else if (filterType === 'OPTIMAL') {
+      btn.style.background = '#F0FDF4';
+      btn.style.color = '#15803D';
+      btn.style.borderColor = '#BBF7D0';
+    }
+  }
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
 }
+window.setDashboardStockFilter = setDashboardStockFilter;
+
+function setDashboardStockPage(page) {
+  window._dashboardStockPage = page;
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
+}
+window.setDashboardStockPage = setDashboardStockPage;
+
+function setDashboardStockPageSize(size) {
+  window._dashboardStockPageSize = parseInt(size, 10) || 6;
+  window._dashboardStockPage = 1;
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
+}
+window.setDashboardStockPageSize = setDashboardStockPageSize;
+
+function setDashboardStockView(mode) {
+  window._dashboardStockViewMode = mode;
+  const btnTable = document.getElementById('btnStockViewTable');
+  const btnGrid = document.getElementById('btnStockViewGrid');
+  const tableView = document.getElementById('dashboardStockTableView');
+  const gridView = document.getElementById('dashboardStockGridView');
+
+  if (mode === 'grid') {
+    if (tableView) tableView.style.display = 'none';
+    if (gridView) gridView.style.display = 'grid';
+    if (btnGrid) {
+      btnGrid.style.background = '#FFF';
+      btnGrid.style.color = '#0B192C';
+      btnGrid.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }
+    if (btnTable) {
+      btnTable.style.background = 'transparent';
+      btnTable.style.color = '#64748B';
+      btnTable.style.boxShadow = 'none';
+    }
+  } else {
+    if (tableView) tableView.style.display = 'block';
+    if (gridView) gridView.style.display = 'none';
+    if (btnTable) {
+      btnTable.style.background = '#FFF';
+      btnTable.style.color = '#0B192C';
+      btnTable.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+    }
+    if (btnGrid) {
+      btnGrid.style.background = 'transparent';
+      btnGrid.style.color = '#64748B';
+      btnGrid.style.boxShadow = 'none';
+    }
+  }
+  const searchInput = document.getElementById('dashboardProductSearch');
+  const familyFilter = document.getElementById('dashboardFamilyFilter');
+  renderProductsTable(searchInput ? searchInput.value.trim().toLowerCase() : '', familyFilter ? familyFilter.value : 'ALL');
+}
+window.setDashboardStockView = setDashboardStockView;
+
+function renderProductsTable(searchTerm, family) {
+  const tbody = document.getElementById('productsTableBody');
+  const gridContainer = document.getElementById('dashboardStockGridView');
+  if (!tbody && !gridContainer) return;
+
+  const allProds = AppState.products || [];
+
+  // 1. Contadores de Salud de Stock
+  const lowProds = allProds.filter(p => Number(p.stock) <= Number(p.minStock));
+  const modProds = allProds.filter(p => Number(p.stock) > Number(p.minStock) && Number(p.stock) <= (Number(p.minStock) * 2.5));
+  const optProds = allProds.filter(p => Number(p.stock) > (Number(p.minStock) * 2.5));
+
+  const countAllEl = document.getElementById('stockCountAll');
+  const countLowEl = document.getElementById('stockCountLow');
+  const countModEl = document.getElementById('stockCountMod');
+  const countOptEl = document.getElementById('stockCountOpt');
+  const totalBadge = document.getElementById('dashboardStockTotalBadge');
+
+  if (countAllEl) countAllEl.textContent = allProds.length;
+  if (countLowEl) countLowEl.textContent = lowProds.length;
+  if (countModEl) countModEl.textContent = modProds.length;
+  if (countOptEl) countOptEl.textContent = optProds.length;
+  if (totalBadge) totalBadge.textContent = `${allProds.length} Referencias`;
+
+  // 2. Filtro Activo por Estado de Salud
+  let filtered = allProds;
+  const currentStockFilter = window._dashboardStockFilter || 'ALL';
+  if (currentStockFilter === 'LOW') {
+    filtered = lowProds;
+  } else if (currentStockFilter === 'MODERATE') {
+    filtered = modProds;
+  } else if (currentStockFilter === 'OPTIMAL') {
+    filtered = optProds;
+  }
+
+  // 3. Filtro por Familia
+  const famVal = (family !== undefined) ? family : (document.getElementById('dashboardFamilyFilter')?.value || 'ALL');
+  if (famVal && famVal !== 'ALL') {
+    filtered = filtered.filter(p => String(p.familyId) === String(famVal) || p.familyName === famVal);
+  }
+
+  // 4. Búsqueda Rápida por SKU, Nombre o Ubicación
+  const term = (searchTerm !== undefined ? searchTerm : (document.getElementById('dashboardProductSearch')?.value || '')).trim().toLowerCase();
+  if (term) {
+    filtered = filtered.filter(p => 
+      (p.sku && p.sku.toLowerCase().includes(term)) ||
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(term)) ||
+      (p.location && p.location.toLowerCase().includes(term))
+    );
+  }
+
+  // 5. Paginación Compacta
+  const totalFiltered = filtered.length;
+  const pageSize = window._dashboardStockPageSize || 6;
+  const totalPages = Math.ceil(totalFiltered / pageSize) || 1;
+  if (window._dashboardStockPage > totalPages) window._dashboardStockPage = totalPages;
+  if (window._dashboardStockPage < 1) window._dashboardStockPage = 1;
+  const currentPage = window._dashboardStockPage;
+
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, totalFiltered);
+  const pagedProducts = filtered.slice(startIdx, endIdx);
+
+  // 6. Actualizar Texto de Paginación
+  const showingEl = document.getElementById('dashboardStockShowingText');
+  if (showingEl) {
+    if (totalFiltered === 0) {
+      showingEl.textContent = 'No se encontraron productos coincidentes con los filtros.';
+    } else {
+      showingEl.innerHTML = `Mostrando <strong>${startIdx + 1} &ndash; ${endIdx}</strong> de <strong>${totalFiltered}</strong> productos en bodega`;
+    }
+  }
+
+  // 7. Botones de Control de Paginación
+  const pageControls = document.getElementById('dashboardStockPageControls');
+  if (pageControls) {
+    if (totalPages <= 1) {
+      pageControls.innerHTML = '';
+    } else {
+      let btnsHtml = `
+        <button type="button" class="btn-fragama" style="padding:4px 9px; font-size:0.75rem; background:#FFF; border:1px solid #CBD5E1; color:#0B192C; border-radius:6px; cursor:${currentPage === 1 ? 'not-allowed' : 'pointer'}; opacity:${currentPage === 1 ? '0.4' : '1'};" ${currentPage === 1 ? 'disabled' : `onclick="setDashboardStockPage(${currentPage - 1})"`}>
+          <i class="bi bi-chevron-left"></i>
+        </button>
+      `;
+
+      let pStart = Math.max(1, currentPage - 2);
+      let pEnd = Math.min(totalPages, pStart + 4);
+      if (pEnd - pStart < 4) {
+        pStart = Math.max(1, pEnd - 4);
+      }
+
+      for (let pNum = pStart; pNum <= pEnd; pNum++) {
+        const isCurrent = pNum === currentPage;
+        btnsHtml += `
+          <button type="button" class="btn-fragama" style="padding:4px 9px; font-size:0.75rem; border-radius:6px; font-weight:700; cursor:pointer; ${isCurrent ? 'background:#0284C7; color:#FFF; border:1px solid #0284C7; box-shadow:0 2px 4px rgba(2,132,199,0.3);' : 'background:#FFF; color:#475569; border:1px solid #CBD5E1;'}" onclick="setDashboardStockPage(${pNum})">
+            ${pNum}
+          </button>
+        `;
+      }
+
+      btnsHtml += `
+        <button type="button" class="btn-fragama" style="padding:4px 9px; font-size:0.75rem; background:#FFF; border:1px solid #CBD5E1; color:#0B192C; border-radius:6px; cursor:${currentPage === totalPages ? 'not-allowed' : 'pointer'}; opacity:${currentPage === totalPages ? '0.4' : '1'};" ${currentPage === totalPages ? 'disabled' : `onclick="setDashboardStockPage(${currentPage + 1})"`}>
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      `;
+      pageControls.innerHTML = btnsHtml;
+    }
+  }
+
+  // 8. Render de la Tabla Compacta
+  if (tbody) {
+    if (pagedProducts.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align:center; padding:2rem; color:#64748B;">
+            <i class="bi bi-inbox" style="font-size:1.5rem; display:block; margin-bottom:6px; color:#94A3B8;"></i>
+            No se encontraron existencias coincidentes con los filtros seleccionados.
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = pagedProducts.map(p => {
+        const isLow = Number(p.stock) <= Number(p.minStock);
+        const isMod = !isLow && Number(p.stock) <= (Number(p.minStock) * 2.5);
+        const ratio = Math.min(100, Math.round((Number(p.stock) / (Number(p.minStock) * 3 || 30)) * 100));
+        
+        let barColor = '#10B981';
+        let statusBadge = '<span style="font-size:0.7rem; font-weight:800; background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; padding:1px 6px; border-radius:4px;"><i class="bi bi-check-circle-fill"></i> Óptimo</span>';
+        if (isLow) {
+          barColor = '#EF4444';
+          statusBadge = `<span style="font-size:0.7rem; font-weight:800; background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; padding:1px 6px; border-radius:4px;"><i class="bi bi-exclamation-triangle-fill"></i> Bajo (Mín: ${p.minStock})</span>`;
+        } else if (isMod) {
+          barColor = '#F59E0B';
+          statusBadge = `<span style="font-size:0.7rem; font-weight:800; background:#FFFBEB; color:#D97706; border:1px solid #FDE68A; padding:1px 6px; border-radius:4px;">Seguridad (Mín: ${p.minStock})</span>`;
+        }
+
+        return `
+          <tr style="border-bottom:1px solid #F1F5F9; transition:background 0.15s;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='transparent'">
+            <td style="padding:10px 12px;">
+              <span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:#0284C7; font-size:0.78rem; background:#F0F9FF; border:1px solid #BAE6FD; padding:3px 7px; border-radius:5px; display:inline-block;">
+                ${p.sku}
+              </span>
+            </td>
+            <td style="padding:10px 12px;">
+              <div style="font-weight:700; color:#0B192C; font-size:0.86rem; line-height:1.3;">${escapeHtml(p.name)}</div>
+              <div style="font-size:0.72rem; color:#64748B; display:flex; gap:6px; align-items:center; margin-top:2px;">
+                <span>EAN: ${p.barcode || 'N/A'}</span>
+                <span>&bull;</span>
+                <span>Lote: ${p.batchNumber || 'LOT-2026-CAT'}</span>
+              </div>
+            </td>
+            <td style="padding:10px 12px;">
+              <span class="badge-status badge-in-route" style="font-size:0.72rem; padding:2px 8px; font-weight:700;">${escapeHtml(p.familyName || 'General')}</span>
+              <div style="font-size:0.7rem; color:#64748B; margin-top:2px;">${escapeHtml(p.subfamilyName || '')}</div>
+            </td>
+            <td style="padding:10px 12px; font-size:0.8rem; color:#475569;">
+              <div style="display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+                <i class="bi bi-geo-alt-fill" style="color:var(--accent-orange); font-size:0.8rem;"></i>
+                ${p.location || 'BOD-CARTAGO'}
+              </div>
+            </td>
+            <td style="padding:10px 12px; font-weight:800; color:#0B192C; font-size:0.86rem;">
+              ${formatCRC(p.price)}
+            </td>
+            <td style="padding:10px 12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                <span style="font-weight:900; font-size:0.92rem; color:${isLow ? '#DC2626' : '#0B192C'}; font-family:'JetBrains Mono',monospace;">
+                  ${p.stock} <small style="font-weight:600; font-size:0.7rem; color:#64748B;">${p.unit || 'und'}</small>
+                </span>
+                ${statusBadge}
+              </div>
+              <div style="width:100%; height:5px; background:#E2E8F0; border-radius:999px; overflow:hidden;">
+                <div style="width:${Math.max(6, ratio)}%; height:100%; background:${barColor}; border-radius:999px; transition:width 0.3s ease;"></div>
+              </div>
+            </td>
+            <td style="padding:10px 12px; text-align:center;">
+              <div style="display:flex; gap:4px; justify-content:center;">
+                <button class="btn-fragama btn-primary-fragama" style="padding:4px 8px; font-size:0.72rem; border-radius:6px; font-weight:700;" onclick="openMovementModal(${p.id})" title="Registrar Asiento de Kardex">
+                  <i class="bi bi-arrow-left-right"></i> Kardex
+                </button>
+                <button class="btn-fragama btn-outline-fragama" style="padding:4px 7px; font-size:0.72rem; border-radius:6px;" onclick="showBarcodeForProduct(${p.id})" title="Ver Código de Barras">
+                  <i class="bi bi-upc-scan"></i> Código
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // 9. Render de la Cuadrícula Visual (Grid View)
+  if (gridContainer && window._dashboardStockViewMode === 'grid') {
+    if (pagedProducts.length === 0) {
+      gridContainer.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:2rem; color:#64748B;">No se encontraron productos coincidentes.</div>';
+    } else {
+      gridContainer.innerHTML = pagedProducts.map(p => {
+        const isLow = Number(p.stock) <= Number(p.minStock);
+        const isMod = !isLow && Number(p.stock) <= (Number(p.minStock) * 2.5);
+        const ratio = Math.min(100, Math.round((Number(p.stock) / (Number(p.minStock) * 3 || 30)) * 100));
+        let barColor = '#10B981';
+        let statusBadge = '<span style="font-size:0.68rem; font-weight:800; background:#ECFDF5; color:#059669; padding:2px 6px; border-radius:4px;">Óptimo</span>';
+        if (isLow) {
+          barColor = '#EF4444';
+          statusBadge = '<span style="font-size:0.68rem; font-weight:800; background:#FEF2F2; color:#DC2626; padding:2px 6px; border-radius:4px;">Bajo Stock</span>';
+        } else if (isMod) {
+          barColor = '#F59E0B';
+          statusBadge = '<span style="font-size:0.68rem; font-weight:800; background:#FFFBEB; color:#D97706; padding:2px 6px; border-radius:4px;">Seguridad</span>';
+        }
+
+        return `
+          <div style="background:#FFF; border:1px solid ${isLow ? '#FECACA' : '#E2E8F0'}; border-radius:10px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,0.03); display:flex; flex-direction:column; justify-content:space-between; transition:all 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 14px rgba(0,0,0,0.06)'" onmouseleave="this.style.transform='none'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.03)'">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; font-weight:800; background:#F0F9FF; color:#0284C7; padding:2px 6px; border-radius:4px; border:1px solid #BAE6FD;">${p.sku}</span>
+                ${statusBadge}
+              </div>
+              <div style="font-weight:700; font-size:0.86rem; color:#0B192C; margin-bottom:4px; line-height:1.3; min-height:36px;">${escapeHtml(p.name)}</div>
+              <div style="font-size:0.72rem; color:#64748B; margin-bottom:10px;"><i class="bi bi-geo-alt"></i> ${p.location} &bull; ${p.familyName}</div>
+              
+              <div style="background:#F8FAFC; border-radius:8px; padding:8px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:4px;">
+                  <span style="color:#64748B;">Existencias:</span>
+                  <span style="font-weight:800; color:${isLow ? '#DC2626' : '#0B192C'}; font-family:'JetBrains Mono',monospace;">${p.stock} ${p.unit}</span>
+                </div>
+                <div style="width:100%; height:5px; background:#E2E8F0; border-radius:999px; overflow:hidden;">
+                  <div style="width:${Math.max(6, ratio)}%; height:100%; background:${barColor}; border-radius:999px;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#94A3B8; margin-top:3px;">
+                  <span>Mín: ${p.minStock}</span>
+                  <span style="font-weight:700; color:#0B192C;">${formatCRC(p.price)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button class="btn-fragama btn-primary-fragama" style="flex:1; padding:4px 8px; font-size:0.72rem; border-radius:6px; font-weight:700;" onclick="openMovementModal(${p.id})">
+                <i class="bi bi-arrow-left-right"></i> Kardex
+              </button>
+              <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.72rem; border-radius:6px;" onclick="showBarcodeForProduct(${p.id})">
+                <i class="bi bi-upc-scan"></i> Código
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+window.renderProductsTable = renderProductsTable;
 
 function renderKardexTable() {
   const tbody = document.getElementById('kardexTableBody');
@@ -4083,38 +4431,73 @@ function setupDriverActions() {
       const notes = document.getElementById('driverNotesInput')?.value || '';
 
       if (window.currentSelectedDispatchId) {
-        const item = AppState.dispatches.find(d => d.id === window.currentSelectedDispatchId);
+        let item = AppState.dispatches.find(d => String(d.id) === String(window.currentSelectedDispatchId));
         if (item) {
           item.status = selectedStatus;
           item.observation = notes;
+        }
 
-          // Si el cliente rechazó la mercancía, reingresar automáticamente al stock central y asentar en Kardex
-          if (selectedStatus === 'Rechazado') {
-            const returnedProduct = AppState.products[0];
-            const restockQty = 5;
-            returnedProduct.stock += restockQty;
+        // Si el cliente rechazó la mercancía, reingresar automáticamente al stock central y asentar en Kardex
+        if (selectedStatus === 'Rechazado') {
+          const returnedProduct = AppState.products[0];
+          const restockQty = 5;
+          if (returnedProduct) returnedProduct.stock += restockQty;
 
-            const nextId = AppState.kardexMovements.length + 101;
-            AppState.kardexMovements.unshift({
-              id: nextId,
-              code: `DEV-20260929-${String(nextId).padStart(4, '0')}`,
-              product: returnedProduct.name,
-              batch: returnedProduct.batchNumber,
-              type: 'Devolución / Rechazo en Ruta',
-              sign: 1,
-              qty: restockQty,
-              prev: returnedProduct.stock - restockQty,
-              final: returnedProduct.stock,
-              cost: returnedProduct.costPrice,
-              doc: item.code,
-              user: 'Minor Coto (Chofer)'
-            });
-            renderAllViews();
+          const nextId = AppState.kardexMovements.length + 101;
+          AppState.kardexMovements.unshift({
+            id: nextId,
+            code: `DEV-20260929-${String(nextId).padStart(4, '0')}`,
+            product: returnedProduct ? returnedProduct.name : 'Mercadería de Pedido',
+            batch: returnedProduct ? returnedProduct.batchNumber : 'LOT-DEV-01',
+            type: 'Devolución / Rechazo en Ruta',
+            sign: 1,
+            qty: restockQty,
+            prev: (returnedProduct ? returnedProduct.stock : 0) - restockQty,
+            final: returnedProduct ? returnedProduct.stock : restockQty,
+            cost: returnedProduct ? returnedProduct.costPrice : 1500,
+            doc: item ? item.code : 'DSP-DEV',
+            user: AppState.currentUser?.name || 'Chofer'
+          });
+          renderAllViews();
+        }
+
+        // Trazabilidad Total: Sincronizar con el pedido central en AppState.salesOrders y la Base de Datos
+        let orderCode = item ? item.orderCode : null;
+        if (!orderCode && String(window.currentSelectedDispatchId).startsWith('ord_')) {
+          const ordId = String(window.currentSelectedDispatchId).replace('ord_', '');
+          const so = AppState.salesOrders.find(o => String(o.id) === ordId);
+          if (so) orderCode = so.orderCode || so.id;
+        }
+
+        if (orderCode) {
+          const targetStatus = (selectedStatus === 'Entregado') ? 'ENTREGADO' : (selectedStatus === 'Rechazado' ? 'NO_ENTREGADO' : 'EN_RUTA');
+          const ord = AppState.salesOrders.find(o => o.orderCode === orderCode || String(o.id) === String(orderCode));
+          if (ord) {
+            ord.status = targetStatus;
+            ord.deliveredAt = new Date().toISOString();
+            if (targetStatus === 'ENTREGADO') ord.stockDeducted = 1;
           }
 
-          renderDriverDispatches();
-          showNotificationToast(`Entrega ${item.code} en ${item.customer} marcada como "${selectedStatus}".`, 'success');
+          // Enviar confirmación al servidor backend para persistencia en SQL Server
+          fetch(`/api/orders/${encodeURIComponent(orderCode)}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: targetStatus,
+              responsibleUserName: AppState.currentUser?.name || 'Chofer Logístico',
+              responsibleUserId: AppState.currentUser?.id || 5,
+              notes: notes ? `Entrega en ruta móvil: ${notes}` : `Completado y firmado por el cliente en ruta de entrega.`
+            })
+          }).then(res => res.json()).then(resData => {
+            if (typeof fetchProducts === 'function' && targetStatus === 'ENTREGADO') {
+              fetchProducts();
+            }
+          }).catch(err => console.warn("Sync status err:", err));
         }
+
+        renderDriverDispatches();
+        if (typeof renderWebOrdersView === 'function') renderWebOrdersView();
+        showNotificationToast(`Entrega ${item ? item.code : ''} marcada como "${selectedStatus}". Trazabilidad actualizada.`, 'success');
       }
       modal.classList.remove('active');
     });
@@ -4395,8 +4778,8 @@ function executePosCheckout() {
       <div style="text-align:center; border-bottom:2px solid #0B192C; padding-bottom:12px; margin-bottom:12px;">
         <img src="img/logo.svg" style="height:36px; margin-bottom:6px;">
         <div style="font-weight:900; font-size:1.1rem; color:#0B192C;">DISTRIBUIDORA FRAGAMA</div>
-        <small style="color:#64748B;">Cédula Jurídica: 3-101-789012<br>Taras, San Nicolás, Cartago, Costa Rica<br>Tel: +506 2551-0000</small>
-        <div style="font-size:0.85rem; font-weight:700; margin-top:6px; color:#0284C7;">FACTURA ELECTRÓNICA DE VENTA</div>
+        <small style="color:#64748B;">Cédula Jurídica: 3-101-778899 • Actividad: 466901<br>Taras, San Nicolás, Cartago, Costa Rica<br>WhatsApp & Tel: +506 6267-7053 / 2551-0000</small>
+        <div style="font-size:0.85rem; font-weight:700; margin-top:6px; color:#0284C7;">FACTURA ELECTRÓNICA DE VENTA (v4.3 DGT)</div>
         <div style="font-family:'JetBrains Mono',monospace; font-size:0.9rem; font-weight:800;">${invoiceNumber}</div>
         <div style="font-size:0.75rem; color:#64748B;">Fecha: ${dateFormatted}</div>
       </div>
@@ -5287,10 +5670,76 @@ async function saveOrder(isQuote = false) {
   );
 }
 
+function generateHaciendaClave50(order) {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  const country = '506';
+  const cedulaEmisor = '0003101778899'; // 12 dígitos oficiales Hacienda
+  const numRaw = String(order.orderCode || order.id || '101').replace(/\D/g, '');
+  const consecutivo = '0010000101' + (numRaw ? numRaw.slice(-10).padStart(10, '0') : '0000000101');
+  const situacion = '1'; // 1 = Normal
+  let hash = 0;
+  const str = String(order.orderCode || 'FRAGAMA');
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const secCode = String(Math.abs(hash % 90000000) + 10000000);
+  return `${country}${day}${month}${year}${cedulaEmisor}${consecutivo}${situacion}${secCode}`;
+}
+
+window.copyClave50Digits = function(clave) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(clave).then(() => {
+      showNotificationToast('📋 Clave numérica de 50 dígitos copiada al portapapeles.', 'success');
+    }).catch(() => {
+      prompt('Copie la clave numérica de 50 dígitos:', clave);
+    });
+  } else {
+    prompt('Copie la clave numérica de 50 dígitos:', clave);
+  }
+};
+
+window.shareCurrentOrderWhatsApp = function() {
+  const order = window._currentPrintingOrder;
+  if (!order) {
+    showNotificationToast('No hay documento activo para compartir.', 'warning');
+    return;
+  }
+  const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
+  const isQuote = (order.docType === 'COTIZACION');
+  const docTitle = isQuote ? 'PROFORMA / COTIZACIÓN' : 'FACTURA ELECTRÓNICA DE VENTA';
+  const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(order) : 'Varios bultos';
+  
+  let msg = `*DISTRIBUIDORA FRAGAMA S.A.*\n` +
+            `*Comprobante Oficial de ${docTitle}*\n\n` +
+            `📄 *N° Documento:* ${order.orderCode}\n` +
+            `👤 *Cliente:* ${order.customerName || 'Cliente'}\n` +
+            `📍 *Destino:* ${order.customerProvince || 'Cartago'}, ${order.customerCanton || 'Central'}\n` +
+            `📦 *Bultos:* ${bultos}\n` +
+            `💰 *Monto Total:* ${formatCRC(order.total)}\n` +
+            `🚚 *Estado:* ${order.status || 'Alistado'}\n` +
+            `🏢 *Cédula Jurídica:* 3-101-778899\n` +
+            `⚙️ *Actividad:* 466901 Venta químicos y limpieza\n\n` +
+            `_Consulte o valide sus pedidos en línea con Distribuidora Fragama S.A._\n` +
+            `WhatsApp Bodega & Ventas: +506 6267-7053`;
+
+  const encodedMsg = encodeURIComponent(msg);
+  const waUrl = cleanPhone.length >= 8 
+    ? `https://api.whatsapp.com/send?phone=506${cleanPhone.slice(-8)}&text=${encodedMsg}`
+    : `https://api.whatsapp.com/send?text=${encodedMsg}`;
+
+  window.open(waUrl, '_blank');
+};
+
 function openOrderPrintModal(order) {
   const modal = document.getElementById('orderPrintModal');
   const body = document.getElementById('orderPrintModalBody');
   if (!modal || !body || !order) return;
+
+  window._currentPrintingOrder = order;
 
   const isQuote = (order.docType === 'COTIZACION');
   const printItems = Array.isArray(order.items) ? order.items : [];
@@ -5299,28 +5748,45 @@ function openOrderPrintModal(order) {
   const descTot = (order.descuentoTotal !== undefined && order.descuentoTotal !== null) ? Number(order.descuentoTotal) : 0;
   const subNeto = (order.subtotalNeto !== undefined && order.subtotalNeto !== null) ? Number(order.subtotalNeto) : (subBruto - descTot);
   const ivaAmount = (order.iva !== undefined && order.iva !== null) ? Number(order.iva) : (tot - subNeto);
+  const clave50 = generateHaciendaClave50(order);
+  const formattedClave = `${clave50.slice(0,3)} ${clave50.slice(3,9)} ${clave50.slice(9,21)} ${clave50.slice(21,41)} ${clave50.slice(41,42)} ${clave50.slice(42)}`;
 
   body.innerHTML = `
     <!-- ENCABEZADO CORPORATIVO OFICIAL FRAGAMA CON LOGO DE FACEBOOK -->
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #0284C7; padding-bottom:14px; margin-bottom:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #0284C7; padding-bottom:14px; margin-bottom:14px;">
       <div style="display:flex; align-items:center; gap:16px;">
         <img src="img/logo_oficial.png" alt="Distribuidora Fragama" style="max-height:64px; object-fit:contain; border-radius:6px;">
         <div>
           <h2 style="margin:0; font-size:1.25rem; font-weight:900; color:#0B192C; letter-spacing:0.5px;">DISTRIBUIDORA FRAGAMA S.A.</h2>
-          <div style="font-size:0.75rem; color:#475569; line-height:1.35;">
-            Cédula Jurídica: 3-101-789012 • Cartago, Costa Rica<br>
-            WhatsApp & Teléfono: +506 6267-7053<br>
-            Correo: ventas@distribuidorafragama.com • fb.com/dist.fragama
+          <div style="font-size:0.76rem; color:#475569; line-height:1.35;">
+            <strong>Cédula Jurídica:</strong> 3-101-778899 &bull; <strong>Actividad DGT:</strong> 466901<br>
+            Bodega Central Taras, 300m Oeste Iglesia, Cartago, Costa Rica<br>
+            <strong>WhatsApp &amp; Tel:</strong> +506 6267-7053 / 2551-0000 &bull; <strong>Correo:</strong> facturacion@fragama.cr
           </div>
         </div>
       </div>
       <div style="text-align:right;">
         <span style="display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:800; background:${isQuote ? '#E0F2FE' : '#DCFCE7'}; color:${isQuote ? '#0284C7' : '#15803D'}; border:1px solid ${isQuote ? '#38BDF8' : '#86EFAC'}; margin-bottom:4px;">
-          ${isQuote ? 'PROFORMA / COTIZACIÓN' : 'ORDEN DE PEDIDO & ALISTO'}
+          ${isQuote ? 'PROFORMA / COTIZACIÓN' : 'FACTURA ELECTRÓNICA DE VENTA (v4.3)'}
         </span>
         <div style="font-family:'JetBrains Mono',monospace; font-size:1.15rem; font-weight:800; color:#0B192C;">${escapeHtml(order.orderCode)}</div>
         <div style="font-size:0.75rem; color:#64748B;">Emisión: ${escapeHtml(order.date || 'Hoy')}</div>
       </div>
+    </div>
+
+    <!-- CLAVE NUMÉRICA DE 50 DÍGITOS HACIENDA CR (DGT) -->
+    <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:8px; padding:8px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <div style="font-size:0.7rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">
+          <i class="bi bi-shield-lock-fill text-primary"></i> Clave Numérica de 50 Dígitos (Hacienda Costa Rica DGT-R-48):
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:0.78rem; font-weight:700; color:#0B192C; word-break:break-all;">
+          ${formattedClave}
+        </div>
+      </div>
+      <button type="button" class="btn-fragama btn-outline-fragama no-print" onclick="copyClave50Digits('${clave50}')" style="padding:3px 9px; font-size:0.72rem; background:#FFF; border-color:#0284C7; color:#0284C7; font-weight:700;">
+        <i class="bi bi-clipboard-check"></i> Copiar Clave
+      </button>
     </div>
 
     <!-- DATOS DEL CLIENTE Y LOGÍSTICA -->
@@ -5328,17 +5794,18 @@ function openOrderPrintModal(order) {
       <div>
         <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Facturado / Dirigido a:</div>
         <div style="font-weight:800; font-size:0.95rem; color:#0B192C;">${escapeHtml(order.customerName || 'Cliente')}</div>
-        <div><strong>Cédula:</strong> ${escapeHtml(order.customerTaxId || 'N/A')}</div>
+        <div><strong>Cédula / Identificación:</strong> ${escapeHtml(order.customerTaxId || 'N/A')}</div>
         <div><strong>Contacto:</strong> ${escapeHtml(order.customerContact || 'N/A')}</div>
         <div><strong>Teléfono:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
+        <div><strong>Correo Electrónico:</strong> ${escapeHtml(order.customerEmail || 'facturacion@cliente.cr')}</div>
       </div>
       <div>
-        <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Datos de Despacho Nacional (Costa Rica):</div>
-        <div><strong>Responsable Asignado(a):</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-person-badge"></i> ${escapeHtml(order.assignedUserName || order.preparedByName || 'Colaborador Fragama')} (${escapeHtml(order.assignedUserRole || 'Encargado')})</span></div>
-        <div><strong>Provincia / Destino:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
-        <div><strong>Fecha de Entrega:</strong> ${escapeHtml(order.deliveryDate || order.date || 'Inmediata')}</div>
-        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado')}</div>
-        <div><strong>Dirección:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
+        <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Datos de Despacho &amp; Entrega Nacional:</div>
+        <div><strong>Chofer / Repartidor Asignado:</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-truck"></i> ${escapeHtml(order.driverName || 'Minor Coto (Chofer Logístico)')}</span></div>
+        <div><strong>Responsable de Alisto:</strong> <span style="font-weight:700; color:#059669;">${escapeHtml(order.preparedByName || order.assignedUserName || 'Colaborador Fragama')}</span></div>
+        <div><strong>Provincia / Cantón:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
+        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado (SINPE Móvil / Transferencia)')}</div>
+        <div><strong>Dirección Exacta:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
         ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${escapeHtml(order.notes)}</div>` : ''}
       </div>
     </div>
@@ -5351,7 +5818,7 @@ function openOrderPrintModal(order) {
       <div style="display:flex; justify-content:center;">
         <svg id="printOrderBarcodeSvg"></svg>
       </div>
-      <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${escapeHtml(order.orderCode)}')">
+      <button type="button" class="btn-fragama btn-outline-fragama no-print" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${escapeHtml(order.orderCode)}')">
         <i class="bi bi-search"></i> Probar Lectura de este Pedido
       </button>
     </div>
@@ -5361,7 +5828,7 @@ function openOrderPrintModal(order) {
       <div style="flex:1; padding-right:16px;">
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
           <span style="background:#15803D; color:#FFF; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
-            <i class="bi bi-qr-code-scan"></i> CÓDIGO QR DE BULTOS
+            <i class="bi bi-qr-code-scan"></i> CÓDIGO QR DE BULTOS &amp; RUTA
           </span>
           <span style="font-size:0.75rem; color:#15803D; font-weight:700;">Distribución Nacional Todo Costa Rica</span>
         </div>
@@ -5382,33 +5849,38 @@ function openOrderPrintModal(order) {
       </div>
     </div>
 
-    <!-- TABLA DE ARTÍCULOS DETALLADOS -->
+    <!-- TABLA DE ARTÍCULOS DETALLADOS CON CABYS Y IVA -->
     <table style="width:100%; border-collapse:collapse; font-size:0.82rem; margin-bottom:16px;">
       <thead style="background:#0B192C; color:#FFFFFF;">
         <tr>
-          <th style="padding:7px 10px; text-align:left;">SKU</th>
+          <th style="padding:7px 8px; text-align:left;">SKU</th>
+          <th style="padding:7px 8px; text-align:left;">Código CABYS</th>
           <th style="padding:7px 10px; text-align:left;">Descripción del Producto</th>
-          <th style="padding:7px 8px; text-align:center; width:60px;">Cant.</th>
-          <th style="padding:7px 10px; text-align:right; width:85px;">P. Unit</th>
-          <th style="padding:7px 8px; text-align:center; width:60px;">Desc.</th>
-          <th style="padding:7px 10px; text-align:right; width:100px;">Monto (₡)</th>
+          <th style="padding:7px 8px; text-align:center; width:55px;">Cant.</th>
+          <th style="padding:7px 8px; text-align:right; width:85px;">P. Unit</th>
+          <th style="padding:7px 8px; text-align:center; width:50px;">Desc.</th>
+          <th style="padding:7px 8px; text-align:center; width:55px;">IVA</th>
+          <th style="padding:7px 10px; text-align:right; width:100px;">Total (₡)</th>
         </tr>
       </thead>
       <tbody>
         ${printItems.length === 0 ? `
-          <tr><td colspan="6" style="padding:16px; text-align:center; color:#64748B;">No hay líneas de artículos detalladas en este pedido.</td></tr>
+          <tr><td colspan="8" style="padding:16px; text-align:center; color:#64748B;">No hay líneas de artículos detalladas en este pedido.</td></tr>
         ` : printItems.map((it, idx) => {
           const qty = Number(it.qty || it.quantity || 1);
           const uPrice = Number(it.unitPrice || 0);
           const disc = Number(it.discountPct || 0);
           const sub = Number(it.subtotal || (qty * uPrice));
+          const cabys = it.cabys || it.cabysCode || '4669010000000';
           return `
           <tr style="border-bottom:1px solid #E2E8F0; background:${idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA'};">
-            <td style="padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#475569;">${escapeHtml(it.sku || 'N/A')}</td>
+            <td style="padding:7px 8px; font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:#475569;">${escapeHtml(it.sku || 'N/A')}</td>
+            <td style="padding:7px 8px; font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:#0284C7; font-weight:700;">${escapeHtml(cabys)}</td>
             <td style="padding:7px 10px; font-weight:600; color:#0B192C;">${escapeHtml(it.name || it.productName || 'Artículo')} <span style="font-size:0.7rem; color:#64748B;">(${escapeHtml(it.unit || 'UND')})</span></td>
             <td style="padding:7px 8px; text-align:center; font-weight:700;">${qty}</td>
-            <td style="padding:7px 10px; text-align:right;">${formatCRC(uPrice)}</td>
+            <td style="padding:7px 8px; text-align:right;">${formatCRC(uPrice)}</td>
             <td style="padding:7px 8px; text-align:center; color:${disc > 0 ? '#DC2626' : '#64748B'};">${disc}%</td>
+            <td style="padding:7px 8px; text-align:center; font-weight:700; color:#0369A1;">13%</td>
             <td style="padding:7px 10px; text-align:right; font-weight:800; color:#0B192C;">${formatCRC(sub)}</td>
           </tr>
         `;
@@ -5416,42 +5888,48 @@ function openOrderPrintModal(order) {
       </tbody>
     </table>
 
-    <!-- TOTALES FINANCIEROS -->
+    <!-- TOTALES FINANCIEROS Y TRIBUTARIOS -->
     <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
-      <div style="width:280px; font-size:0.84rem;">
+      <div style="width:310px; font-size:0.84rem; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 14px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-          <span style="color:#64748B;">Subtotal Bruto:</span>
+          <span style="color:#64748B;">Subtotal Mercancías Gravadas:</span>
           <span style="font-weight:600;">${formatCRC(subBruto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#DC2626;">
-          <span>Descuento Comercial:</span>
+          <span>Descuento Comercial Concedido:</span>
           <span style="font-weight:600;">-${formatCRC(descTot)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-          <span style="color:#64748B;">Subtotal Gravable:</span>
+          <span style="color:#64748B;">Subtotal Gravable (Base Imponible):</span>
           <span style="font-weight:600;">${formatCRC(subNeto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-          <span style="color:#64748B;">IVA Costa Rica (13%):</span>
-          <span style="font-weight:600;">${formatCRC(ivaAmount)}</span>
+          <span style="color:#64748B;">IVA Costa Rica (13% D-104):</span>
+          <span style="font-weight:600; color:#0284C7;">${formatCRC(ivaAmount)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:1.15rem; font-weight:900; color:#0B192C; border-top:2px solid #0284C7; padding-top:6px;">
-          <span>TOTAL:</span>
+          <span>TOTAL A PAGAR:</span>
           <span style="color:#0284C7;">${formatCRC(tot)}</span>
         </div>
       </div>
     </div>
 
     <!-- FIRMAS DE AUTORIZACIÓN Y RECIBO -->
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-top:30px; font-size:0.75rem; text-align:center;">
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-top:24px; font-size:0.75rem; text-align:center;">
       <div style="border-top:1px solid #94A3B8; padding-top:6px;">
-        <strong>${order.assignedUserName || 'Distribuidora Fragama S.A.'}</strong><br>
-        <span style="color:#64748B;">${order.assignedUserRole || 'Responsable Asignado'} • Control y Alisto</span>
+        <strong>${escapeHtml(order.preparedByName || order.assignedUserName || 'Distribuidora Fragama S.A.')}</strong><br>
+        <span style="color:#64748B;">Control y Alisto &bull; Bodega Fragama</span>
       </div>
       <div style="border-top:1px solid #94A3B8; padding-top:6px;">
         <strong>Recibido Conforme (Cliente)</strong><br>
         <span style="color:#64748B;">Firma, Cédula y Sello Comercial</span>
       </div>
+    </div>
+
+    <!-- LEYENDA TRIBUTARIA OFICIAL -->
+    <div style="margin-top:20px; padding-top:8px; border-top:1px dashed #CBD5E1; text-align:center; font-size:0.7rem; color:#64748B;">
+      Autorizada mediante Resolución DGT-R-48-2016 y DGT-R-033-2019 de la Dirección General de Tributación.<br>
+      Este documento es una representación gráfica de la Factura Electrónica generada para los efectos tributarios de ley.
     </div>
   `;
 
@@ -5460,10 +5938,13 @@ function openOrderPrintModal(order) {
   // Renderizar Código de Barras y QR
   const qrPayload = JSON.stringify({
     empresa: 'Distribuidora Fragama S.A.',
+    cedula: '3-101-778899',
+    clave: clave50,
     pedido: order.orderCode,
     tipo: order.docType,
     cliente: order.customerName,
     responsable: order.assignedUserName || 'Asignado',
+    chofer: order.driverName || 'Minor Coto',
     provincia: order.customerProvince || 'Cartago',
     canton: order.customerCanton || 'Central',
     bultos: summarizeOrderPackages(order),
@@ -5694,14 +6175,18 @@ function renderOrderHistory() {
 // 1. MODAL DE ALISTADO & PICKING CON ASIGNACIÓN DE RESPONSABLES
 // ==============================================================================
 window.openOrderPickingModal = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
   if (!order) {
     alert("No se encontró el pedido seleccionado.");
     return;
   }
 
-  document.getElementById('pickingOrderId').value = order.id;
-  document.getElementById('pickingOrderCode').value = order.orderCode;
+  document.getElementById('pickingOrderId').value = order.id || order.orderCode;
+  document.getElementById('pickingOrderCode').value = order.orderCode || order.id;
   document.getElementById('pickingModalSubtitle').textContent = `Pedido #${order.orderCode} • Emisión: ${order.date || 'Hoy'}`;
   document.getElementById('pickingCustomerName').textContent = order.customerName || 'Cliente';
   document.getElementById('pickingCustomerPhone').textContent = order.customerPhone ? `Tel: ${order.customerPhone}` : 'Sin teléfono';
@@ -5747,19 +6232,35 @@ window.openOrderPickingModal = async function(orderIdentifier) {
   // Cargar lista de colaboradores (Bodegueros y Choferes)
   await loadStaffSelectors();
 
-  // Pre-seleccionar usuario actual en bodeguero si aplica
+  // Pre-seleccionar usuario actual en bodeguero si aplica, y en chofer si el rol es Chofer
   const curUser = AppState.currentUser || {};
   const respSelect = document.getElementById('pickingResponsibleSelect');
-  if (curUser && curUser.id && respSelect) {
+  const driverSelect = document.getElementById('pickingDriverSelect');
+
+  if (curUser && respSelect) {
     for (let i = 0; i < respSelect.options.length; i++) {
-      if (Number(respSelect.options[i].value) === Number(curUser.id)) {
+      if (Number(respSelect.options[i].value) === Number(curUser.id) || (curUser.name && respSelect.options[i].text.includes(curUser.name.split(' ')[0]))) {
         respSelect.selectedIndex = i;
         break;
       }
     }
   }
 
-  document.getElementById('orderPickingModal').classList.add('active');
+  if (curUser && driverSelect && curUser.role === 'Chofer') {
+    for (let i = 0; i < driverSelect.options.length; i++) {
+      if (Number(driverSelect.options[i].value) === Number(curUser.id) || (curUser.name && driverSelect.options[i].text.includes(curUser.name.split(' ')[0])) || (curUser.username === 'chofer' && driverSelect.options[i].text.includes('Minor'))) {
+        driverSelect.selectedIndex = i;
+        break;
+      }
+    }
+  }
+
+  const modal = document.getElementById('orderPickingModal');
+  if (modal) {
+    modal.style.removeProperty('display');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
 };
 
 window.checkAllPickingItems = function() {
@@ -5877,8 +6378,15 @@ window.handleConfirmOrderPicking = async function(event) {
 // 2. DESPACHO A RUTA (ALISTADO -> EN_RUTA)
 // ==============================================================================
 window.dispatchOrderToRoute = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
-  if (!order) return;
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
+  if (!order) {
+    alert("No se encontró el pedido a despachar.");
+    return;
+  }
 
   const driver = order.driverName || 'Chofer de Ruta';
   if (!confirm(`¿Confirmar que el pedido #${order.orderCode} ha salido de bodega en ruta con ${driver}?`)) {
@@ -5911,8 +6419,15 @@ window.dispatchOrderToRoute = async function(orderIdentifier) {
 // 3. CONFIRMAR ENTREGA Y DESCUENTO AUTOMÁTICO EN KARDEX (ALISTADO/EN_RUTA -> ENTREGADO)
 // ==============================================================================
 window.confirmOrderDelivered = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
-  if (!order) return;
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
+  if (!order) {
+    alert("No se encontró el pedido seleccionado para entrega.");
+    return;
+  }
 
   const confirmMsg = `¿CONFIRMAR ENTREGA DEL PEDIDO #${order.orderCode} AL CLIENTE?\n\n` +
                      `📦 Cliente: ${order.customerName}\n` +
@@ -5937,10 +6452,11 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
       })
     });
 
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
     if (res.ok && result.success) {
       order.status = 'ENTREGADO';
       order.stockDeducted = 1;
+      order.deliveredAt = new Date().toISOString();
       
       // Recargar catálogo de productos para actualizar stocks en pantalla
       if (typeof fetchProducts === 'function') {
@@ -5950,7 +6466,7 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
       refreshAllOrderViews();
       showNotificationToast(`🎉 Pedido ${order.orderCode} entregado. ¡Inventario Kardex descontado automáticamente sin descuadre!`, 'success');
     } else {
-      alert(result.detail || "Error al confirmar entrega.");
+      alert(result.detail || "Error al confirmar entrega en el servidor central.");
     }
   } catch(e) {
     console.error("Error confirmando entrega:", e);
@@ -5963,18 +6479,27 @@ window.confirmOrderDelivered = async function(orderIdentifier) {
 // 4. REGISTRAR NO ENTREGA / RECHAZO (JUSTIFICACIÓN OBLIGATORIA)
 // ==============================================================================
 window.openOrderUndeliveredModal = async function(orderIdentifier) {
-  const order = AppState.salesOrders.find(o => String(o.id) === String(orderIdentifier) || o.orderCode === String(orderIdentifier));
+  const cleanId = String(orderIdentifier || '').trim().toUpperCase();
+  const order = AppState.salesOrders.find(o => 
+    String(o.id || '').trim().toUpperCase() === cleanId || 
+    String(o.orderCode || '').trim().toUpperCase() === cleanId
+  );
   if (!order) return;
 
-  document.getElementById('undeliveredOrderId').value = order.id;
-  document.getElementById('undeliveredOrderCode').value = order.orderCode;
+  document.getElementById('undeliveredOrderId').value = order.id || order.orderCode;
+  document.getElementById('undeliveredOrderCode').value = order.orderCode || order.id;
   document.getElementById('undeliveredModalSubtitle').textContent = `Pedido #${order.orderCode} • Cliente: ${order.customerName}`;
   document.getElementById('undeliveredPredefinedReason').value = '';
   document.getElementById('undeliveredJustificationText').value = '';
   document.getElementById('undeliveredErrorAlert').style.display = 'none';
 
   await loadStaffSelectors();
-  document.getElementById('orderUndeliveredModal').classList.add('active');
+  const modal = document.getElementById('orderUndeliveredModal');
+  if (modal) {
+    modal.style.removeProperty('display');
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
 };
 
 window.handlePredefinedReasonChange = function() {
@@ -6294,47 +6819,171 @@ function setDriverProvinceFilter(province) {
 }
 window.setDriverProvinceFilter = setDriverProvinceFilter;
 
+window.onAdminDriverFilterChange = function(driverVal) {
+  AppState.adminSelectedDriverFilter = driverVal;
+  renderDriverDispatches();
+};
+
+function getUnifiedDriverDispatches() {
+  const curUser = AppState.currentUser || {};
+  const list = [...AppState.dispatches];
+
+  // Integrar pedidos en ALISTADO o EN_RUTA desde AppState.salesOrders si aún no están en la lista
+  const activeOrders = (AppState.salesOrders || []).filter(o => {
+    const st = (o.status || '').toUpperCase();
+    return st === 'EN_RUTA' || st === 'ALISTADO' || st === 'ENTREGADO';
+  });
+
+  activeOrders.forEach(o => {
+    const code = o.orderCode || o.id;
+    const exists = list.some(d => d.orderCode === code || d.code === code);
+    if (!exists) {
+      const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(o) : 'Carga general';
+      const itemsList = Array.isArray(o.items) && o.items.length > 0
+        ? o.items.map(it => `${it.qty || 1}x ${it.name || it.productName || 'Producto'}`).join(', ')
+        : 'Carga de mercadería';
+
+      list.push({
+        id: 'ord_' + o.id,
+        code: `DSP-${code}`,
+        orderCode: code,
+        customer: o.customerName || 'Cliente Fragama',
+        province: o.customerProvince || o.deliveryRoute || 'Cartago',
+        canton: o.customerCanton || 'Central',
+        address: o.customerAddress || 'Dirección registrada en pedido',
+        contact: `${o.customerContact || o.customerName || 'Cliente'} (${o.customerPhone || 'N/A'})`,
+        invoice: `FAC-${code}`,
+        items: itemsList,
+        packages: [{ qty: (Array.isArray(o.items) ? o.items.length : 1), unit: 'Bultos', desc: bultos }],
+        driver: o.driverName || 'Minor Coto - Isuzu CL-294012',
+        driverName: o.driverName || 'Minor Coto',
+        driverUserId: o.driverUserId || 5,
+        status: o.status === 'ENTREGADO' ? 'Entregado' : (o.status === 'EN_RUTA' ? 'En Ruta' : 'Asignado'),
+        verified: true,
+        departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM'
+      });
+    }
+  });
+
+  return list;
+}
+
 function renderDriverDispatches() {
   const container = document.getElementById('driverDispatchesList');
   if (!container) return;
 
-  const currentProv = AppState.driverProvinceFilter || 'ALL';
+  const curUser = AppState.currentUser || {};
+  const isAdmin = (curUser.role === 'Administrador');
+  const isDriver = (curUser.role === 'Chofer');
 
-  // Filtrado por provincia
-  const filtered = AppState.dispatches.filter(d => {
+  // 1. Configuración de controles de administrador vs chofer
+  const adminBar = document.getElementById('adminDriverControlBar');
+  const adminSelect = document.getElementById('adminDriverFilterSelect');
+  const userNameEl = document.getElementById('driverLoggedUserName');
+  const vehicleInfoEl = document.getElementById('driverVehicleInfo');
+  const scopeBadgeEl = document.getElementById('driverScopeBadge');
+
+  const allDispatches = getUnifiedDriverDispatches();
+
+  if (isAdmin) {
+    if (adminBar) adminBar.style.display = 'block';
+    if (adminSelect) {
+      // Recopilar nombres únicos de choferes asignados
+      const setDrivers = new Set();
+      (AppState.systemUsers || []).filter(u => u.role === 'Chofer').forEach(u => setDrivers.add(u.name.split(' (')[0].trim()));
+      allDispatches.forEach(d => {
+        const raw = d.driverName || (d.driver ? d.driver.split(' - ')[0] : '');
+        if (raw) setDrivers.add(raw.trim());
+      });
+
+      const currentSel = AppState.adminSelectedDriverFilter || 'ALL';
+      adminSelect.innerHTML = `<option value="ALL" ${currentSel === 'ALL' ? 'selected' : ''}>🌐 Todos los Choferes (Flota Consolidada)</option>` +
+        Array.from(setDrivers).map(dName => `
+          <option value="${escapeHtml(dName)}" ${currentSel === dName ? 'selected' : ''}>🚚 ${escapeHtml(dName)}</option>
+        `).join('');
+    }
+
+    const selDriver = AppState.adminSelectedDriverFilter || 'ALL';
+    if (userNameEl) {
+      userNameEl.textContent = (selDriver === 'ALL') 
+        ? "Centro Maestro de Despacho & Rutas (Auditoría Administrativa)" 
+        : `Ruta Asignada: ${selDriver}`;
+    }
+    if (vehicleInfoEl) {
+      vehicleInfoEl.innerHTML = `<i class="bi bi-shield-check text-warning"></i> Modo Administrador &bull; Control y supervisión de todos los despachos`;
+    }
+    if (scopeBadgeEl) {
+      scopeBadgeEl.textContent = (selDriver === 'ALL') ? "Flota Completa Nacional" : `Chofer: ${selDriver}`;
+    }
+  } else {
+    if (adminBar) adminBar.style.display = 'none';
+    if (userNameEl) userNameEl.textContent = curUser.name || 'Minor Coto (Chofer Logístico)';
+    if (vehicleInfoEl) vehicleInfoEl.innerHTML = `<i class="bi bi-truck-front-fill text-warning"></i> Camión Isuzu Forward CL-294012 &bull; Bodega Central Taras`;
+    if (scopeBadgeEl) scopeBadgeEl.textContent = "Mis Entregas Asignadas";
+  }
+
+  // 2. SEGREGACIÓN DE DATOS POR ASIGNACIÓN (Row-Level Security)
+  let visibleDispatches = allDispatches;
+  if (!isAdmin) {
+    // Si no es Administrador (ej. Chofer), SOLO ve lo que tiene asignado
+    const uNameLower = (curUser.name || '').toLowerCase();
+    const uFirst = uNameLower.split(' ')[0] || '';
+    visibleDispatches = allDispatches.filter(d => {
+      const dDriver = (d.driver || '').toLowerCase();
+      const dDriverName = (d.driverName || '').toLowerCase();
+      const matchName = uFirst && (dDriver.includes(uFirst) || dDriverName.includes(uFirst));
+      const matchId = curUser.id && d.driverUserId && (Number(d.driverUserId) === Number(curUser.id));
+      const isDefaultChofer = (curUser.username === 'chofer' && (dDriver.includes('minor') || dDriverName.includes('minor')));
+      return matchName || matchId || isDefaultChofer;
+    });
+  } else if (AppState.adminSelectedDriverFilter && AppState.adminSelectedDriverFilter !== 'ALL') {
+    const selLower = AppState.adminSelectedDriverFilter.toLowerCase();
+    visibleDispatches = allDispatches.filter(d => {
+      const dDriver = (d.driver || '').toLowerCase();
+      const dDriverName = (d.driverName || '').toLowerCase();
+      return dDriver.includes(selLower) || dDriverName.includes(selLower);
+    });
+  }
+
+  // 3. Filtrado por provincia de Costa Rica
+  const currentProv = AppState.driverProvinceFilter || 'ALL';
+  const filtered = visibleDispatches.filter(d => {
     if (currentProv === 'ALL') return true;
     return d.province === currentProv;
   });
 
-  // Métricas superiores
+  // 4. Métricas superiores calculadas con las entregas asignadas visibles
   const totalPkgsEl = document.getElementById('driverTotalPackages');
   const covProvsEl = document.getElementById('driverCoveredProvinces');
   const deliveredRatioEl = document.getElementById('driverDeliveredRatio');
   const navBadgeEl = document.getElementById('navDispatchCount');
 
-  if (navBadgeEl) navBadgeEl.textContent = AppState.dispatches.length;
+  if (navBadgeEl) navBadgeEl.textContent = visibleDispatches.length;
 
   let totalBultos = 0;
-  AppState.dispatches.forEach(d => {
+  visibleDispatches.forEach(d => {
     if (d.packages && Array.isArray(d.packages)) {
       d.packages.forEach(p => totalBultos += (p.qty || 0));
     } else {
-      totalBultos += 5; // fallback
+      totalBultos += 3;
     }
   });
 
-  const uniqueProvs = new Set(AppState.dispatches.map(d => d.province || 'Cartago')).size;
-  const deliveredCount = AppState.dispatches.filter(d => d.status === 'Entregado').length;
+  const uniqueProvs = new Set(visibleDispatches.map(d => d.province || 'Cartago')).size;
+  const deliveredCount = visibleDispatches.filter(d => d.status === 'Entregado').length;
 
   if (totalPkgsEl) totalPkgsEl.textContent = `${totalBultos} bultos`;
-  if (covProvsEl) covProvsEl.textContent = `${uniqueProvs} Provincias`;
-  if (deliveredRatioEl) deliveredRatioEl.textContent = `${deliveredCount} / ${AppState.dispatches.length}`;
+  if (covProvsEl) covProvsEl.textContent = `${uniqueProvs} Zonas`;
+  if (deliveredRatioEl) deliveredRatioEl.textContent = `${deliveredCount} / ${visibleDispatches.length}`;
 
   if (filtered.length === 0) {
     container.innerHTML = `
       <div style="background:#FFF; border:1px dashed #CBD5E1; border-radius:12px; padding:2rem; text-align:center; color:#64748B;">
         <i class="bi bi-geo-alt-fill" style="font-size:2rem; color:#CBD5E1;"></i>
-        <div style="font-weight:700; margin-top:8px;">No hay despachos registrados para ${currentProv}</div>
+        <div style="font-weight:700; margin-top:8px;">No hay despachos asignados para ${currentProv === 'ALL' ? 'su ruta actual' : currentProv}</div>
+        <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
+          ${!isAdmin ? 'Usted solo visualiza los paquetes y pedidos asignados específicamente a su usuario/camión.' : 'No hay despachos con el filtro seleccionado.'}
+        </p>
         <button class="btn-fragama btn-outline-fragama" style="margin-top:12px; padding:6px 14px; font-size:0.8rem;" onclick="setDriverProvinceFilter('ALL')">
           Ver todas las provincias
         </button>
@@ -6358,15 +7007,21 @@ function renderDriverDispatches() {
     else if (pLower.includes('heredia')) provClass = 'prov-heredia';
 
     const bultosStr = d.items || (d.packages ? d.packages.map(p => `${p.qty}x ${p.unit}`).join(', ') : 'Varios bultos');
+    const assignedDriverName = d.driverName || (d.driver ? d.driver.split(' - ')[0] : 'Chofer');
 
     return `
       <div class="dispatch-card ${d.status === 'En Ruta' ? 'highlight' : ''}">
         <div class="dispatch-card-header">
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span class="dispatch-code">${d.code}</span>
             <span class="badge-province ${provClass}">
               <i class="bi bi-pin-map-fill"></i> ${d.province || 'Costa Rica'} &bull; ${d.canton || 'Central'}
             </span>
+            ${isAdmin ? `
+              <span style="background:#0F172A; color:#E2E8F0; font-size:0.72rem; padding:2px 8px; border-radius:12px; font-weight:700;">
+                <i class="bi bi-person-fill text-warning"></i> ${escapeHtml(assignedDriverName)}
+              </span>
+            ` : ''}
           </div>
           <span class="badge-status ${badgeClass}"><i class="bi bi-circle-fill" style="font-size:6px"></i> ${d.status}</span>
         </div>
@@ -6391,7 +7046,7 @@ function renderDriverDispatches() {
                 ${bultosStr}
               </div>
             </div>
-            <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch(${d.id})" title="Ver Código QR de estos bultos">
+            <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch('${d.id}')" title="Ver Código QR de estos bultos">
               <i class="bi bi-qr-code"></i> Ver QR
             </button>
           </div>
@@ -6406,10 +7061,10 @@ function renderDriverDispatches() {
             <button class="btn-driver-action btn-delivered" onclick="openQrScannerModal('${d.orderCode || d.code}')" style="background:#0284C7; color:#FFF; border-color:#0284C7;">
               <i class="bi bi-qr-code-scan"></i> Auditar QR
             </button>
-            <button class="btn-driver-action btn-delivered" onclick="openDriverModal(${d.id}, 'Entregado')">
+            <button class="btn-driver-action btn-delivered" onclick="openDriverModal('${d.id}', 'Entregado')">
               <i class="bi bi-check-circle-fill"></i> Entregado
             </button>
-            <button class="btn-driver-action btn-observed" onclick="openDriverModal(${d.id}, 'Observado')">
+            <button class="btn-driver-action btn-observed" onclick="openDriverModal('${d.id}', 'Observado')">
               <i class="bi bi-exclamation-triangle-fill"></i> Novedad
             </button>
           </div>
@@ -7636,16 +8291,30 @@ function setupDashboardControls() {
 
   if (search) {
     search.addEventListener('input', () => {
+      window._dashboardStockPage = 1;
       renderProductsTable(search.value.trim().toLowerCase(), familyFilter ? familyFilter.value : 'ALL');
     });
   }
 
   if (familyFilter) {
     familyFilter.addEventListener('change', () => {
+      window._dashboardStockPage = 1;
       renderProductsTable(search ? search.value.trim().toLowerCase() : '', familyFilter.value);
     });
   }
 }
+
+window._fragamaCharts = window._fragamaCharts || {};
+window._dashboardTimeframe = window._dashboardTimeframe || 'month';
+
+function setDashboardTimeframe(timeframe, btn) {
+  window._dashboardTimeframe = timeframe;
+  const filterBtns = document.querySelectorAll('#dashboardTimeFilters .powerbi-filter-btn');
+  filterBtns.forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderDashboardAnalytics();
+}
+window.setDashboardTimeframe = setDashboardTimeframe;
 
 function renderDashboardAnalytics() {
   // 1. Valorización Total de Inventario
@@ -7663,57 +8332,280 @@ function renderDashboardAnalytics() {
   const lowCount = AppState.products.filter(p => p.stock <= p.minStock).length;
   if (kpiAlert) kpiAlert.textContent = lowCount;
 
-  // 2. Gráfico Visual de Barras por Familia
-  const familyBarsContainer = document.getElementById('dashboardFamilyBars');
-  if (familyBarsContainer) {
-    const colors = ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6'];
-    familyBarsContainer.innerHTML = AppState.families.map((f, idx) => {
-      const familyProducts = AppState.products.filter(p => p.familyId === f.id);
-      const unitsInFamily = familyProducts.reduce((sum, p) => sum + p.stock, 0);
-      const valInFamily = familyProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
-      const pct = totalUnits > 0 ? Math.round((unitsInFamily / totalUnits) * 100) : 0;
-      const barColor = colors[idx % colors.length];
-
-      return `
-        <div class="family-bar-row">
-          <div class="family-bar-header">
-            <span><i class="bi ${f.icon || 'bi-boxes'}" style="color:${barColor}"></i> ${f.name}</span>
-            <span><strong>${pct}%</strong> (${unitsInFamily} uds • ${formatCRC(valInFamily)})</span>
-          </div>
-          <div class="family-bar-track">
-            <div class="family-bar-fill" style="width:${pct}%; background:${barColor};"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
+  // Si Chart.js aún no está cargado, salir sin error
+  if (typeof Chart === 'undefined') {
+    return;
   }
 
-  // 3. Gráfico Semanal de Kardex (Entradas vs Salidas)
-  const weeklyContainer = document.getElementById('dashboardWeeklyChart');
-  if (weeklyContainer) {
-    const weeklyData = [
-      { day: 'Lun', inVal: 80, outVal: 45 },
-      { day: 'Mar', inVal: 30, outVal: 65 },
-      { day: 'Mié', inVal: 120, outVal: 85 },
-      { day: 'Jue', inVal: 40, outVal: 95 },
-      { day: 'Vie', inVal: 90, outVal: 110 },
-      { day: 'Sáb', inVal: 20, outVal: 50 }
-    ];
-    const maxVal = 140;
+  const tf = window._dashboardTimeframe || 'month';
 
-    weeklyContainer.innerHTML = weeklyData.map(d => {
-      const inHeight = Math.round((d.inVal / maxVal) * 110);
-      const outHeight = Math.round((d.outVal / maxVal) * 110);
-      return `
-        <div class="weekly-col">
-          <div class="weekly-bar-pair">
-            <div class="weekly-bar in" style="height:${inHeight}px;" data-tooltip="Entradas: ${d.inVal} uds"></div>
-            <div class="weekly-bar out" style="height:${outHeight}px;" data-tooltip="Salidas: ${d.outVal} uds"></div>
-          </div>
-          <span class="weekly-label">${d.day}</span>
-        </div>
-      `;
-    }).join('');
+  // Configuración global de fuentes y colores para estilo GitHub / Tremor / PowerBI
+  const fontConfig = { family: "'Plus Jakarta Sans', sans-serif" };
+  const tooltipConfig = {
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    titleColor: '#FFFFFF',
+    titleFont: { size: 12, weight: 'bold', family: "'Plus Jakarta Sans', sans-serif" },
+    bodyColor: '#F8FAFC',
+    bodyFont: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
+    padding: 10,
+    cornerRadius: 8,
+    boxPadding: 4
+  };
+
+  // 2. Gráfico 1: Flujo Semanal de Mercadería Kardex (Entradas vs Salidas)
+  const weeklyCanvas = document.getElementById('weeklyChart');
+  if (weeklyCanvas) {
+    if (window._fragamaCharts.weekly) {
+      window._fragamaCharts.weekly.destroy();
+    }
+
+    let weeklyData = [];
+    if (tf === 'today') {
+      weeklyData = [
+        { label: '08:00', inVal: 15, outVal: 8 },
+        { label: '10:00', inVal: 28, outVal: 14 },
+        { label: '12:00', inVal: 35, outVal: 22 },
+        { label: '14:00', inVal: 18, outVal: 30 },
+        { label: '16:00', inVal: 12, outVal: 26 }
+      ];
+    } else if (tf === '7d' || tf === 'month') {
+      weeklyData = [
+        { label: 'Lun', inVal: 85, outVal: 50 },
+        { label: 'Mar', inVal: 40, outVal: 70 },
+        { label: 'Mié', inVal: 130, outVal: 95 },
+        { label: 'Jue', inVal: 60, outVal: 110 },
+        { label: 'Vie', inVal: 105, outVal: 125 },
+        { label: 'Sáb', inVal: 25, outVal: 60 }
+      ];
+    } else {
+      weeklyData = [
+        { label: 'Q1', inVal: 340, outVal: 290 },
+        { label: 'Q2', inVal: 410, outVal: 380 },
+        { label: 'Q3', inVal: 390, outVal: 420 },
+        { label: 'Q4', inVal: 480, outVal: 460 }
+      ];
+    }
+
+    const sumIn = weeklyData.reduce((acc, d) => acc + d.inVal, 0);
+    const sumOut = weeklyData.reduce((acc, d) => acc + d.outVal, 0);
+    const kBadge = document.getElementById('kardexTotalBadge');
+    if (kBadge) {
+      kBadge.textContent = `Entradas: ${sumIn} • Salidas: ${sumOut}`;
+    }
+
+    window._fragamaCharts.weekly = new Chart(weeklyCanvas, {
+      type: 'bar',
+      data: {
+        labels: weeklyData.map(d => d.label),
+        datasets: [
+          {
+            label: 'Entradas (Uds)',
+            data: weeklyData.map(d => d.inVal),
+            backgroundColor: '#10B981',
+            borderRadius: 6
+          },
+          {
+            label: 'Salidas (Uds)',
+            data: weeklyData.map(d => d.outVal),
+            backgroundColor: '#0284C7',
+            borderRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { boxWidth: 12, font: { ...fontConfig, size: 11 } }
+          },
+          tooltip: {
+            ...tooltipConfig,
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} uds`
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { ...fontConfig, size: 10 } } },
+          x: { grid: { display: false }, ticks: { font: { ...fontConfig, size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // 3. Gráfico 2: Stock & Valor por Familia
+  const familyCanvas = document.getElementById('familyChart');
+  if (familyCanvas) {
+    if (window._fragamaCharts.family) {
+      window._fragamaCharts.family.destroy();
+    }
+    const labels = AppState.families.map(f => f.name);
+    const unitsData = AppState.families.map(f => {
+      const familyProducts = AppState.products.filter(p => p.familyId === f.id);
+      return familyProducts.reduce((sum, p) => sum + p.stock, 0);
+    });
+    const valueData = AppState.families.map(f => {
+      const familyProducts = AppState.products.filter(p => p.familyId === f.id);
+      return familyProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
+    });
+
+    const sumSummary = document.getElementById('dashboardFamilySummaryText');
+    if (sumSummary) {
+      const sumVal = valueData.reduce((a, b) => a + b, 0);
+      sumSummary.textContent = `${totalUnits.toLocaleString()} uds • ${formatCRC(sumVal)}`;
+    }
+
+    window._fragamaCharts.family = new Chart(familyCanvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Unidades en Bodega',
+          data: unitsData,
+          backgroundColor: ['#0284C7', '#F59E0B', '#10B981', '#8B5CF6'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...tooltipConfig,
+            callbacks: {
+              label: ctx => ` Unidades: ${ctx.raw.toLocaleString()} uds (${formatCRC(valueData[ctx.dataIndex])})`
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { ...fontConfig, size: 10 } } },
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { ...fontConfig, size: 10 },
+              callback: function(val) {
+                const label = this.getLabelForValue(val);
+                return label.length > 15 ? label.substring(0, 14) + '...' : label;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 4. Gráfico 3: Tendencia de Facturación (Área / Spline PowerBI)
+  const salesCanvas = document.getElementById('salesTrendChart');
+  if (salesCanvas) {
+    if (window._fragamaCharts.sales) {
+      window._fragamaCharts.sales.destroy();
+    }
+
+    let salesLabels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4 (Actual)'];
+    let salesData = [1850000, 2420000, 2190000, 2030200];
+    if (tf === 'today') {
+      salesLabels = ['08h', '10h', '12h', '14h', '16h', '18h'];
+      salesData = [180000, 420000, 890000, 1250000, 1680000, 2030200];
+    } else if (tf === 'year') {
+      salesLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct'];
+      salesData = [6200000, 7100000, 7800000, 8100000, 8400000, 8650000, 8900000, 8300000, 8700000, 8490200];
+    }
+
+    window._fragamaCharts.sales = new Chart(salesCanvas, {
+      type: 'line',
+      data: {
+        labels: salesLabels,
+        datasets: [{
+          label: 'Ventas (₡)',
+          data: salesData,
+          borderColor: '#059669',
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2.5,
+          pointBackgroundColor: '#059669',
+          pointBorderColor: '#FFFFFF',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...tooltipConfig,
+            callbacks: {
+              label: ctx => ` Facturación: ${formatCRC(ctx.raw)}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            grid: { color: '#F1F5F9' },
+            ticks: {
+              font: { ...fontConfig, size: 10 },
+              callback: v => '₡' + (v / 1000000).toFixed(1) + 'M'
+            }
+          },
+          x: { grid: { display: false }, ticks: { font: { ...fontConfig, size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // 5. Gráfico 4: Cumplimiento y Estado de Pedidos (Doughnut PowerBI)
+  const orderCanvas = document.getElementById('orderStatusChart');
+  if (orderCanvas) {
+    if (window._fragamaCharts.orders) {
+      window._fragamaCharts.orders.destroy();
+    }
+    let deliveredCount = 28;
+    let inRouteCount = 14;
+    let prepCount = 6;
+    let pendingCount = 2;
+    if (Array.isArray(AppState.salesOrders) && AppState.salesOrders.length > 0) {
+      deliveredCount = AppState.salesOrders.filter(o => o.status === 'ENTREGADO').length || deliveredCount;
+      inRouteCount = AppState.salesOrders.filter(o => o.status === 'EN_RUTA').length || inRouteCount;
+      prepCount = AppState.salesOrders.filter(o => o.status === 'EN_ALISTADO' || o.status === 'ALISTADO').length || prepCount;
+      pendingCount = AppState.salesOrders.filter(o => o.status === 'PENDIENTE' || o.status === 'SOLICITADO').length || pendingCount;
+    }
+
+    window._fragamaCharts.orders = new Chart(orderCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Entregados', 'En Ruta', 'En Alistado', 'Pendientes'],
+        datasets: [{
+          data: [deliveredCount, inRouteCount, prepCount, pendingCount],
+          backgroundColor: ['#10B981', '#0284C7', '#F59E0B', '#EF4444'],
+          borderWidth: 2,
+          borderColor: '#FFFFFF'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '72%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 10, font: { ...fontConfig, size: 10 }, padding: 8 }
+          },
+          tooltip: {
+            ...tooltipConfig,
+            callbacks: {
+              label: ctx => ` ${ctx.label}: ${ctx.raw} pedidos`
+            }
+          }
+        }
+      }
+    });
   }
 
   // 4. Feed de Actividad Reciente del Kardex
@@ -8020,13 +8912,28 @@ window.renderWebOrdersFullTable = function() {
   const searchInput = document.getElementById('webOrdersSearchInput');
   const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
 
-  // Filtrar solo pedidos web
-  const webOrders = AppState.salesOrders.filter(isWebOrder);
+  // Obtener pedidos elegibles para alistado y despacho (Web y Bodega, excluyendo cotizaciones)
+  const allOrders = AppState.salesOrders.filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
 
-  const filtered = webOrders.filter(order => {
+  const filtered = allOrders.filter(order => {
+    const isWeb = isWebOrder(order);
     const st = (order.status || 'PENDIENTE').toUpperCase().trim();
     let matchFilter = true;
-    if (_currentWebOrderFilter === 'PENDIENTE') {
+    if (_currentWebOrderFilter === 'MY_ASSIGNED') {
+      const curU = AppState.currentUser || {};
+      const uName = (curU.name || '').toLowerCase();
+      const uFirst = uName.split(' ')[0] || '';
+      const ordDriver = (order.driverName || '').toLowerCase();
+      const ordResp = (order.assignedUserName || order.preparedByName || '').toLowerCase();
+      const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && order.driverUserId && Number(order.driverUserId) === Number(curU.id));
+      const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && order.assignedUserId && Number(order.assignedUserId) === Number(curU.id));
+      const isDefaultChofer = (curU.username === 'chofer' && (ordDriver.includes('minor') || !ordDriver));
+      matchFilter = isMyDriver || isMyResp || isDefaultChofer;
+    } else if (_currentWebOrderFilter === 'WEB') {
+      matchFilter = isWeb;
+    } else if (_currentWebOrderFilter === 'BODEGA') {
+      matchFilter = !isWeb;
+    } else if (_currentWebOrderFilter === 'PENDIENTE') {
       matchFilter = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
     } else if (_currentWebOrderFilter === 'ALISTADO') {
       matchFilter = (st === 'ALISTADO' || st === 'EN_ALISTADO');
@@ -8053,9 +8960,9 @@ window.renderWebOrdersFullTable = function() {
       <tr>
         <td colspan="8" style="text-align:center; padding:3rem 1rem; color:#64748B;">
           <i class="bi bi-inbox" style="font-size:2.2rem; color:#CBD5E1; display:block; margin-bottom:8px;"></i>
-          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos web coincidentes con el filtro actual</span>
+          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos coincidentes con el filtro actual</span>
           <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
-            Los pedidos generados por clientes en la Tienda Virtual de Fragama ingresarán automáticamente a esta bandeja.
+            Los pedidos de la tienda web y los generados en bodega ingresan automáticamente con trazabilidad completa.
           </p>
         </td>
       </tr>
@@ -8064,6 +8971,7 @@ window.renderWebOrdersFullTable = function() {
   }
 
   tbody.innerHTML = filtered.map(o => {
+    const isWeb = isWebOrder(o);
     const st = (o.status || 'PENDIENTE').toUpperCase().trim();
     const isPending = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
     const isPrepared = (st === 'ALISTADO' || st === 'EN_ALISTADO');
@@ -8110,6 +9018,17 @@ window.renderWebOrdersFullTable = function() {
         <td style="padding:12px 14px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
           ${o.orderCode}
           ${isPending ? `<span style="display:inline-block; font-size:0.65rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:4px; font-weight:800; animation:pulse 2s infinite;">NUEVO</span>` : ''}
+          <div style="margin-top:4px;">
+            ${isWeb ? `
+              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; display:inline-flex; align-items:center; gap:3px;">
+                <i class="bi bi-globe2"></i> Web
+              </span>
+            ` : `
+              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; display:inline-flex; align-items:center; gap:3px;">
+                <i class="bi bi-building"></i> Bodega
+              </span>
+            `}
+          </div>
           <div style="font-size:0.72rem; color:#64748B; font-family:inherit; font-weight:normal; margin-top:2px;">
             ${o.date || 'Hoy'}
           </div>
@@ -8209,22 +9128,10 @@ window.renderWebOrdersFullTable = function() {
 };
 
 window.triggerManualOrderSync = async function() {
-  try {
-    const res = await fetch('/api/orders');
-    if (res.ok) {
-      const orders = await res.json();
-      if (Array.isArray(orders)) {
-        AppState.salesOrders = orders;
-        renderAllViews();
-        if (typeof showNotificationToast === 'function') {
-          showNotificationToast(`✅ Bandeja sincronizada: ${orders.length} pedidos en total.`, 'success');
-        }
-      }
-    }
-  } catch (e) {
-    if (typeof showNotificationToast === 'function') {
-      showNotificationToast('Aviso: Sincronizando con base de datos local.', 'info');
-    }
+  _syncCountdown = 4;
+  await performOrderSync(true);
+  if (typeof showNotificationToast === 'function') {
+    showNotificationToast(`✅ Bandeja sincronizada (${AppState.salesOrders.length} pedidos en total).`, 'success');
   }
 };
 

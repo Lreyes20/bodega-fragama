@@ -15,8 +15,11 @@
   <!-- Bootstrap Icons CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
+  <!-- Chart.js CDN para Dashboards PowerBI -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <!-- Hoja de Estilos Corporativa Fragama (Estilo Plazas Vacantes) -->
-  <link rel="stylesheet" href="css/style.css?v=20261001_reports_pro_v7">
+  <link rel="stylesheet" href="css/style.css?v=20261015_powerbi_v7">
 </head>
 <body>
 
@@ -557,7 +560,7 @@
         </button>
 
         <!-- Alerta en Vivo de Pedidos Web para Alistado Inmediato -->
-        <button class="btn-fragama" id="topLiveWebOrdersBtn" onclick="switchOrderTabDirectly('history')" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; padding:6px 12px; font-size:0.8rem; display:none; align-items:center; gap:6px; border-radius:8px; font-weight:800; animation:pulse 2s infinite;" title="Ver Pedidos Web Pendientes de Alistado">
+        <button class="btn-fragama" id="topLiveWebOrdersBtn" onclick="switchViewDirectly('view-alistado-web')" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; padding:6px 12px; font-size:0.8rem; display:none; align-items:center; gap:6px; border-radius:8px; font-weight:800; animation:pulse 2s infinite;" title="Ver Pedidos Pendientes de Alistado">
           <span style="width:8px; height:8px; border-radius:50%; background:#10B981; display:inline-block; box-shadow:0 0 8px #10B981;"></span>
           <span id="topLiveWebOrdersText">🔔 <strong id="topLiveWebOrdersCount">0</strong> Pedidos Web</span>
         </button>
@@ -595,70 +598,249 @@
            ==================================================================== -->
       <section class="role-view active" id="view-admin-dashboard">
         
-        <!-- Hero Banner Ejecutivo con Accesos Rápidos -->
-        <div class="dashboard-hero">
-          <div>
-            <div class="hero-pill-badge">
-              <i class="bi bi-broadcast text-warning"></i> Bodega Central Taras, Cartago • Operaciones en Vivo
+        <!-- CONTROLES EJECUTIVOS DEL DASHBOARD (FILTROS TEMPORALES Y ACCIONES) -->
+        <div class="powerbi-control-header" style="margin-bottom:1.5rem;">
+          <div class="powerbi-header-info">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="powerbi-badge-pill">
+                <span class="live-pulse-dot"></span> Bodega Central Taras • Operaciones en Vivo
+              </span>
+              <span style="font-size:0.75rem; color:#64748B; font-weight:600;"><i class="bi bi-shield-check text-success"></i> Servidor ACID Activo</span>
             </div>
-            <h1 class="hero-title">Control Operativo de Inventario &amp; Despachos</h1>
-            <p class="hero-subtitle">
-              Gestión centralizada de formulaciones químicas, papelería institucional, lotes FEFO y preparación de pedidos para el Gran Área Metropolitana.
+            <h1 style="font-size:1.4rem; font-weight:800; color:#0F172A; margin:6px 0 0; letter-spacing:-0.02em;">
+              Tablero de Control &amp; Business Intelligence
+            </h1>
+            <p style="font-size:0.8rem; color:#64748B; margin:2px 0 0;">
+              Supervisión en tiempo real de inventarios, formulaciones químicas, papelería, lotes FEFO y preparación de pedidos.
             </p>
           </div>
-          <div class="hero-shortcuts">
-            <button class="btn-hero-action highlight" onclick="switchViewDirectly('view-customer-orders')">
-              <i class="bi bi-cart-plus-fill"></i> + Toma de Pedidos
+
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
+            <!-- Selector de Rango Temporal Estilo PowerBI -->
+            <div class="powerbi-time-filters" id="dashboardTimeFilters">
+              <button type="button" class="powerbi-filter-btn" onclick="setDashboardTimeframe('today', this)">Hoy</button>
+              <button type="button" class="powerbi-filter-btn" onclick="setDashboardTimeframe('7d', this)">7 Días</button>
+              <button type="button" class="powerbi-filter-btn active" onclick="setDashboardTimeframe('month', this)">Este Mes</button>
+              <button type="button" class="powerbi-filter-btn" onclick="setDashboardTimeframe('year', this)">Año Fiscal</button>
+            </div>
+
+            <!-- Botones de Acción Rápida -->
+            <button class="powerbi-btn-sm" onclick="renderDashboardAnalytics()" title="Recargar métricas">
+              <i class="bi bi-arrow-clockwise"></i> Recargar
             </button>
-            <button class="btn-hero-action" onclick="openMovementModal()">
+            <button class="powerbi-btn-sm" onclick="openMovementModal()">
               <i class="bi bi-arrow-left-right"></i> + Movimiento Kardex
             </button>
-            <button class="btn-hero-action" onclick="switchViewDirectly('view-suppliers-management')">
-              <i class="bi bi-building-up"></i> Proveedores
-            </button>
-            <button class="btn-hero-action" onclick="switchViewDirectly('view-excel-bulk-import')">
-              <i class="bi bi-file-earmark-spreadsheet"></i> Carga Excel
+            <button class="powerbi-btn-sm" onclick="switchViewDirectly('view-customer-orders')" style="background:#0F172A; color:#FFFFFF; border-color:#0F172A;">
+              <i class="bi bi-cart-plus-fill"></i> + Toma de Pedidos
             </button>
           </div>
         </div>
 
-        <!-- Fila de Tarjetas KPI con Gradientes e Indicadores -->
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-info-block">
-              <span class="kpi-title">Valor en Inventario</span>
-              <span class="kpi-value" id="kpiValorInventario">₡15,840,900</span>
-              <span class="kpi-trend positive"><i class="bi bi-arrow-up-right"></i> +5.4% valorizado</span>
+        <!-- GRILLA DE KPIS EJECUTIVOS DE ALTO IMPACTO -->
+        <div class="powerbi-kpi-grid" style="margin-bottom:1.5rem;">
+          
+          <div class="powerbi-kpi-card accent-navy">
+            <div class="powerbi-kpi-head">
+              <span class="powerbi-kpi-title">Valorización de Bodega</span>
+              <div class="powerbi-kpi-icon-pill pill-navy"><i class="bi bi-cash-stack"></i></div>
             </div>
-            <div class="kpi-icon-badge icon-navy"><i class="bi bi-cash-stack"></i></div>
+            <div class="powerbi-kpi-number" id="kpiValorInventario">₡104,543,480</div>
+            <div class="powerbi-kpi-footer">
+              <span class="powerbi-tag positive"><i class="bi bi-arrow-up-right"></i> +5.4%</span>
+              <span>220 SKUs valorizados</span>
+            </div>
           </div>
 
-          <div class="kpi-card kpi-amber">
-            <div class="kpi-info-block">
-              <span class="kpi-title">Ventas &amp; Pedidos del Mes</span>
-              <span class="kpi-value">₡8,490,200</span>
-              <span class="kpi-trend positive"><i class="bi bi-graph-up-arrow"></i> +12.4% vs mes ant.</span>
+          <div class="powerbi-kpi-card accent-emerald">
+            <div class="powerbi-kpi-head">
+              <span class="powerbi-kpi-title">Facturación Mensual</span>
+              <div class="powerbi-kpi-icon-pill pill-emerald"><i class="bi bi-graph-up-arrow"></i></div>
             </div>
-            <div class="kpi-icon-badge icon-amber"><i class="bi bi-cart-check"></i></div>
+            <div class="powerbi-kpi-number">₡8,490,200</div>
+            <div class="powerbi-kpi-footer">
+              <span class="powerbi-tag positive"><i class="bi bi-arrow-up-right"></i> +12.4%</span>
+              <span>84.9% de meta mensual</span>
+            </div>
           </div>
 
-          <div class="kpi-card kpi-success">
-            <div class="kpi-info-block">
-              <span class="kpi-title">Despachos GAM en Ruta</span>
-              <span class="kpi-value">14</span>
-              <span class="kpi-trend neutral"><i class="bi bi-truck"></i> 3 camiones activos</span>
+          <div class="powerbi-kpi-card accent-orange">
+            <div class="powerbi-kpi-head">
+              <span class="powerbi-kpi-title">Despachos GAM en Ruta</span>
+              <div class="powerbi-kpi-icon-pill pill-orange"><i class="bi bi-truck"></i></div>
             </div>
-            <div class="kpi-icon-badge icon-green"><i class="bi bi-send-check"></i></div>
+            <div class="powerbi-kpi-number">14</div>
+            <div class="powerbi-kpi-footer">
+              <span class="powerbi-tag neutral"><i class="bi bi-geo-alt"></i> 3 Camiones</span>
+              <span>Tiempo prom: 42 min</span>
+            </div>
           </div>
 
-          <div class="kpi-card" style="border-top-color:var(--status-danger);">
-            <div class="kpi-info-block">
-              <span class="kpi-title">Alertas de Stock Mínimo</span>
-              <span class="kpi-value" style="color:var(--status-danger)" id="kpiAlertCount">1</span>
-              <span class="kpi-trend negative"><i class="bi bi-exclamation-octagon"></i> Reabastecer urgente</span>
+          <div class="powerbi-kpi-card accent-rose">
+            <div class="powerbi-kpi-head">
+              <span class="powerbi-kpi-title">Alertas de Stock Crítico</span>
+              <div class="powerbi-kpi-icon-pill pill-rose"><i class="bi bi-exclamation-triangle-fill"></i></div>
             </div>
-            <div class="kpi-icon-badge icon-red"><i class="bi bi-box-arrow-in-down"></i></div>
+            <div class="powerbi-kpi-number" id="kpiAlertCount" style="color:#DC2626;">1</div>
+            <div class="powerbi-kpi-footer">
+              <span class="powerbi-tag negative"><i class="bi bi-bell"></i> Acción urgente</span>
+              <span>Lotes bajo punto de reorden</span>
+            </div>
           </div>
+
+        </div>
+
+        <!-- ====================================================================
+             POWER BI ANALYTICS SUITE: TABLERO GRÁFICO INTERACTIVO
+             ==================================================================== -->
+        <div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">
+          
+          <!-- FILA SUPERIOR: FLUJO KARDEX Y DISTRIBUCIÓN POR FAMILIA -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:1.25rem;">
+            
+            <!-- Gráfico 1: Flujo Semanal de Mercadería Kardex -->
+            <div class="powerbi-visual-card">
+              <div class="powerbi-card-header">
+                <div>
+                  <h3 class="powerbi-card-title">
+                    <i class="bi bi-bar-chart-line-fill text-primary"></i> Flujo Semanal de Mercadería (Kardex)
+                  </h3>
+                  <div class="powerbi-card-subtitle">Comparativa diaria de Entradas vs Salidas operativas (Uds)</div>
+                </div>
+                <div class="powerbi-card-actions">
+                  <span class="powerbi-tag neutral" id="kardexTotalBadge">Entradas: 445 • Salidas: 510</span>
+                  <a href="#" onclick="switchViewDirectly('view-bodega-kardex'); return false;" class="powerbi-btn-sm" title="Ir al Kardex">
+                    Ver Kardex &rarr;
+                  </a>
+                </div>
+              </div>
+              <div class="powerbi-chart-container" style="height:260px;">
+                <canvas id="weeklyChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Gráfico 2: Composición de Stock y Valor por Familia -->
+            <div class="powerbi-visual-card">
+              <div class="powerbi-card-header">
+                <div>
+                  <h3 class="powerbi-card-title">
+                    <i class="bi bi-pie-chart-fill text-warning"></i> Stock &amp; Valor por Familia
+                  </h3>
+                  <div class="powerbi-card-subtitle">Distribución porcentual del volumen y capital en bodega</div>
+                </div>
+                <div class="powerbi-card-actions">
+                  <button class="powerbi-btn-sm" onclick="switchViewDirectly('view-families-management')">
+                    Ver Zonas
+                  </button>
+                </div>
+              </div>
+              <div class="powerbi-chart-container" style="height:260px;">
+                <canvas id="familyChart"></canvas>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Total 4 Macrofamilias Segregadas</span>
+                <span id="dashboardFamilySummaryText" style="font-weight:700; color:#0F172A;">100% inventariado</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- FILA INFERIOR: TENDENCIA DE FACTURACIÓN Y SALUD DE PABELLONES -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:1.25rem;">
+            
+            <!-- Gráfico 3: Tendencia de Facturación & Proyección -->
+            <div class="powerbi-visual-card">
+              <div class="powerbi-card-header">
+                <div>
+                  <h3 class="powerbi-card-title">
+                    <i class="bi bi-graph-up-arrow text-success"></i> Tendencia de Facturación &amp; Demanda
+                  </h3>
+                  <div class="powerbi-card-subtitle">Evolución de ingresos semanales en Colones Costarricenses (₡)</div>
+                </div>
+                <div class="powerbi-card-actions">
+                  <span class="powerbi-tag positive"><i class="bi bi-arrow-up-right"></i> +12.4% vs mes ant.</span>
+                </div>
+              </div>
+              <div class="powerbi-chart-container" style="height:250px;">
+                <canvas id="salesTrendChart"></canvas>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Meta mensual: <strong>₡10,000,000</strong></span>
+                <span style="color:#059669; font-weight:700;">84.9% alcanzado</span>
+              </div>
+            </div>
+
+            <!-- Gráfico 4: Cumplimiento de Pedidos & Ocupación de Pabellones -->
+            <div class="powerbi-visual-card">
+              <div class="powerbi-card-header">
+                <div>
+                  <h3 class="powerbi-card-title">
+                    <i class="bi bi-check2-circle text-info"></i> Estado de Pedidos &amp; Despacho
+                  </h3>
+                  <div class="powerbi-card-subtitle">Efectividad operativa y alistado en tiempo real</div>
+                </div>
+                <div class="powerbi-card-actions">
+                  <span class="powerbi-tag" style="background:#EDE9FE; color:#7C3AED; font-weight:700;">Efectividad 96%</span>
+                </div>
+              </div>
+              
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center;">
+                <div class="powerbi-chart-container" style="height:210px;">
+                  <canvas id="orderStatusChart"></canvas>
+                </div>
+                
+                <!-- Indicadores de Capacidad por Pabellón de Bodega -->
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:0.75rem;">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                      <span style="font-weight:700; color:#0F172A;"><i class="bi bi-droplet-half" style="color:#0284C7;"></i> Pabellón A (Químicos)</span>
+                      <span style="font-weight:700; color:#0284C7;">78%</span>
+                    </div>
+                    <div style="height:6px; background:#E2E8F0; border-radius:4px; overflow:hidden;">
+                      <div style="width:78%; height:100%; background:#0284C7; border-radius:4px;"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                      <span style="font-weight:700; color:#0F172A;"><i class="bi bi-file-earmark-text" style="color:#F59E0B;"></i> Pabellón B (Papel/Desechables)</span>
+                      <span style="font-weight:700; color:#F59E0B;">64%</span>
+                    </div>
+                    <div style="height:6px; background:#E2E8F0; border-radius:4px; overflow:hidden;">
+                      <div style="width:64%; height:100%; background:#F59E0B; border-radius:4px;"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                      <span style="font-weight:700; color:#0F172A;"><i class="bi bi-box-seam" style="color:#10B981;"></i> Pabellón C (Bolsas/Plásticos)</span>
+                      <span style="font-weight:700; color:#10B981;">88%</span>
+                    </div>
+                    <div style="height:6px; background:#E2E8F0; border-radius:4px; overflow:hidden;">
+                      <div style="width:88%; height:100%; background:#10B981; border-radius:4px;"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                      <span style="font-weight:700; color:#0F172A;"><i class="bi bi-tools" style="color:#8B5CF6;"></i> Pabellón D (Útiles/EPP)</span>
+                      <span style="font-weight:700; color:#8B5CF6;">42%</span>
+                    </div>
+                    <div style="height:6px; background:#E2E8F0; border-radius:4px; overflow:hidden;">
+                      <div style="width:42%; height:100%; background:#8B5CF6; border-radius:4px;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#64748B; margin-top:8px; border-top:1px dashed #E2E8F0; padding-top:6px;">
+                <span>Tiempo prom. alisto: <strong>18 min</strong></span>
+                <a href="#" onclick="switchViewDirectly('view-customer-orders'); return false;" style="color:var(--fragama-blue-primary); text-decoration:none; font-weight:700;">Ver Pedidos &rarr;</a>
+              </div>
+            </div>
+
+          </div>
+
         </div>
 
         <!-- PANEL DE ALISTADO INMEDIATO DE PEDIDOS WEB (ENTRANTES EN TIEMPO REAL) -->
@@ -691,55 +873,6 @@
               </tbody>
             </table>
           </div>
-        </div>
-
-        <!-- Gráficos Visuales: Distribución por Familia & Flujo Semanal de Kardex -->
-        <div class="dashboard-analytics-grid">
-          
-          <!-- Gráfico 1: Distribución por Familia -->
-          <div class="chart-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <div>
-                <h3 style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">
-                  <i class="bi bi-pie-chart-fill text-primary"></i> Distribución de Stock por Familias
-                </h3>
-                <span style="font-size:0.75rem; color:#64748B;">Participación y volumen físico en bodega</span>
-              </div>
-              <button class="btn-fragama btn-outline-fragama" style="padding:4px 8px; font-size:0.75rem;" onclick="switchViewDirectly('view-families-management')">
-                Ver Zonas
-              </button>
-            </div>
-
-            <div class="family-progress-bar-container" id="dashboardFamilyBars">
-              <!-- Render dinámico vía JS -->
-            </div>
-          </div>
-
-          <!-- Gráfico 2: Flujo Semanal de Kardex (Entradas vs Salidas) -->
-          <div class="chart-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <div>
-                <h3 style="font-size:0.95rem; font-weight:800; color:#0B192C; margin:0;">
-                  <i class="bi bi-bar-chart-line-fill text-primary"></i> Flujo Semanal de Mercadería (Kardex)
-                </h3>
-                <span style="font-size:0.75rem; color:#64748B;">Unidades movilizadas de Lunes a Sábado</span>
-              </div>
-              <div style="display:flex; gap:10px; font-size:0.75rem;">
-                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#10B981; border-radius:2px; display:inline-block;"></span> Entradas</span>
-                <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#0284C7; border-radius:2px; display:inline-block;"></span> Salidas</span>
-              </div>
-            </div>
-
-            <div class="weekly-kardex-chart" id="dashboardWeeklyChart">
-              <!-- Render de barras dinámicas con tooltips -->
-            </div>
-
-            <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:#64748B; padding-top:4px;">
-              <span>Rotación semanal promedio: <strong>84.5%</strong></span>
-              <a href="#" onclick="switchViewDirectly('view-bodega-kardex'); return false;" style="color:var(--fragama-blue-primary); text-decoration:none; font-weight:700;">Ver Kardex completo &rarr;</a>
-            </div>
-          </div>
-
         </div>
 
         <!-- Fila Secundaria: Alertas Operativas & Feed de Actividad Reciente -->
@@ -788,33 +921,100 @@
         </div>
 
         <!-- Tabla Maestra de Existencias Físicas en Bodega -->
-        <div class="content-card">
-          <div class="card-header-custom" style="flex-wrap:wrap; gap:10px;">
-            <div class="card-header-title">
-              <i class="bi bi-boxes text-primary"></i> Existencias Físicas en Bodega Central (Taras, Cartago)
+        <!-- MONITOR EJECUTIVO DE EXISTENCIAS Y SALUD DE INVENTARIO WMS -->
+        <div class="content-card" style="border-radius:12px; border:1px solid #E2E8F0; box-shadow:0 4px 16px rgba(11,25,44,0.05); overflow:hidden;">
+          
+          <!-- Encabezado Principal con Controles de Búsqueda y Acciones Rápidas -->
+          <div class="card-header-custom" style="padding:1rem 1.25rem; border-bottom:1px solid #E2E8F0; background:#FFFFFF; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
+            <div>
+              <div class="card-header-title" style="display:flex; align-items:center; gap:8px; font-size:1.05rem;">
+                <i class="bi bi-boxes" style="color:var(--accent-orange); font-size:1.2rem;"></i> 
+                <span>Existencias y Salud de Inventario WMS</span>
+                <span id="dashboardStockTotalBadge" style="font-size:0.75rem; font-weight:800; background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:999px; border:1px solid #E2E8F0;">
+                  220 Referencias
+                </span>
+              </div>
+              <div style="font-size:0.78rem; color:#64748B; margin-top:2px;">
+                Bodega Central Taras, Cartago &bull; Monitoreo y rotación en tiempo real
+              </div>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <select id="dashboardFamilyFilter" style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; font-family:inherit;">
+
+            <!-- Controles de Búsqueda, Familia y Botones -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <div style="position:relative;">
+                <i class="bi bi-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94A3B8; font-size:0.8rem;"></i>
+                <input type="text" id="dashboardProductSearch" placeholder="Buscar por SKU o producto..." style="border:1px solid #CBD5E1; border-radius:8px; padding:6px 12px 6px 30px; font-size:0.82rem; width:190px; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='#0284C7'" onblur="this.style.borderColor='#CBD5E1'">
+              </div>
+
+              <select id="dashboardFamilyFilter" style="border:1px solid #CBD5E1; border-radius:8px; padding:6px 10px; font-size:0.82rem; font-family:inherit; background:#FFF; cursor:pointer;">
                 <option value="ALL">Todas las Familias</option>
               </select>
-              <input type="text" id="dashboardProductSearch" placeholder="Buscar por SKU o nombre..." style="border:1px solid #CBD5E1; border-radius:6px; padding:6px 10px; font-size:0.82rem; width:180px;">
-              <button class="btn-fragama btn-primary-fragama" id="btnNewMovement" style="padding:6px 12px; font-size:0.82rem;">
+
+              <button class="btn-fragama btn-primary-fragama" id="btnNewMovement" style="padding:6px 12px; font-size:0.82rem; border-radius:8px;">
                 <i class="bi bi-plus-circle"></i> + Asiento Kardex
+              </button>
+
+              <button class="btn-fragama btn-outline-fragama" onclick="switchViewDirectly('view-product-maintenance')" style="padding:6px 12px; font-size:0.82rem; border-radius:8px;" title="Ver Catálogo Completo de 220 Productos">
+                <i class="bi bi-arrow-up-right-square"></i> Ver Catálogo Completo
               </button>
             </div>
           </div>
+
+          <!-- Barra de Filtros Rápidos por Salud de Stock & Selector de Vista -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:8px 1.25rem; background:#F8FAFC; border-bottom:1px solid #E2E8F0; font-size:0.82rem;">
+            
+            <!-- Pestañas de Salud -->
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+              <span style="font-size:0.75rem; font-weight:700; color:#64748B; margin-right:4px;">ESTADO:</span>
+              <button type="button" class="dashboard-stock-tab active" id="stockTabAll" onclick="setDashboardStockFilter('ALL', this)" style="border:none; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#0B192C; color:#FFF; transition:all 0.2s;">
+                Todos (<span id="stockCountAll">220</span>)
+              </button>
+              <button type="button" class="dashboard-stock-tab" id="stockTabLow" onclick="setDashboardStockFilter('LOW', this)" style="border:1px solid #FECACA; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#FEF2F2; color:#DC2626; transition:all 0.2s;">
+                <i class="bi bi-exclamation-triangle-fill"></i> Bajo Stock (<span id="stockCountLow">0</span>)
+              </button>
+              <button type="button" class="dashboard-stock-tab" id="stockTabMod" onclick="setDashboardStockFilter('MODERATE', this)" style="border:1px solid #FED7AA; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#FFF7ED; color:#C2410C; transition:all 0.2s;">
+                <i class="bi bi-shield-check"></i> Stock Moderado (<span id="stockCountMod">0</span>)
+              </button>
+              <button type="button" class="dashboard-stock-tab" id="stockTabOpt" onclick="setDashboardStockFilter('OPTIMAL', this)" style="border:1px solid #BBF7D0; padding:4px 10px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; background:#F0FDF4; color:#15803D; transition:all 0.2s;">
+                <i class="bi bi-check-circle-fill"></i> Óptimo (<span id="stockCountOpt">0</span>)
+              </button>
+            </div>
+
+            <!-- Conmutador de Vista (Tabla vs Cuadrícula) y Selector de Paginación -->
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="display:flex; align-items:center; gap:4px; font-size:0.75rem; color:#64748B;">
+                <span>Mostrar:</span>
+                <select id="dashboardStockPageSize" onchange="setDashboardStockPageSize(this.value)" style="border:1px solid #CBD5E1; border-radius:4px; padding:2px 6px; font-size:0.75rem; background:#FFF;">
+                  <option value="6" selected>6 / pág</option>
+                  <option value="12">12 / pág</option>
+                  <option value="24">24 / pág</option>
+                </select>
+              </div>
+
+              <div style="display:inline-flex; background:#E2E8F0; border-radius:6px; padding:2px;">
+                <button type="button" id="btnStockViewTable" onclick="setDashboardStockView('table')" title="Vista Tabla Compacta" style="border:none; background:#FFF; color:#0B192C; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.8rem; box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <i class="bi bi-table"></i>
+                </button>
+                <button type="button" id="btnStockViewGrid" onclick="setDashboardStockView('grid')" title="Vista Tarjetas WMS" style="border:none; background:transparent; color:#64748B; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                  <i class="bi bi-grid-fill"></i>
+                </button>
+              </div>
+            </div>
+
+          </div>
           
-          <div style="overflow-x:auto;">
-            <table class="custom-table">
+          <!-- Vista 1: Tabla Compacta (Por Defecto) -->
+          <div id="dashboardStockTableView" style="overflow-x:auto;">
+            <table class="custom-table" style="margin:0; width:100%;">
               <thead>
                 <tr>
-                  <th>SKU</th>
+                  <th style="width:110px;">SKU</th>
                   <th>Producto / EAN</th>
-                  <th>Familia &amp; Subfamilia</th>
-                  <th>Ubicación Física</th>
+                  <th>Familia WMS</th>
+                  <th>Ubicación</th>
                   <th>Precio Venta</th>
-                  <th>Stock Actual</th>
-                  <th>Acciones</th>
+                  <th style="min-width:180px;">Nivel y Salud de Stock</th>
+                  <th style="width:140px; text-align:center;">Acciones</th>
                 </tr>
               </thead>
               <tbody id="productsTableBody">
@@ -822,6 +1022,30 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Vista 2: Cuadrícula Visual de Tarjetas WMS (Opcional) -->
+          <div id="dashboardStockGridView" style="display:none; padding:1.25rem; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
+            <!-- Render dinámico vía JS -->
+          </div>
+
+          <!-- Barra de Paginación y Resumen Inferior -->
+          <div id="dashboardStockPagination" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:0.75rem 1.25rem; background:#F8FAFC; border-top:1px solid #E2E8F0; font-size:0.8rem; color:#64748B;">
+            <div id="dashboardStockShowingText">
+              Mostrando 1 - 6 de 220 existencias registradas
+            </div>
+            
+            <div id="dashboardStockPageControls" style="display:flex; align-items:center; gap:4px;">
+              <!-- Botones de página inyectados por JS -->
+            </div>
+
+            <div>
+              <a href="javascript:void(0)" onclick="switchViewDirectly('view-product-maintenance')" style="color:var(--accent-orange); font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                <span>Explorar Catálogo Completo (220)</span>
+                <i class="bi bi-arrow-right"></i>
+              </a>
+            </div>
+          </div>
+
         </div>
 
       </section>
@@ -1911,21 +2135,21 @@
             <div>
               <div class="card-header-title" style="color:#065F46; font-size:1.05rem; font-weight:800; display:flex; align-items:center; gap:8px;">
                 <i class="bi bi-box-seam-fill" style="color:#10B981; font-size:1.3rem;"></i> 
-                <span>Bandeja Central de Alistado &amp; Despacho de Pedidos Web</span>
+                <span>Bandeja Central de Alistado &amp; Despacho de Pedidos (Web &amp; Bodega)</span>
                 <span class="badge-status badge-confirmed" id="badgeWebOrdersTotalBadge" style="font-size:0.78rem; font-weight:800;">0 pedidos</span>
               </div>
               <p style="margin:4px 0 0 0; font-size:0.8rem; color:#047857;">
-                Pedidos entrantes desde la Tienda en Línea Fragama en tiempo real. Asigne colaboradores, gestione el picking y rebaje el Kardex al entregar.
+                Bandeja unificada de pedidos entrantes de la Tienda Virtual y generados directamente en Bodega. Asigne colaboradores, gestione el picking y rebaje el Kardex al entregar.
               </p>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
               <div style="display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; background:#ECFDF5; border:1px solid #10B981; color:#065F46; padding:5px 12px; border-radius:20px; font-weight:700;">
                 <span style="display:inline-block; width:8px; height:8px; background:#10B981; border-radius:50%; box-shadow:0 0 8px #10B981; animation:pulse 2s infinite;"></span>
-                <span>En Vivo (Sync 3s)</span>
+                <span>En Vivo (Sync <strong id="syncCountdownSec">4s</strong>)</span>
                 <span id="liveSyncTimestamp" style="color:#047857; font-family:'JetBrains Mono',monospace;"></span>
               </div>
-              <button class="btn-fragama btn-outline-fragama" onclick="triggerManualOrderSync()" style="padding:6px 12px; font-size:0.8rem; background:#FFF; border-color:#10B981; color:#065F46; font-weight:700;" title="Sincronizar pedidos con la nube">
-                <i class="bi bi-arrow-clockwise"></i> Refrescar Bandeja
+              <button class="btn-fragama btn-outline-fragama" id="btnManualSyncOrders" onclick="triggerManualOrderSync()" style="padding:6px 12px; font-size:0.8rem; background:#FFF; border-color:#10B981; color:#065F46; font-weight:700;" title="Sincronizar pedidos con la nube">
+                <i class="bi bi-arrow-clockwise" id="iconManualSync"></i> Refrescar Bandeja
               </button>
               <a href="/tienda.html" target="_blank" class="btn-fragama btn-primary-fragama" style="padding:6px 12px; font-size:0.8rem; background:#10B981; border-color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
                 <i class="bi bi-shop"></i> Abrir Tienda Web
@@ -1963,7 +2187,16 @@
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div style="display:flex; gap:6px; flex-wrap:wrap;" id="webOrdersFilterGroup">
               <button class="btn-fragama btn-primary-fragama web-filter-btn active" data-filter="ALL" onclick="filterWebOrdersView('ALL', this)" style="padding:5px 12px; font-size:0.8rem;">
-                Todos los Pedidos Web
+                Todos los Pedidos
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" id="btnFilterMyAssigned" data-filter="MY_ASSIGNED" onclick="filterWebOrdersView('MY_ASSIGNED', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#8B5CF6; color:#6D28D9; font-weight:700;">
+                🎯 Asignados a Mí
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="WEB" onclick="filterWebOrdersView('WEB', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#10B981; color:#065F46;">
+                🌐 Solo Web
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="BODEGA" onclick="filterWebOrdersView('BODEGA', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#6366F1; color:#4338CA;">
+                🏢 Solo Bodega
               </button>
               <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="PENDIENTE" onclick="filterWebOrdersView('PENDIENTE', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#F59E0B; color:#B45309;">
                 ⏳ Pendientes de Alisto
@@ -2561,21 +2794,39 @@
       <section class="role-view" id="view-chofer-mobile">
         <div class="driver-mobile-container">
           
-          <!-- Banner Principal de Distribución Nacional -->
-          <div class="driver-banner">
+          <!-- Barra de Control y Auditoría para Administradores (Visibilidad Total) -->
+          <div id="adminDriverControlBar" style="display:none; background:#0F172A; color:#FFF; border-radius:12px; padding:12px 16px; margin-bottom:14px; border:1px solid #334155; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:var(--fragama-orange-main); color:#FFF; font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:6px; letter-spacing:0.5px;">
+                  <i class="bi bi-shield-lock-fill"></i> AUDITORÍA ADMINISTRATIVA GLOBAL
+                </span>
+                <span style="font-size:0.8rem; color:#94A3B8;">Acceso maestro a todas las unidades y despachos del país</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label for="adminDriverFilterSelect" style="font-size:0.8rem; color:#CBD5E1; margin:0; font-weight:700;"><i class="bi bi-person-badge-fill text-warning"></i> Ver Chofer:</label>
+                <select id="adminDriverFilterSelect" onchange="onAdminDriverFilterChange(this.value)" style="background:#1E293B; color:#F8FAFC; border:1px solid #475569; border-radius:8px; padding:6px 12px; font-size:0.82rem; font-weight:700; cursor:pointer;">
+                  <option value="ALL">🌐 Todos los Choferes (Flota Consolidada)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banner Principal de Distribución Nacional (Dinámico según Chofer/Admin) -->
+          <div class="driver-banner" id="driverBannerContainer">
             <div class="driver-banner-info">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <span class="badge-status badge-confirmed" style="font-size:0.7rem; padding:2px 8px;">
+                <span class="badge-status badge-confirmed" style="font-size:0.7rem; padding:2px 8px;" id="driverBadgeFleet">
                   <i class="bi bi-shield-check"></i> FLOTA ACTIVA
                 </span>
-                <span style="font-size:0.75rem; color:#94A3B8;">Cobertura: Todo Costa Rica</span>
+                <span style="font-size:0.75rem; color:#94A3B8;" id="driverScopeBadge">Cobertura: Todo Costa Rica</span>
               </div>
-              <h3 style="margin:0 0 4px 0; font-size:1.25rem;">Minor Coto (Chofer Logístico)</h3>
-              <p style="margin:0; font-size:0.84rem; color:#E2E8F0;">
+              <h3 style="margin:0 0 4px 0; font-size:1.25rem;" id="driverLoggedUserName">Minor Coto (Chofer Logístico)</h3>
+              <p style="margin:0; font-size:0.84rem; color:#E2E8F0;" id="driverVehicleInfo">
                 <i class="bi bi-truck-front-fill text-warning"></i> Camión Isuzu Forward CL-294012 &bull; Bodega Central Taras
               </p>
             </div>
-            <div class="driver-badge-truck">
+            <div class="driver-badge-truck" id="driverTruckBadge">
               <i class="bi bi-geo-alt-fill text-warning"></i> 7 Provincias C.R.
             </div>
           </div>
@@ -3703,11 +3954,16 @@
         <!-- Inyectado dinámicamente con encabezado corporativo y logo oficial -->
       </div>
 
-      <div class="modal-footer-custom">
+      <div class="modal-footer-custom" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <button class="btn-fragama btn-outline-fragama" id="dismissOrderPrintBtn">Cerrar</button>
-        <button class="btn-fragama btn-primary-fragama" onclick="window.print()">
-          <i class="bi bi-printer"></i> Imprimir Comprobante Oficial
-        </button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-fragama" id="btnShareOrderWhatsApp" style="background:#25D366; color:#FFF; font-weight:700; border:none; display:inline-flex; align-items:center; gap:6px;" onclick="shareCurrentOrderWhatsApp()">
+            <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+          </button>
+          <button class="btn-fragama btn-primary-fragama" onclick="window.print()" style="display:inline-flex; align-items:center; gap:6px;">
+            <i class="bi bi-printer"></i> Imprimir Comprobante / Factura
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -4588,7 +4844,7 @@
   <script src="js/JsBarcode.all.min.js"></script>
   <script src="js/qrcode.min.js"></script>
   <script src="js/html5-qrcode.min.js"></script>
-  <script src="js/catalog-data.js?v=20261001_4"></script>
-  <script src="js/app.js?v=20261012_syntax_fixed_v2"></script>
+  <script src="js/catalog-data.js?v=20261015_powerbi_v7"></script>
+  <script src="js/app.js?v=20261015_powerbi_v7"></script>
 </body>
 </html>

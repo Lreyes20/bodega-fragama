@@ -4431,38 +4431,73 @@ function setupDriverActions() {
       const notes = document.getElementById('driverNotesInput')?.value || '';
 
       if (window.currentSelectedDispatchId) {
-        const item = AppState.dispatches.find(d => d.id === window.currentSelectedDispatchId);
+        let item = AppState.dispatches.find(d => String(d.id) === String(window.currentSelectedDispatchId));
         if (item) {
           item.status = selectedStatus;
           item.observation = notes;
+        }
 
-          // Si el cliente rechazó la mercancía, reingresar automáticamente al stock central y asentar en Kardex
-          if (selectedStatus === 'Rechazado') {
-            const returnedProduct = AppState.products[0];
-            const restockQty = 5;
-            returnedProduct.stock += restockQty;
+        // Si el cliente rechazó la mercancía, reingresar automáticamente al stock central y asentar en Kardex
+        if (selectedStatus === 'Rechazado') {
+          const returnedProduct = AppState.products[0];
+          const restockQty = 5;
+          if (returnedProduct) returnedProduct.stock += restockQty;
 
-            const nextId = AppState.kardexMovements.length + 101;
-            AppState.kardexMovements.unshift({
-              id: nextId,
-              code: `DEV-20260929-${String(nextId).padStart(4, '0')}`,
-              product: returnedProduct.name,
-              batch: returnedProduct.batchNumber,
-              type: 'Devolución / Rechazo en Ruta',
-              sign: 1,
-              qty: restockQty,
-              prev: returnedProduct.stock - restockQty,
-              final: returnedProduct.stock,
-              cost: returnedProduct.costPrice,
-              doc: item.code,
-              user: 'Minor Coto (Chofer)'
-            });
-            renderAllViews();
+          const nextId = AppState.kardexMovements.length + 101;
+          AppState.kardexMovements.unshift({
+            id: nextId,
+            code: `DEV-20260929-${String(nextId).padStart(4, '0')}`,
+            product: returnedProduct ? returnedProduct.name : 'Mercadería de Pedido',
+            batch: returnedProduct ? returnedProduct.batchNumber : 'LOT-DEV-01',
+            type: 'Devolución / Rechazo en Ruta',
+            sign: 1,
+            qty: restockQty,
+            prev: (returnedProduct ? returnedProduct.stock : 0) - restockQty,
+            final: returnedProduct ? returnedProduct.stock : restockQty,
+            cost: returnedProduct ? returnedProduct.costPrice : 1500,
+            doc: item ? item.code : 'DSP-DEV',
+            user: AppState.currentUser?.name || 'Chofer'
+          });
+          renderAllViews();
+        }
+
+        // Trazabilidad Total: Sincronizar con el pedido central en AppState.salesOrders y la Base de Datos
+        let orderCode = item ? item.orderCode : null;
+        if (!orderCode && String(window.currentSelectedDispatchId).startsWith('ord_')) {
+          const ordId = String(window.currentSelectedDispatchId).replace('ord_', '');
+          const so = AppState.salesOrders.find(o => String(o.id) === ordId);
+          if (so) orderCode = so.orderCode || so.id;
+        }
+
+        if (orderCode) {
+          const targetStatus = (selectedStatus === 'Entregado') ? 'ENTREGADO' : (selectedStatus === 'Rechazado' ? 'NO_ENTREGADO' : 'EN_RUTA');
+          const ord = AppState.salesOrders.find(o => o.orderCode === orderCode || String(o.id) === String(orderCode));
+          if (ord) {
+            ord.status = targetStatus;
+            ord.deliveredAt = new Date().toISOString();
+            if (targetStatus === 'ENTREGADO') ord.stockDeducted = 1;
           }
 
-          renderDriverDispatches();
-          showNotificationToast(`Entrega ${item.code} en ${item.customer} marcada como "${selectedStatus}".`, 'success');
+          // Enviar confirmación al servidor backend para persistencia en SQL Server
+          fetch(`/api/orders/${encodeURIComponent(orderCode)}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: targetStatus,
+              responsibleUserName: AppState.currentUser?.name || 'Chofer Logístico',
+              responsibleUserId: AppState.currentUser?.id || 5,
+              notes: notes ? `Entrega en ruta móvil: ${notes}` : `Completado y firmado por el cliente en ruta de entrega.`
+            })
+          }).then(res => res.json()).then(resData => {
+            if (typeof fetchProducts === 'function' && targetStatus === 'ENTREGADO') {
+              fetchProducts();
+            }
+          }).catch(err => console.warn("Sync status err:", err));
         }
+
+        renderDriverDispatches();
+        if (typeof renderWebOrdersView === 'function') renderWebOrdersView();
+        showNotificationToast(`Entrega ${item ? item.code : ''} marcada como "${selectedStatus}". Trazabilidad actualizada.`, 'success');
       }
       modal.classList.remove('active');
     });
@@ -4743,8 +4778,8 @@ function executePosCheckout() {
       <div style="text-align:center; border-bottom:2px solid #0B192C; padding-bottom:12px; margin-bottom:12px;">
         <img src="img/logo.svg" style="height:36px; margin-bottom:6px;">
         <div style="font-weight:900; font-size:1.1rem; color:#0B192C;">DISTRIBUIDORA FRAGAMA</div>
-        <small style="color:#64748B;">Cédula Jurídica: 3-101-789012<br>Taras, San Nicolás, Cartago, Costa Rica<br>Tel: +506 2551-0000</small>
-        <div style="font-size:0.85rem; font-weight:700; margin-top:6px; color:#0284C7;">FACTURA ELECTRÓNICA DE VENTA</div>
+        <small style="color:#64748B;">Cédula Jurídica: 3-101-778899 • Actividad: 466901<br>Taras, San Nicolás, Cartago, Costa Rica<br>WhatsApp & Tel: +506 6267-7053 / 2551-0000</small>
+        <div style="font-size:0.85rem; font-weight:700; margin-top:6px; color:#0284C7;">FACTURA ELECTRÓNICA DE VENTA (v4.3 DGT)</div>
         <div style="font-family:'JetBrains Mono',monospace; font-size:0.9rem; font-weight:800;">${invoiceNumber}</div>
         <div style="font-size:0.75rem; color:#64748B;">Fecha: ${dateFormatted}</div>
       </div>
@@ -5635,10 +5670,76 @@ async function saveOrder(isQuote = false) {
   );
 }
 
+function generateHaciendaClave50(order) {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  const country = '506';
+  const cedulaEmisor = '0003101778899'; // 12 dígitos oficiales Hacienda
+  const numRaw = String(order.orderCode || order.id || '101').replace(/\D/g, '');
+  const consecutivo = '0010000101' + (numRaw ? numRaw.slice(-10).padStart(10, '0') : '0000000101');
+  const situacion = '1'; // 1 = Normal
+  let hash = 0;
+  const str = String(order.orderCode || 'FRAGAMA');
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const secCode = String(Math.abs(hash % 90000000) + 10000000);
+  return `${country}${day}${month}${year}${cedulaEmisor}${consecutivo}${situacion}${secCode}`;
+}
+
+window.copyClave50Digits = function(clave) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(clave).then(() => {
+      showNotificationToast('📋 Clave numérica de 50 dígitos copiada al portapapeles.', 'success');
+    }).catch(() => {
+      prompt('Copie la clave numérica de 50 dígitos:', clave);
+    });
+  } else {
+    prompt('Copie la clave numérica de 50 dígitos:', clave);
+  }
+};
+
+window.shareCurrentOrderWhatsApp = function() {
+  const order = window._currentPrintingOrder;
+  if (!order) {
+    showNotificationToast('No hay documento activo para compartir.', 'warning');
+    return;
+  }
+  const cleanPhone = String(order.customerPhone || '').replace(/\D/g, '');
+  const isQuote = (order.docType === 'COTIZACION');
+  const docTitle = isQuote ? 'PROFORMA / COTIZACIÓN' : 'FACTURA ELECTRÓNICA DE VENTA';
+  const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(order) : 'Varios bultos';
+  
+  let msg = `*DISTRIBUIDORA FRAGAMA S.A.*\n` +
+            `*Comprobante Oficial de ${docTitle}*\n\n` +
+            `📄 *N° Documento:* ${order.orderCode}\n` +
+            `👤 *Cliente:* ${order.customerName || 'Cliente'}\n` +
+            `📍 *Destino:* ${order.customerProvince || 'Cartago'}, ${order.customerCanton || 'Central'}\n` +
+            `📦 *Bultos:* ${bultos}\n` +
+            `💰 *Monto Total:* ${formatCRC(order.total)}\n` +
+            `🚚 *Estado:* ${order.status || 'Alistado'}\n` +
+            `🏢 *Cédula Jurídica:* 3-101-778899\n` +
+            `⚙️ *Actividad:* 466901 Venta químicos y limpieza\n\n` +
+            `_Consulte o valide sus pedidos en línea con Distribuidora Fragama S.A._\n` +
+            `WhatsApp Bodega & Ventas: +506 6267-7053`;
+
+  const encodedMsg = encodeURIComponent(msg);
+  const waUrl = cleanPhone.length >= 8 
+    ? `https://api.whatsapp.com/send?phone=506${cleanPhone.slice(-8)}&text=${encodedMsg}`
+    : `https://api.whatsapp.com/send?text=${encodedMsg}`;
+
+  window.open(waUrl, '_blank');
+};
+
 function openOrderPrintModal(order) {
   const modal = document.getElementById('orderPrintModal');
   const body = document.getElementById('orderPrintModalBody');
   if (!modal || !body || !order) return;
+
+  window._currentPrintingOrder = order;
 
   const isQuote = (order.docType === 'COTIZACION');
   const printItems = Array.isArray(order.items) ? order.items : [];
@@ -5647,28 +5748,45 @@ function openOrderPrintModal(order) {
   const descTot = (order.descuentoTotal !== undefined && order.descuentoTotal !== null) ? Number(order.descuentoTotal) : 0;
   const subNeto = (order.subtotalNeto !== undefined && order.subtotalNeto !== null) ? Number(order.subtotalNeto) : (subBruto - descTot);
   const ivaAmount = (order.iva !== undefined && order.iva !== null) ? Number(order.iva) : (tot - subNeto);
+  const clave50 = generateHaciendaClave50(order);
+  const formattedClave = `${clave50.slice(0,3)} ${clave50.slice(3,9)} ${clave50.slice(9,21)} ${clave50.slice(21,41)} ${clave50.slice(41,42)} ${clave50.slice(42)}`;
 
   body.innerHTML = `
     <!-- ENCABEZADO CORPORATIVO OFICIAL FRAGAMA CON LOGO DE FACEBOOK -->
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #0284C7; padding-bottom:14px; margin-bottom:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #0284C7; padding-bottom:14px; margin-bottom:14px;">
       <div style="display:flex; align-items:center; gap:16px;">
         <img src="img/logo_oficial.png" alt="Distribuidora Fragama" style="max-height:64px; object-fit:contain; border-radius:6px;">
         <div>
           <h2 style="margin:0; font-size:1.25rem; font-weight:900; color:#0B192C; letter-spacing:0.5px;">DISTRIBUIDORA FRAGAMA S.A.</h2>
-          <div style="font-size:0.75rem; color:#475569; line-height:1.35;">
-            Cédula Jurídica: 3-101-789012 • Cartago, Costa Rica<br>
-            WhatsApp & Teléfono: +506 6267-7053<br>
-            Correo: ventas@distribuidorafragama.com • fb.com/dist.fragama
+          <div style="font-size:0.76rem; color:#475569; line-height:1.35;">
+            <strong>Cédula Jurídica:</strong> 3-101-778899 &bull; <strong>Actividad DGT:</strong> 466901<br>
+            Bodega Central Taras, 300m Oeste Iglesia, Cartago, Costa Rica<br>
+            <strong>WhatsApp &amp; Tel:</strong> +506 6267-7053 / 2551-0000 &bull; <strong>Correo:</strong> facturacion@fragama.cr
           </div>
         </div>
       </div>
       <div style="text-align:right;">
         <span style="display:inline-block; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:800; background:${isQuote ? '#E0F2FE' : '#DCFCE7'}; color:${isQuote ? '#0284C7' : '#15803D'}; border:1px solid ${isQuote ? '#38BDF8' : '#86EFAC'}; margin-bottom:4px;">
-          ${isQuote ? 'PROFORMA / COTIZACIÓN' : 'ORDEN DE PEDIDO & ALISTO'}
+          ${isQuote ? 'PROFORMA / COTIZACIÓN' : 'FACTURA ELECTRÓNICA DE VENTA (v4.3)'}
         </span>
         <div style="font-family:'JetBrains Mono',monospace; font-size:1.15rem; font-weight:800; color:#0B192C;">${escapeHtml(order.orderCode)}</div>
         <div style="font-size:0.75rem; color:#64748B;">Emisión: ${escapeHtml(order.date || 'Hoy')}</div>
       </div>
+    </div>
+
+    <!-- CLAVE NUMÉRICA DE 50 DÍGITOS HACIENDA CR (DGT) -->
+    <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:8px; padding:8px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <div style="font-size:0.7rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">
+          <i class="bi bi-shield-lock-fill text-primary"></i> Clave Numérica de 50 Dígitos (Hacienda Costa Rica DGT-R-48):
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:0.78rem; font-weight:700; color:#0B192C; word-break:break-all;">
+          ${formattedClave}
+        </div>
+      </div>
+      <button type="button" class="btn-fragama btn-outline-fragama no-print" onclick="copyClave50Digits('${clave50}')" style="padding:3px 9px; font-size:0.72rem; background:#FFF; border-color:#0284C7; color:#0284C7; font-weight:700;">
+        <i class="bi bi-clipboard-check"></i> Copiar Clave
+      </button>
     </div>
 
     <!-- DATOS DEL CLIENTE Y LOGÍSTICA -->
@@ -5676,17 +5794,18 @@ function openOrderPrintModal(order) {
       <div>
         <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Facturado / Dirigido a:</div>
         <div style="font-weight:800; font-size:0.95rem; color:#0B192C;">${escapeHtml(order.customerName || 'Cliente')}</div>
-        <div><strong>Cédula:</strong> ${escapeHtml(order.customerTaxId || 'N/A')}</div>
+        <div><strong>Cédula / Identificación:</strong> ${escapeHtml(order.customerTaxId || 'N/A')}</div>
         <div><strong>Contacto:</strong> ${escapeHtml(order.customerContact || 'N/A')}</div>
         <div><strong>Teléfono:</strong> ${escapeHtml(order.customerPhone || 'N/A')}</div>
+        <div><strong>Correo Electrónico:</strong> ${escapeHtml(order.customerEmail || 'facturacion@cliente.cr')}</div>
       </div>
       <div>
-        <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Datos de Despacho Nacional (Costa Rica):</div>
-        <div><strong>Responsable Asignado(a):</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-person-badge"></i> ${escapeHtml(order.assignedUserName || order.preparedByName || 'Colaborador Fragama')} (${escapeHtml(order.assignedUserRole || 'Encargado')})</span></div>
-        <div><strong>Provincia / Destino:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
-        <div><strong>Fecha de Entrega:</strong> ${escapeHtml(order.deliveryDate || order.date || 'Inmediata')}</div>
-        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado')}</div>
-        <div><strong>Dirección:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
+        <div style="font-weight:700; color:#64748B; font-size:0.72rem; text-transform:uppercase;">Datos de Despacho &amp; Entrega Nacional:</div>
+        <div><strong>Chofer / Repartidor Asignado:</strong> <span style="font-weight:800; color:#0284C7;"><i class="bi bi-truck"></i> ${escapeHtml(order.driverName || 'Minor Coto (Chofer Logístico)')}</span></div>
+        <div><strong>Responsable de Alisto:</strong> <span style="font-weight:700; color:#059669;">${escapeHtml(order.preparedByName || order.assignedUserName || 'Colaborador Fragama')}</span></div>
+        <div><strong>Provincia / Cantón:</strong> <span style="font-weight:700; color:#0284C7;">${escapeHtml(order.customerProvince || order.deliveryRoute || 'Cartago')} &bull; ${escapeHtml(order.customerCanton || 'Central')}</span></div>
+        <div><strong>Condición de Pago:</strong> ${escapeHtml(order.terms || 'Contado (SINPE Móvil / Transferencia)')}</div>
+        <div><strong>Dirección Exacta:</strong> ${escapeHtml(order.customerAddress || 'Retiro en Bodega')}</div>
         ${order.notes ? `<div style="margin-top:4px; font-style:italic; color:#0369A1;"><strong>Notas:</strong> ${escapeHtml(order.notes)}</div>` : ''}
       </div>
     </div>
@@ -5699,7 +5818,7 @@ function openOrderPrintModal(order) {
       <div style="display:flex; justify-content:center;">
         <svg id="printOrderBarcodeSvg"></svg>
       </div>
-      <button type="button" class="btn-fragama btn-outline-fragama" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${escapeHtml(order.orderCode)}')">
+      <button type="button" class="btn-fragama btn-outline-fragama no-print" style="font-size:0.75rem; padding:3px 8px; margin-top:4px;" onclick="handleScannedBarcode('${escapeHtml(order.orderCode)}')">
         <i class="bi bi-search"></i> Probar Lectura de este Pedido
       </button>
     </div>
@@ -5709,7 +5828,7 @@ function openOrderPrintModal(order) {
       <div style="flex:1; padding-right:16px;">
         <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
           <span style="background:#15803D; color:#FFF; font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px;">
-            <i class="bi bi-qr-code-scan"></i> CÓDIGO QR DE BULTOS
+            <i class="bi bi-qr-code-scan"></i> CÓDIGO QR DE BULTOS &amp; RUTA
           </span>
           <span style="font-size:0.75rem; color:#15803D; font-weight:700;">Distribución Nacional Todo Costa Rica</span>
         </div>
@@ -5730,33 +5849,38 @@ function openOrderPrintModal(order) {
       </div>
     </div>
 
-    <!-- TABLA DE ARTÍCULOS DETALLADOS -->
+    <!-- TABLA DE ARTÍCULOS DETALLADOS CON CABYS Y IVA -->
     <table style="width:100%; border-collapse:collapse; font-size:0.82rem; margin-bottom:16px;">
       <thead style="background:#0B192C; color:#FFFFFF;">
         <tr>
-          <th style="padding:7px 10px; text-align:left;">SKU</th>
+          <th style="padding:7px 8px; text-align:left;">SKU</th>
+          <th style="padding:7px 8px; text-align:left;">Código CABYS</th>
           <th style="padding:7px 10px; text-align:left;">Descripción del Producto</th>
-          <th style="padding:7px 8px; text-align:center; width:60px;">Cant.</th>
-          <th style="padding:7px 10px; text-align:right; width:85px;">P. Unit</th>
-          <th style="padding:7px 8px; text-align:center; width:60px;">Desc.</th>
-          <th style="padding:7px 10px; text-align:right; width:100px;">Monto (₡)</th>
+          <th style="padding:7px 8px; text-align:center; width:55px;">Cant.</th>
+          <th style="padding:7px 8px; text-align:right; width:85px;">P. Unit</th>
+          <th style="padding:7px 8px; text-align:center; width:50px;">Desc.</th>
+          <th style="padding:7px 8px; text-align:center; width:55px;">IVA</th>
+          <th style="padding:7px 10px; text-align:right; width:100px;">Total (₡)</th>
         </tr>
       </thead>
       <tbody>
         ${printItems.length === 0 ? `
-          <tr><td colspan="6" style="padding:16px; text-align:center; color:#64748B;">No hay líneas de artículos detalladas en este pedido.</td></tr>
+          <tr><td colspan="8" style="padding:16px; text-align:center; color:#64748B;">No hay líneas de artículos detalladas en este pedido.</td></tr>
         ` : printItems.map((it, idx) => {
           const qty = Number(it.qty || it.quantity || 1);
           const uPrice = Number(it.unitPrice || 0);
           const disc = Number(it.discountPct || 0);
           const sub = Number(it.subtotal || (qty * uPrice));
+          const cabys = it.cabys || it.cabysCode || '4669010000000';
           return `
           <tr style="border-bottom:1px solid #E2E8F0; background:${idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA'};">
-            <td style="padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#475569;">${escapeHtml(it.sku || 'N/A')}</td>
+            <td style="padding:7px 8px; font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:#475569;">${escapeHtml(it.sku || 'N/A')}</td>
+            <td style="padding:7px 8px; font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:#0284C7; font-weight:700;">${escapeHtml(cabys)}</td>
             <td style="padding:7px 10px; font-weight:600; color:#0B192C;">${escapeHtml(it.name || it.productName || 'Artículo')} <span style="font-size:0.7rem; color:#64748B;">(${escapeHtml(it.unit || 'UND')})</span></td>
             <td style="padding:7px 8px; text-align:center; font-weight:700;">${qty}</td>
-            <td style="padding:7px 10px; text-align:right;">${formatCRC(uPrice)}</td>
+            <td style="padding:7px 8px; text-align:right;">${formatCRC(uPrice)}</td>
             <td style="padding:7px 8px; text-align:center; color:${disc > 0 ? '#DC2626' : '#64748B'};">${disc}%</td>
+            <td style="padding:7px 8px; text-align:center; font-weight:700; color:#0369A1;">13%</td>
             <td style="padding:7px 10px; text-align:right; font-weight:800; color:#0B192C;">${formatCRC(sub)}</td>
           </tr>
         `;
@@ -5764,42 +5888,48 @@ function openOrderPrintModal(order) {
       </tbody>
     </table>
 
-    <!-- TOTALES FINANCIEROS -->
+    <!-- TOTALES FINANCIEROS Y TRIBUTARIOS -->
     <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
-      <div style="width:280px; font-size:0.84rem;">
+      <div style="width:310px; font-size:0.84rem; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 14px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-          <span style="color:#64748B;">Subtotal Bruto:</span>
+          <span style="color:#64748B;">Subtotal Mercancías Gravadas:</span>
           <span style="font-weight:600;">${formatCRC(subBruto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#DC2626;">
-          <span>Descuento Comercial:</span>
+          <span>Descuento Comercial Concedido:</span>
           <span style="font-weight:600;">-${formatCRC(descTot)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-          <span style="color:#64748B;">Subtotal Gravable:</span>
+          <span style="color:#64748B;">Subtotal Gravable (Base Imponible):</span>
           <span style="font-weight:600;">${formatCRC(subNeto)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-          <span style="color:#64748B;">IVA Costa Rica (13%):</span>
-          <span style="font-weight:600;">${formatCRC(ivaAmount)}</span>
+          <span style="color:#64748B;">IVA Costa Rica (13% D-104):</span>
+          <span style="font-weight:600; color:#0284C7;">${formatCRC(ivaAmount)}</span>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:1.15rem; font-weight:900; color:#0B192C; border-top:2px solid #0284C7; padding-top:6px;">
-          <span>TOTAL:</span>
+          <span>TOTAL A PAGAR:</span>
           <span style="color:#0284C7;">${formatCRC(tot)}</span>
         </div>
       </div>
     </div>
 
     <!-- FIRMAS DE AUTORIZACIÓN Y RECIBO -->
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-top:30px; font-size:0.75rem; text-align:center;">
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-top:24px; font-size:0.75rem; text-align:center;">
       <div style="border-top:1px solid #94A3B8; padding-top:6px;">
-        <strong>${order.assignedUserName || 'Distribuidora Fragama S.A.'}</strong><br>
-        <span style="color:#64748B;">${order.assignedUserRole || 'Responsable Asignado'} • Control y Alisto</span>
+        <strong>${escapeHtml(order.preparedByName || order.assignedUserName || 'Distribuidora Fragama S.A.')}</strong><br>
+        <span style="color:#64748B;">Control y Alisto &bull; Bodega Fragama</span>
       </div>
       <div style="border-top:1px solid #94A3B8; padding-top:6px;">
         <strong>Recibido Conforme (Cliente)</strong><br>
         <span style="color:#64748B;">Firma, Cédula y Sello Comercial</span>
       </div>
+    </div>
+
+    <!-- LEYENDA TRIBUTARIA OFICIAL -->
+    <div style="margin-top:20px; padding-top:8px; border-top:1px dashed #CBD5E1; text-align:center; font-size:0.7rem; color:#64748B;">
+      Autorizada mediante Resolución DGT-R-48-2016 y DGT-R-033-2019 de la Dirección General de Tributación.<br>
+      Este documento es una representación gráfica de la Factura Electrónica generada para los efectos tributarios de ley.
     </div>
   `;
 
@@ -5808,10 +5938,13 @@ function openOrderPrintModal(order) {
   // Renderizar Código de Barras y QR
   const qrPayload = JSON.stringify({
     empresa: 'Distribuidora Fragama S.A.',
+    cedula: '3-101-778899',
+    clave: clave50,
     pedido: order.orderCode,
     tipo: order.docType,
     cliente: order.customerName,
     responsable: order.assignedUserName || 'Asignado',
+    chofer: order.driverName || 'Minor Coto',
     provincia: order.customerProvince || 'Cartago',
     canton: order.customerCanton || 'Central',
     bultos: summarizeOrderPackages(order),
@@ -6099,13 +6232,24 @@ window.openOrderPickingModal = async function(orderIdentifier) {
   // Cargar lista de colaboradores (Bodegueros y Choferes)
   await loadStaffSelectors();
 
-  // Pre-seleccionar usuario actual en bodeguero si aplica
+  // Pre-seleccionar usuario actual en bodeguero si aplica, y en chofer si el rol es Chofer
   const curUser = AppState.currentUser || {};
   const respSelect = document.getElementById('pickingResponsibleSelect');
-  if (curUser && curUser.id && respSelect) {
+  const driverSelect = document.getElementById('pickingDriverSelect');
+
+  if (curUser && respSelect) {
     for (let i = 0; i < respSelect.options.length; i++) {
-      if (Number(respSelect.options[i].value) === Number(curUser.id)) {
+      if (Number(respSelect.options[i].value) === Number(curUser.id) || (curUser.name && respSelect.options[i].text.includes(curUser.name.split(' ')[0]))) {
         respSelect.selectedIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (curUser && driverSelect && curUser.role === 'Chofer') {
+    for (let i = 0; i < driverSelect.options.length; i++) {
+      if (Number(driverSelect.options[i].value) === Number(curUser.id) || (curUser.name && driverSelect.options[i].text.includes(curUser.name.split(' ')[0])) || (curUser.username === 'chofer' && driverSelect.options[i].text.includes('Minor'))) {
+        driverSelect.selectedIndex = i;
         break;
       }
     }
@@ -6675,47 +6819,171 @@ function setDriverProvinceFilter(province) {
 }
 window.setDriverProvinceFilter = setDriverProvinceFilter;
 
+window.onAdminDriverFilterChange = function(driverVal) {
+  AppState.adminSelectedDriverFilter = driverVal;
+  renderDriverDispatches();
+};
+
+function getUnifiedDriverDispatches() {
+  const curUser = AppState.currentUser || {};
+  const list = [...AppState.dispatches];
+
+  // Integrar pedidos en ALISTADO o EN_RUTA desde AppState.salesOrders si aún no están en la lista
+  const activeOrders = (AppState.salesOrders || []).filter(o => {
+    const st = (o.status || '').toUpperCase();
+    return st === 'EN_RUTA' || st === 'ALISTADO' || st === 'ENTREGADO';
+  });
+
+  activeOrders.forEach(o => {
+    const code = o.orderCode || o.id;
+    const exists = list.some(d => d.orderCode === code || d.code === code);
+    if (!exists) {
+      const bultos = (typeof summarizeOrderPackages === 'function') ? summarizeOrderPackages(o) : 'Carga general';
+      const itemsList = Array.isArray(o.items) && o.items.length > 0
+        ? o.items.map(it => `${it.qty || 1}x ${it.name || it.productName || 'Producto'}`).join(', ')
+        : 'Carga de mercadería';
+
+      list.push({
+        id: 'ord_' + o.id,
+        code: `DSP-${code}`,
+        orderCode: code,
+        customer: o.customerName || 'Cliente Fragama',
+        province: o.customerProvince || o.deliveryRoute || 'Cartago',
+        canton: o.customerCanton || 'Central',
+        address: o.customerAddress || 'Dirección registrada en pedido',
+        contact: `${o.customerContact || o.customerName || 'Cliente'} (${o.customerPhone || 'N/A'})`,
+        invoice: `FAC-${code}`,
+        items: itemsList,
+        packages: [{ qty: (Array.isArray(o.items) ? o.items.length : 1), unit: 'Bultos', desc: bultos }],
+        driver: o.driverName || 'Minor Coto - Isuzu CL-294012',
+        driverName: o.driverName || 'Minor Coto',
+        driverUserId: o.driverUserId || 5,
+        status: o.status === 'ENTREGADO' ? 'Entregado' : (o.status === 'EN_RUTA' ? 'En Ruta' : 'Asignado'),
+        verified: true,
+        departureTime: o.date ? (o.date.split(' ')[1] || '08:30 AM') : '08:30 AM'
+      });
+    }
+  });
+
+  return list;
+}
+
 function renderDriverDispatches() {
   const container = document.getElementById('driverDispatchesList');
   if (!container) return;
 
-  const currentProv = AppState.driverProvinceFilter || 'ALL';
+  const curUser = AppState.currentUser || {};
+  const isAdmin = (curUser.role === 'Administrador');
+  const isDriver = (curUser.role === 'Chofer');
 
-  // Filtrado por provincia
-  const filtered = AppState.dispatches.filter(d => {
+  // 1. Configuración de controles de administrador vs chofer
+  const adminBar = document.getElementById('adminDriverControlBar');
+  const adminSelect = document.getElementById('adminDriverFilterSelect');
+  const userNameEl = document.getElementById('driverLoggedUserName');
+  const vehicleInfoEl = document.getElementById('driverVehicleInfo');
+  const scopeBadgeEl = document.getElementById('driverScopeBadge');
+
+  const allDispatches = getUnifiedDriverDispatches();
+
+  if (isAdmin) {
+    if (adminBar) adminBar.style.display = 'block';
+    if (adminSelect) {
+      // Recopilar nombres únicos de choferes asignados
+      const setDrivers = new Set();
+      (AppState.systemUsers || []).filter(u => u.role === 'Chofer').forEach(u => setDrivers.add(u.name.split(' (')[0].trim()));
+      allDispatches.forEach(d => {
+        const raw = d.driverName || (d.driver ? d.driver.split(' - ')[0] : '');
+        if (raw) setDrivers.add(raw.trim());
+      });
+
+      const currentSel = AppState.adminSelectedDriverFilter || 'ALL';
+      adminSelect.innerHTML = `<option value="ALL" ${currentSel === 'ALL' ? 'selected' : ''}>🌐 Todos los Choferes (Flota Consolidada)</option>` +
+        Array.from(setDrivers).map(dName => `
+          <option value="${escapeHtml(dName)}" ${currentSel === dName ? 'selected' : ''}>🚚 ${escapeHtml(dName)}</option>
+        `).join('');
+    }
+
+    const selDriver = AppState.adminSelectedDriverFilter || 'ALL';
+    if (userNameEl) {
+      userNameEl.textContent = (selDriver === 'ALL') 
+        ? "Centro Maestro de Despacho & Rutas (Auditoría Administrativa)" 
+        : `Ruta Asignada: ${selDriver}`;
+    }
+    if (vehicleInfoEl) {
+      vehicleInfoEl.innerHTML = `<i class="bi bi-shield-check text-warning"></i> Modo Administrador &bull; Control y supervisión de todos los despachos`;
+    }
+    if (scopeBadgeEl) {
+      scopeBadgeEl.textContent = (selDriver === 'ALL') ? "Flota Completa Nacional" : `Chofer: ${selDriver}`;
+    }
+  } else {
+    if (adminBar) adminBar.style.display = 'none';
+    if (userNameEl) userNameEl.textContent = curUser.name || 'Minor Coto (Chofer Logístico)';
+    if (vehicleInfoEl) vehicleInfoEl.innerHTML = `<i class="bi bi-truck-front-fill text-warning"></i> Camión Isuzu Forward CL-294012 &bull; Bodega Central Taras`;
+    if (scopeBadgeEl) scopeBadgeEl.textContent = "Mis Entregas Asignadas";
+  }
+
+  // 2. SEGREGACIÓN DE DATOS POR ASIGNACIÓN (Row-Level Security)
+  let visibleDispatches = allDispatches;
+  if (!isAdmin) {
+    // Si no es Administrador (ej. Chofer), SOLO ve lo que tiene asignado
+    const uNameLower = (curUser.name || '').toLowerCase();
+    const uFirst = uNameLower.split(' ')[0] || '';
+    visibleDispatches = allDispatches.filter(d => {
+      const dDriver = (d.driver || '').toLowerCase();
+      const dDriverName = (d.driverName || '').toLowerCase();
+      const matchName = uFirst && (dDriver.includes(uFirst) || dDriverName.includes(uFirst));
+      const matchId = curUser.id && d.driverUserId && (Number(d.driverUserId) === Number(curUser.id));
+      const isDefaultChofer = (curUser.username === 'chofer' && (dDriver.includes('minor') || dDriverName.includes('minor')));
+      return matchName || matchId || isDefaultChofer;
+    });
+  } else if (AppState.adminSelectedDriverFilter && AppState.adminSelectedDriverFilter !== 'ALL') {
+    const selLower = AppState.adminSelectedDriverFilter.toLowerCase();
+    visibleDispatches = allDispatches.filter(d => {
+      const dDriver = (d.driver || '').toLowerCase();
+      const dDriverName = (d.driverName || '').toLowerCase();
+      return dDriver.includes(selLower) || dDriverName.includes(selLower);
+    });
+  }
+
+  // 3. Filtrado por provincia de Costa Rica
+  const currentProv = AppState.driverProvinceFilter || 'ALL';
+  const filtered = visibleDispatches.filter(d => {
     if (currentProv === 'ALL') return true;
     return d.province === currentProv;
   });
 
-  // Métricas superiores
+  // 4. Métricas superiores calculadas con las entregas asignadas visibles
   const totalPkgsEl = document.getElementById('driverTotalPackages');
   const covProvsEl = document.getElementById('driverCoveredProvinces');
   const deliveredRatioEl = document.getElementById('driverDeliveredRatio');
   const navBadgeEl = document.getElementById('navDispatchCount');
 
-  if (navBadgeEl) navBadgeEl.textContent = AppState.dispatches.length;
+  if (navBadgeEl) navBadgeEl.textContent = visibleDispatches.length;
 
   let totalBultos = 0;
-  AppState.dispatches.forEach(d => {
+  visibleDispatches.forEach(d => {
     if (d.packages && Array.isArray(d.packages)) {
       d.packages.forEach(p => totalBultos += (p.qty || 0));
     } else {
-      totalBultos += 5; // fallback
+      totalBultos += 3;
     }
   });
 
-  const uniqueProvs = new Set(AppState.dispatches.map(d => d.province || 'Cartago')).size;
-  const deliveredCount = AppState.dispatches.filter(d => d.status === 'Entregado').length;
+  const uniqueProvs = new Set(visibleDispatches.map(d => d.province || 'Cartago')).size;
+  const deliveredCount = visibleDispatches.filter(d => d.status === 'Entregado').length;
 
   if (totalPkgsEl) totalPkgsEl.textContent = `${totalBultos} bultos`;
-  if (covProvsEl) covProvsEl.textContent = `${uniqueProvs} Provincias`;
-  if (deliveredRatioEl) deliveredRatioEl.textContent = `${deliveredCount} / ${AppState.dispatches.length}`;
+  if (covProvsEl) covProvsEl.textContent = `${uniqueProvs} Zonas`;
+  if (deliveredRatioEl) deliveredRatioEl.textContent = `${deliveredCount} / ${visibleDispatches.length}`;
 
   if (filtered.length === 0) {
     container.innerHTML = `
       <div style="background:#FFF; border:1px dashed #CBD5E1; border-radius:12px; padding:2rem; text-align:center; color:#64748B;">
         <i class="bi bi-geo-alt-fill" style="font-size:2rem; color:#CBD5E1;"></i>
-        <div style="font-weight:700; margin-top:8px;">No hay despachos registrados para ${currentProv}</div>
+        <div style="font-weight:700; margin-top:8px;">No hay despachos asignados para ${currentProv === 'ALL' ? 'su ruta actual' : currentProv}</div>
+        <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
+          ${!isAdmin ? 'Usted solo visualiza los paquetes y pedidos asignados específicamente a su usuario/camión.' : 'No hay despachos con el filtro seleccionado.'}
+        </p>
         <button class="btn-fragama btn-outline-fragama" style="margin-top:12px; padding:6px 14px; font-size:0.8rem;" onclick="setDriverProvinceFilter('ALL')">
           Ver todas las provincias
         </button>
@@ -6739,15 +7007,21 @@ function renderDriverDispatches() {
     else if (pLower.includes('heredia')) provClass = 'prov-heredia';
 
     const bultosStr = d.items || (d.packages ? d.packages.map(p => `${p.qty}x ${p.unit}`).join(', ') : 'Varios bultos');
+    const assignedDriverName = d.driverName || (d.driver ? d.driver.split(' - ')[0] : 'Chofer');
 
     return `
       <div class="dispatch-card ${d.status === 'En Ruta' ? 'highlight' : ''}">
         <div class="dispatch-card-header">
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span class="dispatch-code">${d.code}</span>
             <span class="badge-province ${provClass}">
               <i class="bi bi-pin-map-fill"></i> ${d.province || 'Costa Rica'} &bull; ${d.canton || 'Central'}
             </span>
+            ${isAdmin ? `
+              <span style="background:#0F172A; color:#E2E8F0; font-size:0.72rem; padding:2px 8px; border-radius:12px; font-weight:700;">
+                <i class="bi bi-person-fill text-warning"></i> ${escapeHtml(assignedDriverName)}
+              </span>
+            ` : ''}
           </div>
           <span class="badge-status ${badgeClass}"><i class="bi bi-circle-fill" style="font-size:6px"></i> ${d.status}</span>
         </div>
@@ -6772,7 +7046,7 @@ function renderDriverDispatches() {
                 ${bultosStr}
               </div>
             </div>
-            <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch(${d.id})" title="Ver Código QR de estos bultos">
+            <button type="button" class="btn-fragama btn-outline-fragama" style="padding:3px 8px; font-size:0.75rem; background:#FFF;" onclick="showQrForDispatch('${d.id}')" title="Ver Código QR de estos bultos">
               <i class="bi bi-qr-code"></i> Ver QR
             </button>
           </div>
@@ -6787,10 +7061,10 @@ function renderDriverDispatches() {
             <button class="btn-driver-action btn-delivered" onclick="openQrScannerModal('${d.orderCode || d.code}')" style="background:#0284C7; color:#FFF; border-color:#0284C7;">
               <i class="bi bi-qr-code-scan"></i> Auditar QR
             </button>
-            <button class="btn-driver-action btn-delivered" onclick="openDriverModal(${d.id}, 'Entregado')">
+            <button class="btn-driver-action btn-delivered" onclick="openDriverModal('${d.id}', 'Entregado')">
               <i class="bi bi-check-circle-fill"></i> Entregado
             </button>
-            <button class="btn-driver-action btn-observed" onclick="openDriverModal(${d.id}, 'Observado')">
+            <button class="btn-driver-action btn-observed" onclick="openDriverModal('${d.id}', 'Observado')">
               <i class="bi bi-exclamation-triangle-fill"></i> Novedad
             </button>
           </div>
@@ -8645,7 +8919,17 @@ window.renderWebOrdersFullTable = function() {
     const isWeb = isWebOrder(order);
     const st = (order.status || 'PENDIENTE').toUpperCase().trim();
     let matchFilter = true;
-    if (_currentWebOrderFilter === 'WEB') {
+    if (_currentWebOrderFilter === 'MY_ASSIGNED') {
+      const curU = AppState.currentUser || {};
+      const uName = (curU.name || '').toLowerCase();
+      const uFirst = uName.split(' ')[0] || '';
+      const ordDriver = (order.driverName || '').toLowerCase();
+      const ordResp = (order.assignedUserName || order.preparedByName || '').toLowerCase();
+      const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && order.driverUserId && Number(order.driverUserId) === Number(curU.id));
+      const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && order.assignedUserId && Number(order.assignedUserId) === Number(curU.id));
+      const isDefaultChofer = (curU.username === 'chofer' && (ordDriver.includes('minor') || !ordDriver));
+      matchFilter = isMyDriver || isMyResp || isDefaultChofer;
+    } else if (_currentWebOrderFilter === 'WEB') {
       matchFilter = isWeb;
     } else if (_currentWebOrderFilter === 'BODEGA') {
       matchFilter = !isWeb;

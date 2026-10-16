@@ -2384,7 +2384,9 @@ body {
   body * {
     visibility: hidden !important;
   }
-  #printableOfficialReport, #printableOfficialReport * {
+  #printableOfficialReport, #printableOfficialReport *,
+  #orderPrintModalBody, #orderPrintModalBody *,
+  #invoiceReceiptBody, #invoiceReceiptBody * {
     visibility: visible !important;
   }
   #printableOfficialReport {
@@ -2398,6 +2400,33 @@ body {
     padding: 15px !important;
     margin: 0 !important;
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  }
+  #orderPrintModalBody,
+  #invoiceReceiptBody {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    padding: 20px !important;
+    margin: 0 !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+  .modal-overlay {
+    background: transparent !important;
+    position: static !important;
+  }
+  .modal-box {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+  .modal-header-custom, .modal-footer-custom, .btn-fragama, button {
+    display: none !important;
   }
   .print-page-break {
     page-break-after: always;
@@ -2424,3 +2453,301 @@ body {
     text-transform: uppercase !important;
   }
 }
+
+/* ==============================================================================
+   POWERBI / TREMOR ULTRA-MODERN EXECUTIVE DASHBOARD STYLES
+   ============================================================================== */
+.powerbi-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.powerbi-control-header {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.powerbi-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.powerbi-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #334155;
+  width: fit-content;
+}
+
+.live-pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.powerbi-time-filters {
+  display: flex;
+  background: #F1F5F9;
+  padding: 3px;
+  border-radius: 10px;
+  gap: 2px;
+}
+
+.powerbi-filter-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #64748B;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.powerbi-filter-btn:hover {
+  color: #0F172A;
+}
+
+.powerbi-filter-btn.active {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.powerbi-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.powerbi-kpi-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.powerbi-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -3px rgba(0, 0, 0, 0.06);
+}
+
+.powerbi-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.powerbi-kpi-card.accent-navy::before { background: #0B192C; }
+.powerbi-kpi-card.accent-emerald::before { background: #10B981; }
+.powerbi-kpi-card.accent-orange::before { background: #FF8200; }
+.powerbi-kpi-card.accent-rose::before { background: #EF4444; }
+
+.powerbi-kpi-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.powerbi-kpi-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748B;
+}
+
+.powerbi-kpi-icon-pill {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.pill-navy { background: #EFF6FF; color: #1D4ED8; }
+.pill-emerald { background: #ECFDF5; color: #059669; }
+.pill-orange { background: #FFF7ED; color: #EA580C; }
+.pill-rose { background: #FEF2F2; color: #DC2626; }
+
+.powerbi-kpi-number {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+
+.powerbi-kpi-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #64748B;
+}
+
+.powerbi-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+.powerbi-tag.positive { background: #DCFCE7; color: #15803D; }
+.powerbi-tag.neutral { background: #F1F5F9; color: #475569; }
+.powerbi-tag.negative { background: #FEE2E2; color: #B91C1C; }
+
+.powerbi-visual-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.powerbi-visual-card:hover {
+  box-shadow: 0 8px 20px -3px rgba(0, 0, 0, 0.05);
+}
+
+.powerbi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.powerbi-card-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.powerbi-card-subtitle {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-top: 3px;
+}
+
+.powerbi-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.powerbi-btn-sm {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.powerbi-btn-sm:hover {
+  background: #EDF2F7;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
+
+.powerbi-chart-container {
+  position: relative;
+  width: 100%;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-anim {
+  display: inline-block;
+  animation: spin 0.8s linear infinite !important;
+}
+
+/* ==============================================================================
+   MONITOR EJECUTIVO DE EXISTENCIAS EN BODEGA
+   ============================================================================== */
+.dashboard-stock-tab {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dashboard-stock-tab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+}
+
+.dashboard-stock-tab.active {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12) !important;
+}
+
+#dashboardStockTableView table tr:hover td {
+  background-color: #F8FAFC !important;
+}
+

@@ -2189,6 +2189,9 @@
               <button class="btn-fragama btn-primary-fragama web-filter-btn active" data-filter="ALL" onclick="filterWebOrdersView('ALL', this)" style="padding:5px 12px; font-size:0.8rem;">
                 Todos los Pedidos
               </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" id="btnFilterMyAssigned" data-filter="MY_ASSIGNED" onclick="filterWebOrdersView('MY_ASSIGNED', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#8B5CF6; color:#6D28D9; font-weight:700;">
+                🎯 Asignados a Mí
+              </button>
               <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="WEB" onclick="filterWebOrdersView('WEB', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#10B981; color:#065F46;">
                 🌐 Solo Web
               </button>
@@ -2791,21 +2794,39 @@
       <section class="role-view" id="view-chofer-mobile">
         <div class="driver-mobile-container">
           
-          <!-- Banner Principal de Distribución Nacional -->
-          <div class="driver-banner">
+          <!-- Barra de Control y Auditoría para Administradores (Visibilidad Total) -->
+          <div id="adminDriverControlBar" style="display:none; background:#0F172A; color:#FFF; border-radius:12px; padding:12px 16px; margin-bottom:14px; border:1px solid #334155; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:var(--fragama-orange-main); color:#FFF; font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:6px; letter-spacing:0.5px;">
+                  <i class="bi bi-shield-lock-fill"></i> AUDITORÍA ADMINISTRATIVA GLOBAL
+                </span>
+                <span style="font-size:0.8rem; color:#94A3B8;">Acceso maestro a todas las unidades y despachos del país</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label for="adminDriverFilterSelect" style="font-size:0.8rem; color:#CBD5E1; margin:0; font-weight:700;"><i class="bi bi-person-badge-fill text-warning"></i> Ver Chofer:</label>
+                <select id="adminDriverFilterSelect" onchange="onAdminDriverFilterChange(this.value)" style="background:#1E293B; color:#F8FAFC; border:1px solid #475569; border-radius:8px; padding:6px 12px; font-size:0.82rem; font-weight:700; cursor:pointer;">
+                  <option value="ALL">🌐 Todos los Choferes (Flota Consolidada)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banner Principal de Distribución Nacional (Dinámico según Chofer/Admin) -->
+          <div class="driver-banner" id="driverBannerContainer">
             <div class="driver-banner-info">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <span class="badge-status badge-confirmed" style="font-size:0.7rem; padding:2px 8px;">
+                <span class="badge-status badge-confirmed" style="font-size:0.7rem; padding:2px 8px;" id="driverBadgeFleet">
                   <i class="bi bi-shield-check"></i> FLOTA ACTIVA
                 </span>
-                <span style="font-size:0.75rem; color:#94A3B8;">Cobertura: Todo Costa Rica</span>
+                <span style="font-size:0.75rem; color:#94A3B8;" id="driverScopeBadge">Cobertura: Todo Costa Rica</span>
               </div>
-              <h3 style="margin:0 0 4px 0; font-size:1.25rem;">Minor Coto (Chofer Logístico)</h3>
-              <p style="margin:0; font-size:0.84rem; color:#E2E8F0;">
+              <h3 style="margin:0 0 4px 0; font-size:1.25rem;" id="driverLoggedUserName">Minor Coto (Chofer Logístico)</h3>
+              <p style="margin:0; font-size:0.84rem; color:#E2E8F0;" id="driverVehicleInfo">
                 <i class="bi bi-truck-front-fill text-warning"></i> Camión Isuzu Forward CL-294012 &bull; Bodega Central Taras
               </p>
             </div>
-            <div class="driver-badge-truck">
+            <div class="driver-badge-truck" id="driverTruckBadge">
               <i class="bi bi-geo-alt-fill text-warning"></i> 7 Provincias C.R.
             </div>
           </div>
@@ -3933,11 +3954,16 @@
         <!-- Inyectado dinámicamente con encabezado corporativo y logo oficial -->
       </div>
 
-      <div class="modal-footer-custom">
+      <div class="modal-footer-custom" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <button class="btn-fragama btn-outline-fragama" id="dismissOrderPrintBtn">Cerrar</button>
-        <button class="btn-fragama btn-primary-fragama" onclick="window.print()">
-          <i class="bi bi-printer"></i> Imprimir Comprobante Oficial
-        </button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-fragama" id="btnShareOrderWhatsApp" style="background:#25D366; color:#FFF; font-weight:700; border:none; display:inline-flex; align-items:center; gap:6px;" onclick="shareCurrentOrderWhatsApp()">
+            <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+          </button>
+          <button class="btn-fragama btn-primary-fragama" onclick="window.print()" style="display:inline-flex; align-items:center; gap:6px;">
+            <i class="bi bi-printer"></i> Imprimir Comprobante / Factura
+          </button>
+        </div>
       </div>
     </div>
   </div>
