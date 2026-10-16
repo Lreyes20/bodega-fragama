@@ -1235,6 +1235,8 @@ function setupLoginModule() {
 
           if (loginWrapper) loginWrapper.classList.add('hidden');
           applyRoleRestrictions(u.role);
+          const roleConfig = RolePermissions[u.role] || RolePermissions['Administrador'];
+          switchViewDirectly(roleConfig.homeView);
           updateHeaderProfile();
           showNotificationToast(`Conectado a SQL Server como ${u.name} (${u.role})`, 'success');
           return;
@@ -1683,17 +1685,14 @@ const RolePermissions = {
   'Chofer': {
     homeView: 'view-chofer-mobile',
     allowedViews: [
-      'view-alistado-web',
       'view-chofer-mobile'
     ]
   },
   'Vendedor': {
     homeView: 'view-customer-orders',
     allowedViews: [
-      'view-alistado-web',
       'view-customer-orders',
-      'view-customers-management',
-      'view-product-maintenance'
+      'view-customers-management'
     ]
   }
 };
@@ -1712,39 +1711,79 @@ function setupRoleSwitcher() {
 }
 
 function applyRoleRestrictions(role) {
+  const currentRole = role || (AppState.currentUser && AppState.currentUser.role) || 'Administrador';
+  const isAdmin = (currentRole === 'Administrador');
+  const isBodeguero = (currentRole === 'Bodeguero');
+  const isChofer = (currentRole === 'Chofer');
+  const isCajero = (currentRole === 'Cajero');
+  const isVendedor = (currentRole === 'Vendedor');
+
   const userRoleBadge = document.getElementById('userRoleBadge');
   const userNameDisplay = document.getElementById('userNameDisplay');
 
-  if (userRoleBadge) userRoleBadge.textContent = role;
+  if (userRoleBadge) {
+    userRoleBadge.textContent = currentRole.toUpperCase();
+    if (isAdmin) {
+      userRoleBadge.style.background = 'var(--fragama-orange-main)';
+      userRoleBadge.style.color = '#FFF';
+    } else if (isChofer) {
+      userRoleBadge.style.background = '#8B5CF6';
+      userRoleBadge.style.color = '#FFF';
+    } else {
+      userRoleBadge.style.background = '#0284C7';
+      userRoleBadge.style.color = '#FFF';
+    }
+  }
 
-  // Mostrar el nombre real del usuario autenticado actual
+  // 1. Mostrar nombre real del usuario autenticado
   if (userNameDisplay) {
     if (AppState.currentUser && AppState.currentUser.name) {
       userNameDisplay.textContent = AppState.currentUser.name;
     } else {
-      const currentSysUser = AppState.systemUsers.find(u => u.username === (AppState.currentUser && AppState.currentUser.username));
-      if (currentSysUser && currentSysUser.name) {
-        userNameDisplay.textContent = currentSysUser.name;
-      } else {
-        userNameDisplay.textContent = 'Usuario Fragama';
-      }
+      const currentSysUser = (AppState.systemUsers || []).find(u => u.username === (AppState.currentUser && AppState.currentUser.username));
+      userNameDisplay.textContent = currentSysUser ? currentSysUser.name : 'Usuario Fragama';
     }
   }
 
-  const roleConfig = RolePermissions[role] || RolePermissions['Administrador'];
+  // 2. Control Estricto de Acceso en Barra Superior (Top Navbar)
+  const topBtnNewUser = document.getElementById('topBtnNewUser');
+  if (topBtnNewUser) {
+    // Únicamente el Administrador puede registrar y asignar roles a colaboradores
+    topBtnNewUser.style.display = isAdmin ? 'inline-flex' : 'none';
+  }
+
+  const topBtnProducts = document.getElementById('topBtnProducts');
+  if (topBtnProducts) {
+    // Solo Administrador y Bodeguero pueden mantener catálogo de productos
+    topBtnProducts.style.display = (isAdmin || isBodeguero) ? 'inline-flex' : 'none';
+  }
+
+  const topLiveWebOrdersBtn = document.getElementById('topLiveWebOrdersBtn');
+  if (topLiveWebOrdersBtn && isChofer) {
+    // Ocultar alerta de alistado para choferes en ruta
+    topLiveWebOrdersBtn.style.display = 'none';
+  }
+
+  // 3. Control de Acceso en Botones Operativos de Vistas
+  const btnAutoAssign = document.getElementById('btnAutoAssignOrders');
+  if (btnAutoAssign) {
+    btnAutoAssign.style.display = (isAdmin || isBodeguero) ? 'inline-flex' : 'none';
+  }
+
+  const roleConfig = RolePermissions[currentRole] || RolePermissions['Administrador'];
   const allowed = roleConfig.allowedViews;
 
-  // 1. Filtrar visibilidad de enlaces en el Menú Lateral según roles autorizados
+  // 4. Filtrar visibilidad en el Menú Lateral según roles autorizados
   document.querySelectorAll('.sidebar .nav-link').forEach(link => {
     const rolesAttr = link.getAttribute('data-roles');
     if (rolesAttr) {
       const rolesList = rolesAttr.split(',').map(r => r.trim());
-      const hasAccess = rolesList.includes(role);
+      const hasAccess = rolesList.includes(currentRole);
       link.style.display = hasAccess ? 'flex' : 'none';
     }
   });
 
-  // 2. Ocultar grupos de menú (acordeones) si no tienen enlaces visibles
+  // Ocultar grupos de menú (acordeones) si no tienen enlaces visibles
   document.querySelectorAll('.sidebar .collapse-menu').forEach(menu => {
     const visibleLinks = Array.from(menu.querySelectorAll('.nav-link')).filter(l => l.style.display !== 'none');
     const groupToggle = document.querySelector(`.sidebar .tree-toggle[data-collapse="${menu.id}"]`);
@@ -1757,12 +1796,36 @@ function applyRoleRestrictions(role) {
     }
   });
 
-  // 3. Si la vista actual no está permitida para este rol, redirigir automáticamente
+  // 5. Redirección automática si la vista actual no está permitida para este rol
   const currentActiveView = document.querySelector('.role-view.active');
   const currentViewId = currentActiveView ? currentActiveView.id : '';
 
-  if (!allowed.includes(currentViewId)) {
+  if (!allowed.includes(currentViewId) || (isChofer && currentViewId !== 'view-chofer-mobile')) {
     switchViewDirectly(roleConfig.homeView);
+  }
+
+  // 6. Ajustar Barra Inferior Móvil (Mobile Bottom Nav) según Rol
+  const mobNavHome = document.getElementById('mobNavHome');
+  const mobNavInventory = document.getElementById('mobNavInventory');
+  const mobNavOrders = document.getElementById('mobNavOrders');
+  const mobNavPos = document.getElementById('mobNavPos');
+
+  if (isChofer) {
+    if (mobNavHome) {
+      mobNavHome.setAttribute('onclick', "switchMobileNav('view-chofer-mobile', this)");
+      mobNavHome.innerHTML = '<i class="bi bi-truck"></i><span>Mi Ruta</span>';
+    }
+    if (mobNavInventory) mobNavInventory.style.display = 'none';
+    if (mobNavOrders) mobNavOrders.style.display = 'none';
+    if (mobNavPos) mobNavPos.style.display = 'none';
+  } else {
+    if (mobNavHome) {
+      mobNavHome.setAttribute('onclick', "switchMobileNav('view-admin-dashboard', this)");
+      mobNavHome.innerHTML = '<i class="bi bi-house-door-fill"></i><span>Inicio</span>';
+    }
+    if (mobNavInventory) mobNavInventory.style.display = (isAdmin || isBodeguero) ? 'flex' : 'none';
+    if (mobNavOrders) mobNavOrders.style.display = 'flex';
+    if (mobNavPos) mobNavPos.style.display = (isAdmin || isCajero) ? 'flex' : 'none';
   }
 }
 
@@ -9739,6 +9802,28 @@ window.renderCollaboratorWorkloadChips = async function() {
 };
 
 window.renderWebOrdersView = function() {
+  const curU = AppState.currentUser || {};
+  const isDriver = (curU.role === 'Chofer');
+
+  const autoBtn = document.getElementById('btnAutoAssignOrders');
+  const chipsStrip = document.getElementById('collabWorkloadChipsContainer');
+  const collabSelect = document.getElementById('collabFilterSelect');
+
+  if (isDriver) {
+    // Si un chofer accede a pedidos, restringir estrictamente a sus tareas de entrega asignadas
+    _currentCollabFilter = 'MY_ASSIGNED';
+    _currentWebOrderFilter = 'ACTIVE';
+    if (autoBtn) autoBtn.style.display = 'none';
+    if (chipsStrip) chipsStrip.style.display = 'none';
+    if (collabSelect && collabSelect.parentElement) collabSelect.parentElement.style.display = 'none';
+  } else {
+    if (autoBtn && (curU.role === 'Administrador' || curU.role === 'Bodeguero')) {
+      autoBtn.style.display = 'inline-flex';
+    }
+    if (chipsStrip) chipsStrip.style.display = 'flex';
+    if (collabSelect && collabSelect.parentElement) collabSelect.parentElement.style.display = 'inline-flex';
+  }
+
   updateWebOrdersBadges();
   renderCollaboratorWorkloadChips();
   renderWebOrdersCurrentView();
@@ -10032,30 +10117,37 @@ function renderBoardOrderCard(o, staff) {
       </div>
 
       <!-- Asignación Rápida con Selectores -->
-      <div style="background:#F1F5F9; padding:6px 8px; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
-        <div style="display:flex; align-items:center; gap:4px;">
-          <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-box-seam"></i> Alisto:</span>
-          <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Cambiar bodeguero responsable">
-            <option value="">⚠️ Sin asignar</option>
-            ${bodeguerosList.map(b => `
-              <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
-                ${escapeHtml(b.name.split(' (')[0])}
-              </option>
-            `).join('')}
-          </select>
+      ${(AppState.currentUser && AppState.currentUser.role === 'Chofer') ? `
+        <div style="background:#F1F5F9; padding:6px 8px; border-radius:6px; font-size:0.75rem; color:#475569; display:flex; flex-direction:column; gap:2px;">
+          <div><i class="bi bi-box-seam text-primary"></i> <strong>Alistado por:</strong> ${escapeHtml(o.preparedByName || 'Bodega Central')}</div>
+          <div><i class="bi bi-truck text-warning"></i> <strong>Chofer:</strong> ${escapeHtml(o.driverName || 'Mi Camión')}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:4px;">
-          <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-truck"></i> Chofer:</span>
-          <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Cambiar chofer de ruta">
-            <option value="">⚠️ Sin asignar</option>
-            ${choferesList.map(c => `
-              <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
-                ${escapeHtml(c.name.split(' (')[0])}
-              </option>
-            `).join('')}
-          </select>
+      ` : `
+        <div style="background:#F1F5F9; padding:6px 8px; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-box-seam"></i> Alisto:</span>
+            <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Cambiar bodeguero responsable">
+              <option value="">⚠️ Sin asignar</option>
+              ${bodeguerosList.map(b => `
+                <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
+                  ${escapeHtml(b.name.split(' (')[0])}
+                </option>
+              `).join('')}
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-truck"></i> Chofer:</span>
+            <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Cambiar chofer de ruta">
+              <option value="">⚠️ Sin asignar</option>
+              ${choferesList.map(c => `
+                <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
+                  ${escapeHtml(c.name.split(' (')[0])}
+                </option>
+              `).join('')}
+            </select>
+          </div>
         </div>
-      </div>
+      `}
 
       <!-- Botones de Acción Sencillos de 1 Clic -->
       <div style="display:flex; gap:4px; margin-top:2px;">
@@ -10065,13 +10157,13 @@ function renderBoardOrderCard(o, staff) {
           </div>
         ` : ''}
 
-        ${(!isDelivered && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
+        ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
           <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#10B981; color:#FFF; font-weight:800; border-radius:6px; border:none;" onclick="takeOrderTask('${targetCode}')" title="Asignarme este pedido a mi nombre">
             <i class="bi bi-hand-index-thumb"></i> ✋ Tomar Trabajo
           </button>
         ` : ''}
 
-        ${(!isDelivered && isPending) ? `
+        ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && isPending) ? `
           <button class="btn-fragama btn-primary-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#0284C7; border-color:#0284C7; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido (Checklist)">
             <i class="bi bi-box-seam"></i> Alistar
           </button>
@@ -10213,31 +10305,38 @@ window.renderWebOrdersFullTable = async function(optionalFiltered) {
           ${formatCRC(o.total)}
         </td>
         <td style="padding:10px 12px;">
-          <!-- Dropdowns directos de asignación -->
-          <div style="display:flex; flex-direction:column; gap:4px; min-width:170px;">
-            <div style="display:flex; align-items:center; gap:4px;">
-              <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Alisto:</span>
-              <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Asignar bodeguero">
-                <option value="">⚠️ Sin asignar</option>
-                ${bodeguerosList.map(b => `
-                  <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
-                    ${escapeHtml(b.name.split(' (')[0])}
-                  </option>
-                `).join('')}
-              </select>
+          <!-- Dropdowns directos de asignación o badges de lectura para chofer -->
+          ${(AppState.currentUser && AppState.currentUser.role === 'Chofer') ? `
+            <div style="font-size:0.75rem; color:#475569; display:flex; flex-direction:column; gap:2px;">
+              <div><i class="bi bi-box-seam text-primary"></i> ${escapeHtml(o.preparedByName || 'Bodega Taras')}</div>
+              <div><i class="bi bi-truck text-warning"></i> ${escapeHtml(o.driverName || 'Mi Camión')}</div>
             </div>
-            <div style="display:flex; align-items:center; gap:4px;">
-              <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Chofer:</span>
-              <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Asignar chofer">
-                <option value="">⚠️ Sin asignar</option>
-                ${choferesList.map(c => `
-                  <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
-                    ${escapeHtml(c.name.split(' (')[0])}
-                  </option>
-                `).join('')}
-              </select>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:4px; min-width:170px;">
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Alisto:</span>
+                <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Asignar bodeguero">
+                  <option value="">⚠️ Sin asignar</option>
+                  ${bodeguerosList.map(b => `
+                    <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
+                      ${escapeHtml(b.name.split(' (')[0])}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Chofer:</span>
+                <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Asignar chofer">
+                  <option value="">⚠️ Sin asignar</option>
+                  ${choferesList.map(c => `
+                    <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
+                      ${escapeHtml(c.name.split(' (')[0])}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
             </div>
-          </div>
+          `}
         </td>
         <td style="padding:10px 12px; text-align:center;">
           ${badgeHtml}
@@ -10250,13 +10349,13 @@ window.renderWebOrdersFullTable = async function(optionalFiltered) {
               </span>
             ` : ''}
 
-            ${(!isDelivered && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
+            ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
               <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#10B981; color:#FFF; font-weight:800; border-radius:6px; border:none;" onclick="takeOrderTask('${targetCode}')" title="Asignarme este pedido">
                 <i class="bi bi-hand-index-thumb"></i> ✋ Tomar
               </button>
             ` : ''}
 
-            ${(!isDelivered && isPending) ? `
+            ${(!isDelivered && (AppState.currentUser && AppState.currentUser.role !== 'Chofer') && isPending) ? `
               <button class="btn-fragama btn-primary-fragama" style="padding:4px 9px; font-size:0.72rem; background:#0284C7; border-color:#0284C7; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido">
                 <i class="bi bi-box-seam"></i> Alistar
               </button>
