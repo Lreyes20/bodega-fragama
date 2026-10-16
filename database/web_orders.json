@@ -1,5 +1,46 @@
 [
   {
+    "orderCode": "PED-WEB-61697",
+    "docType": "PEDIDO_WEB",
+    "source": "TIENDA_WEB",
+    "customerId": 9999,
+    "customerName": "Supermercado El Roble",
+    "customerTaxId": "N/A",
+    "customerAddress": "San Rafael de Oreamuno, Cartago",
+    "customerPhone": "8888-9999",
+    "assignedUserId": 2,
+    "assignedUserName": "Esteban Quirós (Bodeguero)",
+    "assignedUserRole": "Vendedor",
+    "assignedUserHandle": "cpiedra",
+    "date": "2026-10-16",
+    "deliveryDate": "Cartago Centro",
+    "deliveryRoute": "Cartago Centro",
+    "terms": "Contado / Contra Entrega",
+    "status": "ENTREGADO",
+    "notes": "Ruta: Cartago Centro. Entregar en puerta principal",
+    "items": [
+      {
+        "productId": 101,
+        "sku": "BAN-BAG-099",
+        "name": "Bandeja 9x9 Bagazo",
+        "qty": 20,
+        "unitPrice": 107.0,
+        "subtotal": 2140.0
+      }
+    ],
+    "subtotalBruto": 2140.0,
+    "descuentoTotal": 0.0,
+    "subtotalNeto": 2140.0,
+    "iva": 278.2,
+    "total": 2418.2,
+    "preparedByUserId": 2,
+    "preparedByName": "Esteban Quirós",
+    "driverUserId": 4,
+    "driverName": "Mauricio Brenes (Chofer)",
+    "id": 115,
+    "stockDeducted": 1
+  },
+  {
     "id": 114,
     "orderCode": "PED-2026-26533",
     "docType": "PEDIDO",
@@ -28,7 +69,9 @@
         "subtotal": 0.0
       }
     ],
-    "stockDeducted": 1
+    "stockDeducted": 1,
+    "preparedByName": "Esteban Quirós (Bodeguero)",
+    "driverName": "Minor Coto (Chofer Rutas)"
   },
   {
     "orderCode": "PED-WEB-64324",
@@ -136,7 +179,9 @@
     "subtotalNeto": 12920.0,
     "iva": 1679.6000000000001,
     "total": 14599.6,
-    "id": 110
+    "id": 110,
+    "preparedByName": "Christian Reyes (Administrador)",
+    "driverName": "Minor Coto (Chofer Rutas)"
   },
   {
     "orderCode": "PED-WEB-11388",
@@ -148,7 +193,7 @@
     "customerAddress": "Costado norte del estadio lito monge de Curridabat",
     "customerPhone": "8888-9999",
     "assignedUserId": 6,
-    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserName": "Carlos Calvo (Bodega Central)",
     "assignedUserRole": "Vendedor",
     "assignedUserHandle": "cpiedra",
     "date": "2026-10-15",
@@ -220,7 +265,9 @@
     "subtotalNeto": 16991.0,
     "iva": 2208.83,
     "total": 19199.83,
-    "id": 109
+    "id": 109,
+    "preparedByName": "Christian Reyes (Administrador)",
+    "driverName": "Minor Coto (Chofer Rutas)"
   },
   {
     "orderCode": "PED-WEB-53917",
@@ -317,14 +364,14 @@
     "customerAddress": "Costado norte del estadio lito monge de Curridabat",
     "customerPhone": "88378662",
     "assignedUserId": 6,
-    "assignedUserName": "Carlos Piedra (Ventas / Despacho)",
+    "assignedUserName": "Carlos Calvo (Bodega Central)",
     "assignedUserRole": "Vendedor",
     "assignedUserHandle": "cpiedra",
     "date": "2026-10-01",
     "deliveryDate": "Puntarenas (Quincenal)",
     "deliveryRoute": "Puntarenas (Quincenal)",
     "terms": "Contado / Contra Entrega",
-    "status": "PENDIENTE",
+    "status": "EN_ALISTADO",
     "notes": "Ruta: Puntarenas (Quincenal). Ruta: Puntarenas (Quincenal).",
     "items": [
       {
@@ -350,8 +397,9 @@
     "iva": 1209.0,
     "total": 10509.0,
     "id": 103,
-    "preparedByName": "Carlos Calvo (Bodeguero)",
-    "stockDeducted": 0
+    "preparedByName": "Carlos Calvo (Bodega Central)",
+    "stockDeducted": 0,
+    "driverName": "Mauricio Brenes (Chofer)"
   },
   {
     "orderCode": "PED-WEB-99999",
@@ -464,7 +512,9 @@
     "descuentoTotal": 0.0,
     "subtotalNeto": 2400.0,
     "iva": 312.0,
-    "total": 2712.0
+    "total": 2712.0,
+    "preparedByName": "Esteban Quirós (Bodeguero)",
+    "driverName": "Minor Coto (Chofer Rutas)"
   },
   {
     "id": 1790875826,
@@ -507,6 +557,8 @@
     "descuentoTotal": 0.0,
     "subtotalNeto": 9950.0,
     "iva": 1293.5,
-    "total": 11243.5
+    "total": 11243.5,
+    "preparedByName": "Carlos Calvo (Bodega Central)",
+    "driverName": "Mauricio Brenes (Chofer)"
   }
 ]

@@ -2151,6 +2151,9 @@
               <button class="btn-fragama btn-outline-fragama" id="btnManualSyncOrders" onclick="triggerManualOrderSync()" style="padding:6px 12px; font-size:0.8rem; background:#FFF; border-color:#10B981; color:#065F46; font-weight:700;" title="Sincronizar pedidos con la nube">
                 <i class="bi bi-arrow-clockwise" id="iconManualSync"></i> Refrescar Bandeja
               </button>
+              <button class="btn-fragama" id="btnAutoAssignOrders" onclick="triggerAutoAssignOrders()" style="padding:6px 14px; font-size:0.8rem; background:#7C3AED; color:#FFF; font-weight:800; border:none; border-radius:6px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(124,58,237,0.25);" title="Asignar y distribuir pedidos pendientes equitativamente a los colaboradores">
+                <i class="bi bi-lightning-charge-fill" style="color:#FDE047;"></i> Auto-Asignar Trabajos
+              </button>
               <a href="/tienda.html" target="_blank" class="btn-fragama btn-primary-fragama" style="padding:6px 12px; font-size:0.8rem; background:#10B981; border-color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
                 <i class="bi bi-shop"></i> Abrir Tienda Web
               </a>
@@ -2182,46 +2185,87 @@
           </div>
         </div>
 
-        <!-- Filtros Rápidos y Buscador de Pedidos Web -->
-        <div class="content-card" style="margin-bottom:1rem; padding:12px 16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div style="display:flex; gap:6px; flex-wrap:wrap;" id="webOrdersFilterGroup">
-              <button class="btn-fragama btn-primary-fragama web-filter-btn active" data-filter="ALL" onclick="filterWebOrdersView('ALL', this)" style="padding:5px 12px; font-size:0.8rem;">
-                Todos los Pedidos
+        <!-- Barra de Carga de Trabajo y Asignación por Colaborador -->
+        <div class="content-card" style="margin-bottom:1rem; padding:12px 16px; background:#F8FAFC; border:1px solid #E2E8F0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+            <div style="font-size:0.84rem; font-weight:800; color:#1E293B; display:flex; align-items:center; gap:8px;">
+              <i class="bi bi-people-fill" style="color:#0284C7; font-size:1.15rem;"></i>
+              <span>Distribución de Trabajos por Colaborador:</span>
+              <span style="font-size:0.75rem; font-weight:600; color:#64748B;">Haga clic en un colaborador para filtrar sus tareas</span>
+            </div>
+            <!-- Toggle entre Vista Tablero Ordenado y Vista Tabla -->
+            <div style="display:inline-flex; background:#E2E8F0; padding:2px; border-radius:8px; gap:2px;">
+              <button class="btn-fragama view-mode-pill-btn active" id="btnViewModeBoard" onclick="switchOrdersViewMode('BOARD')" style="padding:4px 12px; font-size:0.75rem; border-radius:6px; font-weight:700; background:#FFF; color:#0F172A; border:none; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <i class="bi bi-kanban"></i> Tablero por Colaborador
               </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" id="btnFilterMyAssigned" data-filter="MY_ASSIGNED" onclick="filterWebOrdersView('MY_ASSIGNED', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#8B5CF6; color:#6D28D9; font-weight:700;">
-                🎯 Asignados a Mí
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="WEB" onclick="filterWebOrdersView('WEB', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#10B981; color:#065F46;">
-                🌐 Solo Web
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="BODEGA" onclick="filterWebOrdersView('BODEGA', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#6366F1; color:#4338CA;">
-                🏢 Solo Bodega
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="PENDIENTE" onclick="filterWebOrdersView('PENDIENTE', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#F59E0B; color:#B45309;">
-                ⏳ Pendientes de Alisto
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ALISTADO" onclick="filterWebOrdersView('ALISTADO', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#0284C7; color:#0369A1;">
-                📦 Alistados en Bodega
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="EN_RUTA" onclick="filterWebOrdersView('EN_RUTA', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#7C3AED; color:#6B21A8;">
-                🚚 En Ruta
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ENTREGADO" onclick="filterWebOrdersView('ENTREGADO', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#10B981; color:#065F46;">
-                ✅ Entregados
-              </button>
-              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="NO_ENTREGADO" onclick="filterWebOrdersView('NO_ENTREGADO', this)" style="padding:5px 12px; font-size:0.8rem; border-color:#DC2626; color:#991B1B;">
-                ❌ No Entregados
+              <button class="btn-fragama view-mode-pill-btn" id="btnViewModeTable" onclick="switchOrdersViewMode('TABLE')" style="padding:4px 12px; font-size:0.75rem; border-radius:6px; font-weight:700; background:transparent; color:#64748B; border:none;">
+                <i class="bi bi-table"></i> Vista Tabla Compacta
               </button>
             </div>
-            <div style="position:relative; min-width:240px; flex-grow:1; max-width:360px;">
-              <input type="text" id="webOrdersSearchInput" oninput="renderWebOrdersFullTable()" placeholder="🔍 Buscar por N° pedido, cliente, teléfono..." style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:7px 12px; font-size:0.82rem;">
+          </div>
+          <!-- Tira de chips de colaboradores y su carga activa -->
+          <div class="collab-workload-strip" id="collabWorkloadChipsContainer">
+            <!-- Renderizado dinámico -->
+          </div>
+        </div>
+
+        <!-- Filtros Rápidos, Selector de Colaborador y Buscador -->
+        <div class="content-card" style="margin-bottom:1rem; padding:12px 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;" id="webOrdersFilterGroup">
+              <!-- Selector directo de Colaborador -->
+              <div style="display:inline-flex; align-items:center; gap:6px; margin-right:4px;">
+                <label for="collabFilterSelect" style="font-size:0.78rem; font-weight:800; color:#334155; margin:0;"><i class="bi bi-person-badge text-primary"></i> Responsable:</label>
+                <select id="collabFilterSelect" onchange="filterByCollaboratorSelect(this.value)" style="border:1px solid #CBD5E1; border-radius:6px; padding:4px 10px; font-size:0.8rem; font-weight:700; background:#FFF; color:#0F172A; cursor:pointer;">
+                  <option value="ALL">🌐 Todos los Colaboradores</option>
+                  <option value="MY_ASSIGNED">🎯 Mis Trabajos Asignados</option>
+                  <option value="UNASSIGNED">⚠️ Sin Asignar (Nuevos)</option>
+                </select>
+              </div>
+
+              <!-- Filtro Principal: Trabajos Activos (Por Defecto) para evitar mezclar con entregados -->
+              <button class="btn-fragama btn-primary-fragama web-filter-btn active" data-filter="ACTIVE" onclick="filterWebOrdersView('ACTIVE', this)" style="padding:5px 12px; font-size:0.78rem; font-weight:800;" title="Mostrar únicamente pedidos en proceso de alistado y entrega">
+                ⚡ Trabajos Activos (<span id="filterCountActive">0</span>)
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" id="btnFilterMyAssigned" data-filter="MY_ASSIGNED" onclick="filterWebOrdersView('MY_ASSIGNED', this)" style="padding:5px 11px; font-size:0.78rem; border-color:#8B5CF6; color:#6D28D9; font-weight:700;" title="Mis tareas asignadas pendientes">
+                🎯 Mis Asignados (<span id="filterCountMyAssigned">0</span>)
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="UNASSIGNED" onclick="filterWebOrdersView('UNASSIGNED', this)" style="padding:5px 11px; font-size:0.78rem; border-color:#E11D48; color:#BE123C; font-weight:700;" title="Pedidos nuevos pendientes de asignación">
+                ⚠️ Sin Asignar (<span id="filterCountUnassigned">0</span>)
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="PENDIENTE" onclick="filterWebOrdersView('PENDIENTE', this)" style="padding:5px 11px; font-size:0.78rem; border-color:#F59E0B; color:#B45309;">
+                ⏳ Pendientes (<span id="filterCountPending">0</span>)
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ALISTADO" onclick="filterWebOrdersView('ALISTADO', this)" style="padding:5px 11px; font-size:0.78rem; border-color:#0284C7; color:#0369A1;">
+                📦 Alistados (<span id="filterCountPrepared">0</span>)
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="EN_RUTA" onclick="filterWebOrdersView('EN_RUTA', this)" style="padding:5px 11px; font-size:0.78rem; border-color:#7C3AED; color:#6B21A8;">
+                🚚 En Ruta (<span id="filterCountInRoute">0</span>)
+              </button>
+
+              <!-- Pestaña Separada para Historial de Pedidos Ya Entregados -->
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ENTREGADO" onclick="filterWebOrdersView('ENTREGADO', this)" style="padding:5px 12px; font-size:0.78rem; border-color:#10B981; color:#065F46; font-weight:800; background:#F0FDF4;" title="Historial de pedidos que ya fueron entregados">
+                ✅ Entregados / Historial (<span id="filterCountDelivered">0</span>)
+              </button>
+              <button class="btn-fragama btn-outline-fragama web-filter-btn" data-filter="ALL" onclick="filterWebOrdersView('ALL', this)" style="padding:5px 10px; font-size:0.78rem; color:#64748B;" title="Ver todos los pedidos sin filtrar">
+                🌐 Ver Todo
+              </button>
+            </div>
+            <div style="position:relative; min-width:240px; flex-grow:1; max-width:320px;">
+              <input type="text" id="webOrdersSearchInput" oninput="renderWebOrdersCurrentView()" placeholder="🔍 Buscar por N° pedido, cliente, chofer..." style="width:100%; border:1px solid #CBD5E1; border-radius:8px; padding:6px 12px; font-size:0.8rem;">
             </div>
           </div>
         </div>
 
-        <!-- Tabla Completa de Pedidos Web -->
-        <div class="content-card">
+        <!-- 1. VISTA TABLERO POR COLABORADOR (ORGANIZADO Y SENCILLO DE USAR) -->
+        <div id="webOrdersBoardContainer" style="display:block;">
+          <div class="collab-board-grid" id="collabBoardColumnsContainer">
+            <!-- Renderizado dinámico de columnas por colaborador -->
+          </div>
+        </div>
+
+        <!-- 2. VISTA TABLA COMPACTA DE PEDIDOS -->
+        <div class="content-card" id="webOrdersTableContainer" style="display:none;">
           <div style="overflow-x:auto;">
             <table style="width:100%; border-collapse:collapse; font-size:0.84rem;">
               <thead style="background:#F8FAFC; border-bottom:2px solid #E2E8F0; color:#475569; font-size:0.78rem;">
@@ -2229,9 +2273,9 @@
                   <th style="padding:10px 14px; text-align:left;">N° Pedido</th>
                   <th style="padding:10px 14px; text-align:left;">Cliente &amp; Contacto</th>
                   <th style="padding:10px 14px; text-align:left;">Ruta &amp; Dirección</th>
-                  <th style="padding:10px 14px; text-align:left;">Artículos del Pedido</th>
+                  <th style="padding:10px 14px; text-align:left;">Artículos</th>
                   <th style="padding:10px 14px; text-align:right;">Total (₡)</th>
-                  <th style="padding:10px 14px; text-align:left;">Responsables (Alisto / Chofer)</th>
+                  <th style="padding:10px 14px; text-align:left; min-width:210px;">Responsables (Alisto / Chofer)</th>
                   <th style="padding:10px 14px; text-align:center;">Estado</th>
                   <th style="padding:10px 14px; text-align:center;">Acciones Operativas</th>
                 </tr>

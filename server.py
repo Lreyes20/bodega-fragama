@@ -483,6 +483,10 @@ class OrderCreateRequest(BaseModel):
     customerPhone: Optional[str] = None
     customerContact: Optional[str] = None
     assignedUserId: Optional[int] = 6
+    preparedByUserId: Optional[int] = None
+    preparedByName: Optional[str] = None
+    driverUserId: Optional[int] = None
+    driverName: Optional[str] = None
     deliveryDate: Optional[str] = None
     terms: Optional[str] = "Contado"
     paymentTerms: Optional[str] = "Contado Inmediato"
@@ -504,6 +508,14 @@ class OrderStatusUpdateRequest(BaseModel):
     driverName: Optional[str] = None
     notes: Optional[str] = None
     justification: Optional[str] = None
+
+class OrderAssignRequest(BaseModel):
+    preparedByUserId: Optional[int] = None
+    preparedByName: Optional[str] = None
+    driverUserId: Optional[int] = None
+    driverName: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
 
 class CustomerCreateRequest(BaseModel):
     taxId: str = Field(..., min_length=5, max_length=30)
@@ -735,6 +747,67 @@ def get_public_catalog():
     except Exception:
         return []
 
+def get_best_collaborator_assignment(cur, preferred_bod_id=None, preferred_driver_id=None):
+    """
+    Selecciona de forma inteligente el bodeguero y chofer disponible con menor carga activa,
+    garantizando un reparto equitativo y ordenado de los trabajos.
+    """
+    assigned_bod_id = preferred_bod_id
+    assigned_bod_name = None
+    if assigned_bod_id:
+        cur.execute("SELECT UserId, FullName FROM Users WHERE UserId = ? AND IsActive = 1", (assigned_bod_id,))
+        brow = cur.fetchone()
+        if brow:
+            assigned_bod_name = brow["FullName"]
+
+    if not assigned_bod_name:
+        cur.execute("""
+            SELECT u.UserId, u.FullName, COUNT(so.SalesOrderId) as ActiveOrders
+            FROM Users u
+            INNER JOIN Roles r ON u.RoleId = r.RoleId
+            LEFT JOIN SalesOrders so ON so.PreparedByUserId = u.UserId AND so.Status IN ('PENDIENTE', 'EN_ALISTADO', 'ALISTADO')
+            WHERE u.IsActive = 1 AND (r.Name = 'Bodeguero' OR u.Username IN ('bodega', 'equiros') OR r.Name = 'Administrador')
+            GROUP BY u.UserId
+            ORDER BY (CASE WHEN r.Name = 'Bodeguero' THEN 1 ELSE 2 END), ActiveOrders ASC, u.UserId ASC
+            LIMIT 1
+        """)
+        best_b = cur.fetchone()
+        if best_b:
+            assigned_bod_id = best_b["UserId"]
+            assigned_bod_name = best_b["FullName"]
+        else:
+            assigned_bod_id = 9
+            assigned_bod_name = "Carlos Calvo (Bodega Central)"
+
+    assigned_chof_id = preferred_driver_id
+    assigned_chof_name = None
+    if assigned_chof_id:
+        cur.execute("SELECT UserId, FullName FROM Users WHERE UserId = ? AND IsActive = 1", (assigned_chof_id,))
+        drow = cur.fetchone()
+        if drow:
+            assigned_chof_name = drow["FullName"]
+
+    if not assigned_chof_name:
+        cur.execute("""
+            SELECT u.UserId, u.FullName, COUNT(so.SalesOrderId) as ActiveDeliveries
+            FROM Users u
+            INNER JOIN Roles r ON u.RoleId = r.RoleId
+            LEFT JOIN SalesOrders so ON so.DriverUserId = u.UserId AND so.Status IN ('ALISTADO', 'EN_RUTA')
+            WHERE u.IsActive = 1 AND (r.Name = 'Chofer' OR u.Username IN ('chofer', 'mbrenes'))
+            GROUP BY u.UserId
+            ORDER BY ActiveDeliveries ASC, u.UserId ASC
+            LIMIT 1
+        """)
+        best_d = cur.fetchone()
+        if best_d:
+            assigned_chof_id = best_d["UserId"]
+            assigned_chof_name = best_d["FullName"]
+        else:
+            assigned_chof_id = 11
+            assigned_chof_name = "Minor Coto (Chofer Rutas)"
+
+    return assigned_bod_id, assigned_bod_name, assigned_chof_id, assigned_chof_name
+
 @app.post("/api/public/orders")
 async def create_public_order(req: PublicOrderCreateRequest, request: Request):
     """
@@ -816,13 +889,23 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
         cust_row = s_cur.fetchone()
         cust_id = cust_row["CustomerId"] if cust_row else 1
 
+        # Asignar automáticamente bodeguero responsable y chofer según carga de trabajo
+        bod_id, bod_name, chof_id, chof_name = get_best_collaborator_assignment(s_cur)
+        order_record["assignedUserId"] = bod_id
+        order_record["assignedUserName"] = bod_name
+        order_record["preparedByUserId"] = bod_id
+        order_record["preparedByName"] = bod_name
+        order_record["driverUserId"] = chof_id
+        order_record["driverName"] = chof_name
+
         # Insertar Encabezado de Pedido (SalesOrders)
         s_cur.execute("""
             INSERT INTO SalesOrders 
-            (OrderNumber, CustomerId, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
-            VALUES (?, ?, 1, 6, ?, ?, ?, ?, 'PENDIENTE', 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
+            (OrderNumber, CustomerId, UserId, AssignedToUserId, PreparedByUserId, PreparedByName, DriverUserId, DriverName, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryRoute, DeliveryNotes, Source, CreatedAt)
+            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 'PEDIDO_WEB', ?, ?, 'TIENDA_WEB', ?)
         """, (
-            order_code, cust_id, req.subtotalBruto, req.descuentoTotal or 0.0,
+            order_code, cust_id, bod_id, bod_id, bod_name, chof_id, chof_name,
+            req.subtotalBruto, req.descuentoTotal or 0.0,
             req.iva, req.total, clean_route, order_record["notes"], order_date
         ))
         sql_order_id = s_cur.lastrowid
@@ -837,9 +920,19 @@ async def create_public_order(req: PublicOrderCreateRequest, request: Request):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (sql_order_id, it.productId, clean_sku, clean_pname, it.qty, it.unitPrice, it.subtotal or (it.qty * it.unitPrice)))
 
+        # Registrar trazabilidad inicial en OrderAuditLog
+        s_cur.execute("""
+            INSERT INTO OrderAuditLog 
+            (OrderId, OrderCode, Timestamp, PreviousStatus, NewStatus, UserId, UserName, UserRole, Notes, Justification)
+            VALUES (?, ?, ?, NULL, 'PENDIENTE', ?, ?, 'Sistema', ?, NULL)
+        """, (
+            sql_order_id, order_code, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            bod_id, bod_name, f"Pedido ingresado desde Tienda Virtual. Asignado para alistado a {bod_name} y ruta con {chof_name}."
+        ))
+
         s_conn.commit()
         s_conn.close()
-        logger.info(f"✅ Pedido web {order_code} guardado con éxito en SQLite (ID: {sql_order_id}).")
+        logger.info(f"✅ Pedido web {order_code} guardado con éxito en SQLite (ID: {sql_order_id}) asignado a {bod_name}.")
     except Exception as e:
         logger.error(f"Error guardando pedido en SQLite: {e}")
 
@@ -1464,7 +1557,7 @@ def get_order_audit_log(order_id: str):
 
 @app.get("/api/staff")
 def get_staff_members():
-    """Retorna colaboradores activos divididos por roles para asignación de pedidos."""
+    """Retorna colaboradores activos divididos por roles para asignación de pedidos con su carga de trabajo en tiempo real."""
     conn = get_sqlite_conn()
     cur = conn.cursor()
     cur.execute("""
@@ -1475,12 +1568,265 @@ def get_staff_members():
         ORDER BY u.FullName ASC
     """)
     rows = cur.fetchall()
+
+    # Calcular carga de trabajo activa por colaborador
+    cur.execute("""
+        SELECT PreparedByUserId, count(*) as cnt
+        FROM SalesOrders
+        WHERE Status IN ('PENDIENTE', 'EN_ALISTADO', 'ALISTADO') AND PreparedByUserId IS NOT NULL
+        GROUP BY PreparedByUserId
+    """)
+    bod_workload = {r["PreparedByUserId"]: r["cnt"] for r in cur.fetchall()}
+
+    cur.execute("""
+        SELECT DriverUserId, count(*) as cnt
+        FROM SalesOrders
+        WHERE Status IN ('ALISTADO', 'EN_RUTA') AND DriverUserId IS NOT NULL
+        GROUP BY DriverUserId
+    """)
+    chof_workload = {r["DriverUserId"]: r["cnt"] for r in cur.fetchall()}
     conn.close()
-    staff = [dict(r) for r in rows]
+
+    staff = []
+    for r in rows:
+        d = dict(r)
+        d["pickingCount"] = bod_workload.get(d["id"], 0)
+        d["deliveryCount"] = chof_workload.get(d["id"], 0)
+        d["activeOrdersCount"] = d["pickingCount"] + d["deliveryCount"]
+        staff.append(d)
+
     return {
         "all": staff,
         "bodegueros": [u for u in staff if u["role"] in ("Bodeguero", "Administrador")],
         "choferes": [u for u in staff if u["role"] in ("Chofer", "Vendedor", "Administrador")]
+    }
+
+@app.post("/api/orders/{order_id}/assign")
+@app.put("/api/orders/{order_id}/assign")
+def assign_order_collaborator(order_id: str, req: OrderAssignRequest):
+    """
+    Asigna o reasigna un pedido a un bodeguero y/o chofer de forma directa e inmediata.
+    Permite además pasar a EN_ALISTADO si el bodeguero toma la orden.
+    """
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT SalesOrderId, OrderNumber, Status, PreparedByName, DriverName
+        FROM SalesOrders
+        WHERE SalesOrderId = ? OR OrderNumber = ?
+    """, (order_id, order_id))
+    order_row = cur.fetchone()
+
+    if not order_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+    so_id = order_row["SalesOrderId"]
+    order_code = order_row["OrderNumber"]
+    curr_status = order_row["Status"]
+
+    update_fields = []
+    update_params = []
+
+    if req.preparedByName:
+        update_fields.extend(["PreparedByUserId = ?", "PreparedByName = ?", "AssignedToUserId = ?"])
+        update_params.extend([req.preparedByUserId or 1, req.preparedByName.strip(), req.preparedByUserId or 1])
+
+    if req.driverName:
+        update_fields.extend(["DriverUserId = ?", "DriverName = ?"])
+        update_params.extend([req.driverUserId or 1, req.driverName.strip()])
+
+    new_status = curr_status
+    if req.status:
+        new_status = req.status.strip().upper()
+        update_fields.append("Status = ?")
+        update_params.append(new_status)
+
+    if not update_fields:
+        conn.close()
+        return {"success": True, "message": "No se indicaron cambios de asignación."}
+
+    update_params.append(so_id)
+    cur.execute(f"UPDATE SalesOrders SET {', '.join(update_fields)} WHERE SalesOrderId = ?", update_params)
+
+    # Auditoría
+    actor_name = req.preparedByName or "Supervisor"
+    actor_id = req.preparedByUserId or 1
+    audit_notes = req.notes or f"Asignación de responsabilidades: Bodeguero: {req.preparedByName or 'Sin cambio'}, Chofer: {req.driverName or 'Sin cambio'}."
+    
+    cur.execute("""
+        INSERT INTO OrderAuditLog 
+        (OrderId, OrderCode, Timestamp, PreviousStatus, NewStatus, UserId, UserName, UserRole, Notes, Justification)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Colaborador', ?, NULL)
+    """, (so_id, order_code, now_str, curr_status, new_status, actor_id, actor_name, audit_notes))
+
+    conn.commit()
+    conn.close()
+
+    # Replicar en web_orders.json
+    try:
+        w_orders = load_local_web_orders()
+        for wo in w_orders:
+            if str(wo.get("id")) == str(order_id) or str(wo.get("orderCode")) == str(order_id):
+                if req.preparedByName:
+                    wo["preparedByName"] = req.preparedByName
+                    wo["assignedUserName"] = req.preparedByName
+                if req.driverName:
+                    wo["driverName"] = req.driverName
+                if req.status:
+                    wo["status"] = new_status
+                break
+        with open(WEB_ORDERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(w_orders, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"Aviso actualizando web_orders.json: {e}")
+
+    return {
+        "success": True,
+        "message": f"Pedido {order_code} asignado correctamente.",
+        "orderCode": order_code,
+        "preparedByName": req.preparedByName,
+        "driverName": req.driverName,
+        "status": new_status
+    }
+
+@app.post("/api/orders/auto-assign")
+def auto_assign_orders():
+    """
+    Asigna automáticamente de forma equitativa y ordenada todos los pedidos pendientes o sin asignar a los colaboradores activos.
+    """
+    conn = get_sqlite_conn()
+    cur = conn.cursor()
+    
+    # 1. Obtener bodegueros activos
+    cur.execute("""
+        SELECT u.UserId, u.FullName, u.Username
+        FROM Users u
+        INNER JOIN Roles r ON u.RoleId = r.RoleId
+        WHERE u.IsActive = 1 AND (r.Name = 'Bodeguero' OR u.Username IN ('bodega', 'equiros') OR r.Name = 'Administrador')
+        ORDER BY (CASE WHEN r.Name = 'Bodeguero' THEN 1 ELSE 2 END), u.FullName ASC
+    """)
+    bodegueros = [dict(r) for r in cur.fetchall()]
+    if not bodegueros:
+        cur.execute("SELECT UserId, FullName, Username FROM Users WHERE IsActive = 1 LIMIT 1")
+        b_fallback = cur.fetchone()
+        if b_fallback:
+            bodegueros = [dict(b_fallback)]
+
+    # 2. Obtener choferes activos
+    cur.execute("""
+        SELECT u.UserId, u.FullName, u.Username
+        FROM Users u
+        INNER JOIN Roles r ON u.RoleId = r.RoleId
+        WHERE u.IsActive = 1 AND (r.Name = 'Chofer' OR u.Username IN ('chofer', 'mbrenes'))
+        ORDER BY u.FullName ASC
+    """)
+    choferes = [dict(r) for r in cur.fetchall()]
+    if not choferes:
+        cur.execute("SELECT UserId, FullName, Username FROM Users WHERE IsActive = 1 LIMIT 1")
+        c_fallback = cur.fetchone()
+        if c_fallback:
+            choferes = [dict(c_fallback)]
+
+    # 3. Consultar pedidos pendientes o sin bodeguero asignado
+    cur.execute("""
+        SELECT SalesOrderId, OrderNumber, DeliveryRoute, PreparedByName, DriverName, Status
+        FROM SalesOrders
+        WHERE Status IN ('PENDIENTE', 'SOLICITADO') OR PreparedByName IS NULL OR PreparedByName = '' OR PreparedByName = 'Sin asignar'
+        ORDER BY SalesOrderId ASC
+    """)
+    unassigned_orders = cur.fetchall()
+    
+    if not unassigned_orders:
+        conn.close()
+        return {
+            "success": True,
+            "assignedCount": 0,
+            "message": "Todos los pedidos ya tienen colaboradores asignados correctamente.",
+            "details": []
+        }
+
+    # 4. Calcular carga actual de cada bodeguero
+    cur.execute("""
+        SELECT PreparedByUserId, count(*) as cnt
+        FROM SalesOrders
+        WHERE Status IN ('PENDIENTE', 'EN_ALISTADO', 'ALISTADO') AND PreparedByUserId IS NOT NULL
+        GROUP BY PreparedByUserId
+    """)
+    bod_workload = {r["PreparedByUserId"]: r["cnt"] for r in cur.fetchall()}
+    for b in bodegueros:
+        b["load"] = bod_workload.get(b["UserId"], 0)
+
+    cur.execute("""
+        SELECT DriverUserId, count(*) as cnt
+        FROM SalesOrders
+        WHERE Status IN ('ALISTADO', 'EN_RUTA') AND DriverUserId IS NOT NULL
+        GROUP BY DriverUserId
+    """)
+    chof_workload = {r["DriverUserId"]: r["cnt"] for r in cur.fetchall()}
+    for c in choferes:
+        c["load"] = chof_workload.get(c["UserId"], 0)
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    assigned_details = []
+
+    for ord_row in unassigned_orders:
+        so_id = ord_row["SalesOrderId"]
+        order_num = ord_row["OrderNumber"]
+
+        # Elegir bodeguero con menor carga
+        bodegueros.sort(key=lambda x: x["load"])
+        chosen_bod = bodegueros[0]
+        chosen_bod["load"] += 1
+
+        # Elegir chofer con menor carga
+        choferes.sort(key=lambda x: x["load"])
+        chosen_chof = choferes[0]
+        chosen_chof["load"] += 1
+
+        cur.execute("""
+            UPDATE SalesOrders
+            SET PreparedByUserId = ?, PreparedByName = ?, DriverUserId = ?, DriverName = ?, AssignedToUserId = ?
+            WHERE SalesOrderId = ?
+        """, (chosen_bod["UserId"], chosen_bod["FullName"], chosen_chof["UserId"], chosen_chof["FullName"], chosen_bod["UserId"], so_id))
+
+        # Registrar en auditoría
+        cur.execute("""
+            INSERT INTO OrderAuditLog 
+            (OrderId, OrderCode, Timestamp, PreviousStatus, NewStatus, UserId, UserName, UserRole, Notes, Justification)
+            VALUES (?, ?, ?, 'PENDIENTE', 'PENDIENTE', ?, ?, 'Supervisor', ?, NULL)
+        """, (so_id, order_num, now_str, chosen_bod["UserId"], chosen_bod["FullName"], f"Asignado de forma automática y equitativa a {chosen_bod['FullName']} (Alistador) y {chosen_chof['FullName']} (Chofer)"))
+
+        assigned_details.append({
+            "orderCode": order_num,
+            "preparedByName": chosen_bod["FullName"],
+            "driverName": chosen_chof["FullName"]
+        })
+
+    conn.commit()
+    conn.close()
+
+    # Sincronizar archivo web_orders.json
+    try:
+        w_orders = load_local_web_orders()
+        for d in assigned_details:
+            for wo in w_orders:
+                if str(wo.get("orderCode")) == str(d["orderCode"]):
+                    wo["preparedByName"] = d["preparedByName"]
+                    wo["driverName"] = d["driverName"]
+                    break
+        with open(WEB_ORDERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(w_orders, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"Aviso actualizando web_orders.json en auto-assign: {e}")
+
+    return {
+        "success": True,
+        "assignedCount": len(assigned_details),
+        "message": f"Se asignaron {len(assigned_details)} pedidos a los colaboradores en orden equitativo.",
+        "details": assigned_details
     }
 
 @app.post("/api/orders")
@@ -1538,14 +1884,26 @@ def create_internal_order(req: OrderCreateRequest):
         pay_method = req.paymentMethod or "SINPE Móvil"
         order_status = req.docType if req.docType == "COTIZACION" else "ALISTADO"
 
+        # Asignar colaborador responsable (Bodeguero) y Chofer
+        bod_id, bod_name, chof_id, chof_name = get_best_collaborator_assignment(
+            cur, 
+            preferred_bod_id=req.preparedByUserId or req.assignedUserId, 
+            preferred_driver_id=req.driverUserId
+        )
+        if req.preparedByName:
+            bod_name = req.preparedByName
+        if req.driverName:
+            chof_name = req.driverName
+
         cur.execute("""
             INSERT INTO SalesOrders 
-            (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, PaymentTerms, PaymentMethod, UserId, AssignedToUserId, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryNotes, DeliveryDate, Source, CreatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'BODEGA_ERP', ?)
+            (OrderNumber, CustomerId, CustomerName, CustomerTaxId, CustomerPhone, CustomerAddress, PaymentTerms, PaymentMethod, UserId, AssignedToUserId, PreparedByUserId, PreparedByName, DriverUserId, DriverName, SubTotal, DiscountAmount, TaxAmount, TotalAmount, Status, DocType, DeliveryNotes, DeliveryDate, Source, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'BODEGA_ERP', ?)
         """, (
             order_code, actual_customer_id, cust_name, cust_tax, cust_phone, cust_addr,
             pay_terms, pay_method,
-            req.assignedUserId or 6, req.subtotalBruto,
+            bod_id, bod_id, bod_name, chof_id, chof_name,
+            req.subtotalBruto,
             req.descuentoTotal, req.iva, req.total,
             order_status,
             req.docType, req.notes or "", req.deliveryDate or datetime.now().strftime("%Y-%m-%d"),

@@ -966,6 +966,61 @@ function updateWebOrdersBadges() {
       return s === 'NO_ENTREGADO' || s === 'RECHAZADO';
     }).length;
   }
+
+  // Contadores dinámicos para los botones de filtro (separando activos de entregados)
+  const activeCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    return s !== 'ENTREGADO' && s !== 'FACTURADO' && s !== 'CANCELADO' && s !== 'NO_ENTREGADO' && s !== 'RECHAZADO';
+  }).length;
+
+  const curU = AppState.currentUser || {};
+  const uName = (curU.name || '').toLowerCase();
+  const uFirst = uName.split(' ')[0] || '';
+
+  const myAssignedCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    const isActive = s !== 'ENTREGADO' && s !== 'FACTURADO' && s !== 'CANCELADO';
+    const ordDriver = (o.driverName || '').toLowerCase();
+    const ordResp = (o.assignedUserName || o.preparedByName || '').toLowerCase();
+    const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && o.driverUserId && Number(o.driverUserId) === Number(curU.id));
+    const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && o.assignedUserId && Number(o.assignedUserId) === Number(curU.id));
+    const isDefaultChofer = (curU.username === 'chofer' && (ordDriver.includes('minor') || !ordDriver));
+    return (isMyDriver || isMyResp || isDefaultChofer) && isActive;
+  }).length;
+
+  const unassignedCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    const isActive = s !== 'ENTREGADO' && s !== 'FACTURADO' && s !== 'CANCELADO';
+    const noResp = !o.preparedByName || o.preparedByName.trim() === '' || o.preparedByName === 'Sin asignar';
+    return noResp && isActive;
+  }).length;
+
+  const pendingCount = count;
+  const preparedCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    return s === 'ALISTADO' || s === 'EN_ALISTADO';
+  }).length;
+
+  const inRouteCount = allOrders.filter(o => String(o.status || '').toUpperCase().trim() === 'EN_RUTA').length;
+  const deliveredCount = allOrders.filter(o => {
+    const s = String(o.status || '').toUpperCase().trim();
+    return s === 'ENTREGADO' || s === 'FACTURADO';
+  }).length;
+
+  const elActive = document.getElementById('filterCountActive');
+  if (elActive) elActive.textContent = activeCount;
+  const elMy = document.getElementById('filterCountMyAssigned');
+  if (elMy) elMy.textContent = myAssignedCount;
+  const elUn = document.getElementById('filterCountUnassigned');
+  if (elUn) elUn.textContent = unassignedCount;
+  const elPend = document.getElementById('filterCountPending');
+  if (elPend) elPend.textContent = pendingCount;
+  const elPrep = document.getElementById('filterCountPrepared');
+  if (elPrep) elPrep.textContent = preparedCount;
+  const elRoute = document.getElementById('filterCountInRoute');
+  if (elRoute) elRoute.textContent = inRouteCount;
+  const elDeliv = document.getElementById('filterCountDelivered');
+  if (elDeliv) elDeliv.textContent = deliveredCount;
   
   const topCount = document.getElementById('topLiveWebOrdersCount');
   if (topCount) topCount.textContent = count;
@@ -977,6 +1032,10 @@ function updateWebOrdersBadges() {
 
   const histBadge = document.getElementById('orderHistoryBadgeCount');
   if (histBadge) histBadge.textContent = AppState.salesOrders.length;
+
+  if (typeof renderCollaboratorWorkloadChips === 'function') {
+    renderCollaboratorWorkloadChips();
+  }
 }
 
 // Navegación directa a pestaña de historial de pedidos
@@ -1016,7 +1075,8 @@ function renderAllViews() {
 // Actualización omnicanal de pedidos en todas las vistas de la bodega
 function refreshAllOrderViews() {
   if (typeof renderOrderHistory === 'function') renderOrderHistory();
-  if (typeof renderWebOrdersFullTable === 'function') renderWebOrdersFullTable();
+  if (typeof renderWebOrdersCurrentView === 'function') renderWebOrdersCurrentView();
+  else if (typeof renderWebOrdersFullTable === 'function') renderWebOrdersFullTable();
   if (typeof updateWebOrdersBadges === 'function') updateWebOrdersBadges();
   if (typeof renderDashboardAnalytics === 'function') renderDashboardAnalytics();
   if (typeof renderDriverDispatches === 'function') renderDriverDispatches();
@@ -9475,7 +9535,52 @@ function renderSuppliersGrid(searchTerm = '', categoryFilter = 'ALL') {
 // ==============================================================================
 // BANDEJA DEDICADA DE ALISTADO Y DESPACHO DE PEDIDOS WEB
 // ==============================================================================
-let _currentWebOrderFilter = 'ALL';
+let _currentWebOrderFilter = 'ACTIVE'; // 'ACTIVE' por defecto para NO mezclar con entregados
+let _currentCollabFilter = 'ALL';
+let _ordersViewMode = 'BOARD'; // 'BOARD' o 'TABLE'
+let _cachedStaffMembers = null;
+
+// Cambiar modo de vista: Tablero Ordenado por Colaborador vs Tabla Compacta
+window.switchOrdersViewMode = function(mode) {
+  _ordersViewMode = mode;
+  const boardEl = document.getElementById('webOrdersBoardContainer');
+  const tableEl = document.getElementById('webOrdersTableContainer');
+  const btnBoard = document.getElementById('btnViewModeBoard');
+  const btnTable = document.getElementById('btnViewModeTable');
+
+  if (mode === 'BOARD') {
+    if (boardEl) boardEl.style.display = 'block';
+    if (tableEl) tableEl.style.display = 'none';
+    if (btnBoard) {
+      btnBoard.classList.add('active');
+      btnBoard.style.background = '#FFF';
+      btnBoard.style.color = '#0F172A';
+      btnBoard.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnTable) {
+      btnTable.classList.remove('active');
+      btnTable.style.background = 'transparent';
+      btnTable.style.color = '#64748B';
+      btnTable.style.boxShadow = 'none';
+    }
+  } else {
+    if (boardEl) boardEl.style.display = 'none';
+    if (tableEl) tableEl.style.display = 'block';
+    if (btnTable) {
+      btnTable.classList.add('active');
+      btnTable.style.background = '#FFF';
+      btnTable.style.color = '#0F172A';
+      btnTable.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    }
+    if (btnBoard) {
+      btnBoard.classList.remove('active');
+      btnBoard.style.background = 'transparent';
+      btnBoard.style.color = '#64748B';
+      btnBoard.style.boxShadow = 'none';
+    }
+  }
+  renderWebOrdersCurrentView();
+};
 
 window.filterWebOrdersView = function(filterVal, btnElement) {
   _currentWebOrderFilter = filterVal;
@@ -9487,29 +9592,176 @@ window.filterWebOrdersView = function(filterVal, btnElement) {
     btnElement.classList.add('btn-primary-fragama', 'active');
     btnElement.classList.remove('btn-outline-fragama');
   }
-  renderWebOrdersFullTable();
+  renderWebOrdersCurrentView();
+};
+
+window.filterByCollaboratorSelect = function(val) {
+  _currentCollabFilter = val;
+  updateCollabChipsActiveState();
+  renderWebOrdersCurrentView();
+};
+
+window.filterByCollaboratorChip = function(collabId) {
+  _currentCollabFilter = String(collabId);
+  const sel = document.getElementById('collabFilterSelect');
+  if (sel) sel.value = String(collabId);
+  updateCollabChipsActiveState();
+  renderWebOrdersCurrentView();
+};
+
+function updateCollabChipsActiveState() {
+  document.querySelectorAll('.collab-chip').forEach(ch => {
+    const cid = ch.getAttribute('data-collab-id');
+    if (cid === String(_currentCollabFilter)) {
+      ch.classList.add('active');
+    } else {
+      ch.classList.remove('active');
+    }
+  });
+}
+
+// Carga lista de staff para selectores y asignaciones
+async function getStaffMembersList(force = false) {
+  if (!force && _cachedStaffMembers && _cachedStaffMembers.length > 0) return _cachedStaffMembers;
+  try {
+    const res = await fetch('/api/staff');
+    if (res.ok) {
+      const data = await res.json();
+      _cachedStaffMembers = data.all || [];
+      return _cachedStaffMembers;
+    }
+  } catch(e) {}
+  _cachedStaffMembers = AppState.systemUsers || [
+    { id: 9, name: "Carlos Calvo (Bodega Central)", role: "Bodeguero" },
+    { id: 2, name: "Esteban Quirós (Bodeguero)", role: "Bodeguero" },
+    { id: 11, name: "Minor Coto (Chofer Rutas)", role: "Chofer" },
+    { id: 4, name: "Mauricio Brenes (Chofer)", role: "Chofer" },
+    { id: 7, name: "Leonardo Reyes Hernández", role: "Administrador" },
+    { id: 1, name: "Christian Reyes (Administrador)", role: "Administrador" },
+    { id: 6, name: "Carlos Piedra (Ventas / Despacho)", role: "Vendedor" }
+  ];
+  return _cachedStaffMembers;
+}
+
+// Renderiza las píldoras de colaboradores y su carga en tiempo real (SOLO ACTIVOS)
+window.renderCollaboratorWorkloadChips = async function() {
+  const container = document.getElementById('collabWorkloadChipsContainer');
+  const sel = document.getElementById('collabFilterSelect');
+  const staff = await getStaffMembersList();
+  const allOrders = (AppState.salesOrders || []).filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
+
+  // Pedidos activos (excluye finalizados y entregados para no estorbar el día a día)
+  const isOrderActive = o => {
+    const st = String(o.status || '').toUpperCase().trim();
+    return st !== 'ENTREGADO' && st !== 'FACTURADO' && st !== 'CANCELADO' && st !== 'NO_ENTREGADO' && st !== 'RECHAZADO';
+  };
+  const activeOrders = allOrders.filter(isOrderActive);
+
+  // Calcular carga activa
+  const unassignedCount = activeOrders.filter(o => {
+    const noResp = !o.preparedByName || o.preparedByName.trim() === '' || o.preparedByName === 'Sin asignar';
+    return noResp;
+  }).length;
+
+  const curU = AppState.currentUser || {};
+  const uName = (curU.name || '').toLowerCase();
+  const uFirst = uName.split(' ')[0] || '';
+
+  const myOrdersCount = activeOrders.filter(o => {
+    const ordDriver = (o.driverName || '').toLowerCase();
+    const ordResp = (o.assignedUserName || o.preparedByName || '').toLowerCase();
+    const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && o.driverUserId && Number(o.driverUserId) === Number(curU.id));
+    const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && o.assignedUserId && Number(o.assignedUserId) === Number(curU.id));
+    return (isMyDriver || isMyResp);
+  }).length;
+
+  // Actualizar selector desplegable
+  if (sel) {
+    const currentVal = sel.value || 'ALL';
+    sel.innerHTML = `
+      <option value="ALL">🌐 Todos los Colaboradores (${activeOrders.length} activos)</option>
+      <option value="MY_ASSIGNED">🎯 Mis Trabajos Asignados (${myOrdersCount})</option>
+      <option value="UNASSIGNED">⚠️ Sin Asignar (Nuevos: ${unassignedCount})</option>
+    ` + staff.map(u => {
+      const uFirstCollab = (u.name || '').split(' ')[0].toLowerCase();
+      const uCount = activeOrders.filter(o => {
+        const pName = (o.preparedByName || '').toLowerCase();
+        const dName = (o.driverName || '').toLowerCase();
+        const match = (uFirstCollab && (pName.includes(uFirstCollab) || dName.includes(uFirstCollab))) ||
+                      (Number(o.preparedByUserId) === Number(u.id)) ||
+                      (Number(o.driverUserId) === Number(u.id));
+        return match;
+      }).length;
+      return `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.role)}: ${uCount} activos)</option>`;
+    }).join('');
+    sel.value = currentVal;
+  }
+
+  // Renderizar chips interactivos
+  if (container) {
+    let chipsHtml = `
+      <div class="collab-chip ${_currentCollabFilter === 'ALL' ? 'active' : ''}" data-collab-id="ALL" onclick="filterByCollaboratorChip('ALL')" title="Mostrar todos los colaboradores">
+        <i class="bi bi-grid-fill"></i> Todos <span class="badge-chip-count">${activeOrders.length}</span>
+      </div>
+      <div class="collab-chip ${_currentCollabFilter === 'MY_ASSIGNED' ? 'active' : ''}" data-collab-id="MY_ASSIGNED" onclick="filterByCollaboratorChip('MY_ASSIGNED')" style="border-color:#8B5CF6; color:#6D28D9;" title="Mostrar únicamente mis pedidos pendientes">
+        <i class="bi bi-person-check-fill"></i> Mis Trabajos <span class="badge-chip-count" style="background:#EDE9FE; color:#5B21B6;">${myOrdersCount}</span>
+      </div>
+      <div class="collab-chip ${_currentCollabFilter === 'UNASSIGNED' ? 'active' : ''}" data-collab-id="UNASSIGNED" onclick="filterByCollaboratorChip('UNASSIGNED')" style="border-color:${unassignedCount > 0 ? '#F43F5E' : '#CBD5E1'}; color:${unassignedCount > 0 ? '#E11D48' : '#64748B'};" title="Pedidos pendientes de asignar alistador o chofer">
+        <i class="bi bi-exclamation-triangle-fill" style="color:${unassignedCount > 0 ? '#E11D48' : '#94A3B8'};"></i> Por Asignar <span class="badge-chip-count" style="background:${unassignedCount > 0 ? '#FFE4E6' : '#F1F5F9'}; color:${unassignedCount > 0 ? '#9F1239' : '#475569'};">${unassignedCount}</span>
+      </div>
+    `;
+
+    const activeStaff = staff.filter(u => u.role === 'Bodeguero' || u.role === 'Chofer' || u.role === 'Administrador');
+    chipsHtml += activeStaff.map(u => {
+      const uFirstCollab = (u.name || '').split(' ')[0].toLowerCase();
+      const uCount = activeOrders.filter(o => {
+        const pName = (o.preparedByName || '').toLowerCase();
+        const dName = (o.driverName || '').toLowerCase();
+        const match = (uFirstCollab && (pName.includes(uFirstCollab) || dName.includes(uFirstCollab))) ||
+                      (Number(o.preparedByUserId) === Number(u.id)) ||
+                      (Number(o.driverUserId) === Number(u.id));
+        return match;
+      }).length;
+      const isBod = u.role === 'Bodeguero';
+      const icon = isBod ? 'bi-box-seam' : (u.role === 'Chofer' ? 'bi-truck' : 'bi-shield-check');
+      const isCollabActive = _currentCollabFilter === String(u.id);
+
+      return `
+        <div class="collab-chip ${isCollabActive ? 'active' : ''}" data-collab-id="${u.id}" onclick="filterByCollaboratorChip('${u.id}')" title="${escapeHtml(u.name)} (${u.role}): ${uCount} pedidos en proceso">
+          <i class="bi ${icon}"></i> ${escapeHtml(u.name.split(' (')[0])}
+          <span class="badge-chip-count" style="${uCount > 0 ? 'background:#DBEAFE; color:#1E40AF;' : ''}">${uCount}</span>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = chipsHtml;
+  }
 };
 
 window.renderWebOrdersView = function() {
   updateWebOrdersBadges();
-  renderWebOrdersFullTable();
+  renderCollaboratorWorkloadChips();
+  renderWebOrdersCurrentView();
 };
 
-window.renderWebOrdersFullTable = function() {
-  const tbody = document.getElementById('webOrdersFullTableBody');
-  if (!tbody) return;
-
+function getFilteredWebOrdersList() {
   const searchInput = document.getElementById('webOrdersSearchInput');
   const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  const allOrders = (AppState.salesOrders || []).filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
 
-  // Obtener pedidos elegibles para alistado y despacho (Web y Bodega, excluyendo cotizaciones)
-  const allOrders = AppState.salesOrders.filter(o => o && o.docType !== 'COTIZACION' && o.status !== 'CANCELADO');
-
-  const filtered = allOrders.filter(order => {
+  return allOrders.filter(order => {
     const isWeb = isWebOrder(order);
     const st = (order.status || 'PENDIENTE').toUpperCase().trim();
-    let matchFilter = true;
-    if (_currentWebOrderFilter === 'MY_ASSIGNED') {
+    const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
+    const isUndelivered = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+    const isActive = !isDelivered && !isUndelivered && st !== 'CANCELADO';
+    
+    // 1. Filtro por Estado Operativo
+    let matchState = true;
+    if (_currentWebOrderFilter === 'ACTIVE') {
+      // SOLO pedidos activos en proceso (Pendientes, En Alistado, Alistados, En Ruta)
+      matchState = isActive;
+    } else if (_currentWebOrderFilter === 'MY_ASSIGNED') {
       const curU = AppState.currentUser || {};
       const uName = (curU.name || '').toLowerCase();
       const uFirst = uName.split(' ')[0] || '';
@@ -9518,41 +9770,356 @@ window.renderWebOrdersFullTable = function() {
       const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && order.driverUserId && Number(order.driverUserId) === Number(curU.id));
       const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && order.assignedUserId && Number(order.assignedUserId) === Number(curU.id));
       const isDefaultChofer = (curU.username === 'chofer' && (ordDriver.includes('minor') || !ordDriver));
-      matchFilter = isMyDriver || isMyResp || isDefaultChofer;
+      // Mis asignados SOLO pendientes de procesar (excluye ya entregados)
+      matchState = (isMyDriver || isMyResp || isDefaultChofer) && isActive;
+    } else if (_currentWebOrderFilter === 'UNASSIGNED') {
+      const noResp = (!order.preparedByName || order.preparedByName.trim() === '' || order.preparedByName === 'Sin asignar');
+      matchState = noResp && isActive;
     } else if (_currentWebOrderFilter === 'WEB') {
-      matchFilter = isWeb;
+      matchState = isWeb && isActive;
     } else if (_currentWebOrderFilter === 'BODEGA') {
-      matchFilter = !isWeb;
+      matchState = !isWeb && isActive;
     } else if (_currentWebOrderFilter === 'PENDIENTE') {
-      matchFilter = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+      matchState = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
     } else if (_currentWebOrderFilter === 'ALISTADO') {
-      matchFilter = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+      matchState = (st === 'ALISTADO' || st === 'EN_ALISTADO');
     } else if (_currentWebOrderFilter === 'EN_RUTA') {
-      matchFilter = (st === 'EN_RUTA');
+      matchState = (st === 'EN_RUTA');
     } else if (_currentWebOrderFilter === 'ENTREGADO') {
-      matchFilter = (st === 'ENTREGADO' || st === 'FACTURADO');
+      // Filtro exclusivo para pedidos ya entregados/facturados (historial)
+      matchState = isDelivered;
     } else if (_currentWebOrderFilter === 'NO_ENTREGADO') {
-      matchFilter = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+      matchState = isUndelivered;
+    } else if (_currentWebOrderFilter === 'ALL') {
+      matchState = true;
     }
 
+    // 2. Filtro por Colaborador
+    let matchCollab = true;
+    if (_currentCollabFilter === 'MY_ASSIGNED') {
+      const curU = AppState.currentUser || {};
+      const uName = (curU.name || '').toLowerCase();
+      const uFirst = uName.split(' ')[0] || '';
+      const ordDriver = (order.driverName || '').toLowerCase();
+      const ordResp = (order.assignedUserName || order.preparedByName || '').toLowerCase();
+      const isMyDriver = (uFirst && ordDriver.includes(uFirst)) || (curU.id && order.driverUserId && Number(order.driverUserId) === Number(curU.id));
+      const isMyResp = (uFirst && ordResp.includes(uFirst)) || (curU.id && order.assignedUserId && Number(order.assignedUserId) === Number(curU.id));
+      matchCollab = isMyDriver || isMyResp;
+    } else if (_currentCollabFilter === 'UNASSIGNED') {
+      matchCollab = (!order.preparedByName || order.preparedByName.trim() === '' || order.preparedByName === 'Sin asignar');
+    } else if (_currentCollabFilter !== 'ALL') {
+      const targetId = Number(_currentCollabFilter);
+      const targetUser = (_cachedStaffMembers || []).find(u => Number(u.id) === targetId);
+      const uFirst = targetUser ? (targetUser.name || '').split(' ')[0].toLowerCase() : '';
+      const ordDriver = (order.driverName || '').toLowerCase();
+      const ordResp = (order.assignedUserName || order.preparedByName || '').toLowerCase();
+      
+      const isMatchId = (order.preparedByUserId && Number(order.preparedByUserId) === targetId) ||
+                        (order.driverUserId && Number(order.driverUserId) === targetId) ||
+                        (order.assignedUserId && Number(order.assignedUserId) === targetId);
+      const isMatchName = uFirst && (ordDriver.includes(uFirst) || ordResp.includes(uFirst));
+      matchCollab = isMatchId || isMatchName;
+    }
+
+    // 3. Búsqueda de texto
     const matchSearch = !searchTerm ||
       (order.orderCode && order.orderCode.toLowerCase().includes(searchTerm)) ||
       (order.customerName && order.customerName.toLowerCase().includes(searchTerm)) ||
       (order.customerPhone && order.customerPhone.toLowerCase().includes(searchTerm)) ||
       (order.deliveryRoute && order.deliveryRoute.toLowerCase().includes(searchTerm)) ||
+      (order.preparedByName && order.preparedByName.toLowerCase().includes(searchTerm)) ||
+      (order.driverName && order.driverName.toLowerCase().includes(searchTerm)) ||
       (order.customerTaxId && order.customerTaxId.toLowerCase().includes(searchTerm));
 
-    return matchFilter && matchSearch;
+    return matchState && matchCollab && matchSearch;
   });
+}
+
+window.renderWebOrdersCurrentView = function() {
+  const filtered = getFilteredWebOrdersList();
+  if (_ordersViewMode === 'BOARD') {
+    renderWebOrdersBoardView(filtered);
+  } else {
+    renderWebOrdersFullTable(filtered);
+  }
+};
+
+// ==============================================================================
+// 1. RENDERIZADO DEL TABLERO ORDENADO POR COLABORADOR (CERO DESORDEN)
+// ==============================================================================
+window.renderWebOrdersBoardView = async function(filteredOrders) {
+  const container = document.getElementById('collabBoardColumnsContainer');
+  if (!container) return;
+
+  const staff = await getStaffMembersList();
+  const bodegueros = staff.filter(u => u.role === 'Bodeguero' || u.id === 9 || u.id === 2);
+  const choferes = staff.filter(u => u.role === 'Chofer' || u.id === 11 || u.id === 4);
+  const admins = staff.filter(u => u.role === 'Administrador' && u.id !== 9 && u.id !== 2);
+
+  const isViewingDelivered = (_currentWebOrderFilter === 'ENTREGADO');
+
+  // Columnas base del tablero
+  const boardColumns = [
+    {
+      id: 'UNASSIGNED',
+      title: isViewingDelivered ? '⚠️ Sin Asignar (Historial)' : '⚠️ Por Asignar (Nuevos)',
+      subtitle: isViewingDelivered ? 'Entregados sin responsable' : 'Requieren alistador o chofer',
+      headerBg: '#FEF2F2',
+      headerBorder: '#FECACA',
+      titleColor: '#991B1B',
+      filterFn: o => {
+        const noResp = (!o.preparedByName || o.preparedByName.trim() === '' || o.preparedByName === 'Sin asignar');
+        const isDone = (o.status === 'ENTREGADO' || o.status === 'FACTURADO');
+        if (isViewingDelivered) return noResp && isDone;
+        return noResp && !isDone && o.status !== 'CANCELADO';
+      }
+    },
+    ...bodegueros.map(b => ({
+      id: String(b.id),
+      userId: b.id,
+      title: `📦 ${b.name.split(' (')[0]}`,
+      subtitle: isViewingDelivered ? 'Historial Entregados' : (b.name.includes('(') ? b.name.split('(')[1].replace(')', '') : 'Bodeguero'),
+      headerBg: '#EFF6FF',
+      headerBorder: '#BFDBFE',
+      titleColor: '#1E40AF',
+      filterFn: o => {
+        const uFirst = b.name.split(' ')[0].toLowerCase();
+        const pName = (o.preparedByName || '').toLowerCase();
+        const isMatch = (o.preparedByUserId && Number(o.preparedByUserId) === Number(b.id)) || (uFirst && pName.includes(uFirst));
+        const isDone = (o.status === 'ENTREGADO' || o.status === 'FACTURADO');
+        if (isViewingDelivered) return isMatch && isDone;
+        return isMatch && !isDone && o.status !== 'CANCELADO';
+      }
+    })),
+    ...choferes.map(c => ({
+      id: String(c.id),
+      userId: c.id,
+      title: `🚚 ${c.name.split(' (')[0]}`,
+      subtitle: isViewingDelivered ? 'Historial Entregados' : (c.name.includes('(') ? c.name.split('(')[1].replace(')', '') : 'Chofer de Ruta'),
+      headerBg: '#FAF5FF',
+      headerBorder: '#E9D5FF',
+      titleColor: '#6B21A8',
+      filterFn: o => {
+        const uFirst = c.name.split(' ')[0].toLowerCase();
+        const dName = (o.driverName || '').toLowerCase();
+        const isMatch = (o.driverUserId && Number(o.driverUserId) === Number(c.id)) || (uFirst && dName.includes(uFirst));
+        const isDone = (o.status === 'ENTREGADO' || o.status === 'FACTURADO');
+        if (isViewingDelivered) return isMatch && isDone;
+        return isMatch && !isDone && o.status !== 'CANCELADO';
+      }
+    }))
+  ];
+
+  // Si hay filtro de colaborador activo específico, mostramos solo esa columna
+  let activeColumns = boardColumns;
+  if (_currentCollabFilter !== 'ALL') {
+    if (_currentCollabFilter === 'UNASSIGNED') {
+      activeColumns = boardColumns.filter(c => c.id === 'UNASSIGNED');
+    } else if (_currentCollabFilter === 'MY_ASSIGNED') {
+      const curU = AppState.currentUser || {};
+      activeColumns = boardColumns.filter(c => c.userId && (Number(c.userId) === Number(curU.id) || (curU.name && c.title.toLowerCase().includes(curU.name.split(' ')[0].toLowerCase()))));
+      if (activeColumns.length === 0) activeColumns = boardColumns;
+    } else {
+      activeColumns = boardColumns.filter(c => c.id === String(_currentCollabFilter));
+      if (activeColumns.length === 0) activeColumns = boardColumns;
+    }
+  }
+
+  container.innerHTML = activeColumns.map(col => {
+    const colOrders = filteredOrders.filter(col.filterFn);
+    const count = colOrders.length;
+
+    const cardsHtml = count === 0 ? `
+      <div style="text-align:center; padding:2.5rem 1rem; color:#94A3B8;">
+        <i class="bi bi-check2-all" style="font-size:1.8rem; display:block; margin-bottom:6px; color:#CBD5E1;"></i>
+        <div style="font-weight:700; font-size:0.82rem; color:#64748B;">Al día</div>
+        <small style="font-size:0.72rem;">Sin tareas pendientes en esta columna</small>
+      </div>
+    ` : colOrders.map(o => renderBoardOrderCard(o, staff)).join('');
+
+    return `
+      <div class="collab-board-column">
+        <div class="collab-column-header" style="background:${col.headerBg}; border-color:${col.headerBorder};">
+          <div>
+            <div style="font-weight:800; font-size:0.86rem; color:${col.titleColor}; display:flex; align-items:center; gap:6px;">
+              <span>${col.title}</span>
+            </div>
+            <div style="font-size:0.7rem; color:#64748B; margin-top:1px;">${col.subtitle}</div>
+          </div>
+          <span style="background:#FFF; color:${col.titleColor}; font-weight:800; font-size:0.76rem; padding:2px 8px; border-radius:12px; border:1px solid ${col.headerBorder};">
+            ${count}
+          </span>
+        </div>
+        <div class="collab-cards-list">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+function renderBoardOrderCard(o, staff) {
+  const isWeb = isWebOrder(o);
+  const st = (o.status || 'PENDIENTE').toUpperCase().trim();
+  const isPending = (st === 'PENDIENTE' || st === 'SOLICITADO' || st === 'PENDIENTE ALISTO' || st === 'NUEVO');
+  const isPrepared = (st === 'ALISTADO' || st === 'EN_ALISTADO');
+  const isInRoute = (st === 'EN_RUTA');
+  const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
+  const targetCode = o.orderCode || o.id;
+
+  let badgeHtml = '';
+  if (isPending) {
+    badgeHtml = `<span class="badge-status badge-observed" style="background:#FEF3C7; color:#92400E; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-clock"></i> Pendiente</span>`;
+  } else if (isPrepared) {
+    badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-box-seam"></i> Alistado</span>`;
+  } else if (isInRoute) {
+    badgeHtml = `<span class="badge-status" style="background:#F3E8FF; color:#6B21A8; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-truck"></i> En Ruta</span>`;
+  } else if (isDelivered) {
+    badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-check-circle-fill"></i> Entregado</span>`;
+  } else {
+    badgeHtml = `<span class="badge-status" style="background:#F1F5F9; color:#475569; font-size:0.7rem; padding:2px 6px;">${st}</span>`;
+  }
+
+  const items = Array.isArray(o.items) ? o.items : [];
+  const totalUnits = items.reduce((s, it) => s + (Number(it.qty) || 1), 0);
+
+  const bodeguerosList = staff.filter(u => u.role === 'Bodeguero' || u.role === 'Administrador');
+  const choferesList = staff.filter(u => u.role === 'Chofer' || u.role === 'Administrador');
+
+  return `
+    <div class="collab-order-card" id="cardOrder_${targetCode}">
+      <!-- Encabezado de la Tarjeta -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span style="font-weight:800; font-family:'JetBrains Mono',monospace; font-size:0.86rem; color:#0F172A;">
+            ${escapeHtml(o.orderCode)}
+          </span>
+          <div style="margin-top:2px; display:flex; align-items:center; gap:4px;">
+            ${isWeb ? `
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0;">
+                <i class="bi bi-globe2"></i> Web
+              </span>
+            ` : `
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE;">
+                <i class="bi bi-building"></i> Bodega
+              </span>
+            `}
+            <span style="font-size:0.68rem; color:#94A3B8;">${escapeHtml(o.date || 'Hoy')}</span>
+          </div>
+        </div>
+        <div>${badgeHtml}</div>
+      </div>
+
+      <!-- Datos del Cliente y Ruta -->
+      <div style="font-size:0.78rem; line-height:1.3; border-top:1px dashed #E2E8F0; padding-top:6px;">
+        <div style="font-weight:700; color:#1E293B; display:flex; align-items:center; justify-content:space-between;">
+          <span>${escapeHtml(o.customerName || 'Cliente')}</span>
+          ${o.customerPhone ? `
+            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="color:#10B981; text-decoration:none; font-weight:800; font-size:0.72rem;" title="Escribir por WhatsApp">
+              <i class="bi bi-whatsapp"></i> Chat
+            </a>
+          ` : ''}
+        </div>
+        <div style="color:#0284C7; font-size:0.72rem; margin-top:2px;">
+          <i class="bi bi-geo-alt-fill"></i> ${escapeHtml(o.deliveryRoute || o.customerAddress || 'Cartago')}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; background:#F8FAFC; padding:4px 6px; border-radius:6px;">
+          <span style="color:#64748B; font-size:0.72rem;">${items.length} líneas (${totalUnits} uds)</span>
+          <strong style="color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace; font-size:0.84rem;">
+            ${formatCRC(o.total)}
+          </strong>
+        </div>
+      </div>
+
+      <!-- Asignación Rápida con Selectores -->
+      <div style="background:#F1F5F9; padding:6px 8px; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-box-seam"></i> Alisto:</span>
+          <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Cambiar bodeguero responsable">
+            <option value="">⚠️ Sin asignar</option>
+            ${bodeguerosList.map(b => `
+              <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
+                ${escapeHtml(b.name.split(' (')[0])}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="font-size:0.68rem; font-weight:700; color:#475569; width:45px;"><i class="bi bi-truck"></i> Chofer:</span>
+          <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Cambiar chofer de ruta">
+            <option value="">⚠️ Sin asignar</option>
+            ${choferesList.map(c => `
+              <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
+                ${escapeHtml(c.name.split(' (')[0])}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+      </div>
+
+      <!-- Botones de Acción Sencillos de 1 Clic -->
+      <div style="display:flex; gap:4px; margin-top:2px;">
+        ${isDelivered ? `
+          <div style="flex:1; background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; padding:5px 8px; border-radius:6px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <i class="bi bi-check-circle-fill" style="color:#059669;"></i> Entregado & Facturado
+          </div>
+        ` : ''}
+
+        ${(!isDelivered && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
+          <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#10B981; color:#FFF; font-weight:800; border-radius:6px; border:none;" onclick="takeOrderTask('${targetCode}')" title="Asignarme este pedido a mi nombre">
+            <i class="bi bi-hand-index-thumb"></i> ✋ Tomar Trabajo
+          </button>
+        ` : ''}
+
+        ${(!isDelivered && isPending) ? `
+          <button class="btn-fragama btn-primary-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#0284C7; border-color:#0284C7; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido (Checklist)">
+            <i class="bi bi-box-seam"></i> Alistar
+          </button>
+        ` : ''}
+
+        ${(!isDelivered && isPrepared) ? `
+          <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#7C3AED; color:#FFF; font-weight:800; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta">
+            <i class="bi bi-truck"></i> A Ruta
+          </button>
+        ` : ''}
+
+        ${(!isDelivered && (isPrepared || isInRoute)) ? `
+          <button class="btn-fragama" style="flex:1; padding:5px 8px; font-size:0.75rem; background:#059669; color:#FFF; font-weight:800; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Rebajar Kardex">
+            <i class="bi bi-check-circle-fill"></i> Entregar
+          </button>
+        ` : ''}
+
+        <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.72rem; border-color:#CBD5E1; color:#475569;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Trazabilidad">
+          <i class="bi bi-clock-history"></i>
+        </button>
+        <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.72rem; border-color:#CBD5E1; color:#475569;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante">
+          <i class="bi bi-printer"></i>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ==============================================================================
+// 2. RENDERIZADO DE LA VISTA TABLA COMPACTA (CON ASIGNACIÓN DIRECTA)
+// ==============================================================================
+window.renderWebOrdersFullTable = async function(optionalFiltered) {
+  const tbody = document.getElementById('webOrdersFullTableBody');
+  if (!tbody) return;
+
+  const filtered = optionalFiltered || getFilteredWebOrdersList();
+  const staff = await getStaffMembersList();
+  const bodeguerosList = staff.filter(u => u.role === 'Bodeguero' || u.role === 'Administrador');
+  const choferesList = staff.filter(u => u.role === 'Chofer' || u.role === 'Administrador');
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" style="text-align:center; padding:3rem 1rem; color:#64748B;">
           <i class="bi bi-inbox" style="font-size:2.2rem; color:#CBD5E1; display:block; margin-bottom:8px;"></i>
-          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos coincidentes con el filtro actual</span>
+          <span style="font-weight:700; font-size:0.95rem; color:#475569;">No hay pedidos coincidentes con los filtros seleccionados</span>
           <p style="font-size:0.8rem; color:#94A3B8; margin-top:4px;">
-            Los pedidos de la tienda web y los generados en bodega ingresan automáticamente con trazabilidad completa.
+            Utilice el botón "⚡ Auto-Asignar Trabajos" para distribuir pedidos automáticamente.
           </p>
         </td>
       </tr>
@@ -9568,16 +10135,17 @@ window.renderWebOrdersFullTable = function() {
     const isInRoute = (st === 'EN_RUTA');
     const isDelivered = (st === 'ENTREGADO' || st === 'FACTURADO');
     const isUndelivered = (st === 'NO_ENTREGADO' || st === 'RECHAZADO');
+    const targetCode = o.orderCode || o.id;
 
     let badgeHtml = '';
     if (isPending) {
       badgeHtml = `<span class="badge-status badge-observed" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; font-weight:800;"><i class="bi bi-clock"></i> Pendiente Alisto</span>`;
     } else if (isPrepared) {
-      badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:800;"><i class="bi bi-box-seam"></i> Alistado en Bodega</span>`;
+      badgeHtml = `<span class="badge-status badge-confirmed" style="background:#E0F2FE; color:#0369A1; border:1px solid #BAE6FD; font-weight:800;"><i class="bi bi-box-seam"></i> Alistado</span>`;
     } else if (isInRoute) {
       badgeHtml = `<span class="badge-status" style="background:#F3E8FF; color:#6B21A8; border:1px solid #DDD6FE; font-weight:800;"><i class="bi bi-truck"></i> En Ruta</span>`;
     } else if (isDelivered) {
-      badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-weight:800;"><i class="bi bi-check-circle-fill"></i> Entregado (Kardex Rebajado)</span>`;
+      badgeHtml = `<span class="badge-status badge-delivered" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-weight:800;"><i class="bi bi-check-circle-fill"></i> Entregado</span>`;
     } else if (isUndelivered) {
       badgeHtml = `<span class="badge-status" style="background:#FEF2F2; color:#991B1B; border:1px solid #FCA5A5; font-weight:800;" title="${escapeHtml(o.undeliveredReason || 'Rechazado')}"><i class="bi bi-x-circle-fill"></i> No Entregado</span>`;
     } else {
@@ -9587,127 +10155,129 @@ window.renderWebOrdersFullTable = function() {
     const items = Array.isArray(o.items) ? o.items : [];
     const itemsCount = items.length;
     const totalUnits = items.reduce((s, it) => s + (Number(it.qty) || 1), 0);
-    const targetCode = o.orderCode || o.id;
 
     const itemsSummary = items.length > 0 
-      ? `<div style="max-height:160px; overflow-y:auto; padding-right:4px;">` + items.map(it => `
-          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:4px; font-size:0.78rem;">
-            <span style="background:#E0F2FE; color:#0284C7; font-weight:800; padding:1px 6px; border-radius:4px; font-size:0.72rem; white-space:nowrap; border:1px solid #BAE6FD; flex-shrink:0;">
+      ? `<div style="max-height:140px; overflow-y:auto; padding-right:4px;">` + items.map(it => `
+          <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:3px; font-size:0.76rem;">
+            <span style="background:#E0F2FE; color:#0284C7; font-weight:800; padding:1px 5px; border-radius:4px; font-size:0.7rem; white-space:nowrap; border:1px solid #BAE6FD; flex-shrink:0;">
               ${it.qty || 1}x
             </span>
-            <div style="line-height:1.25;">
+            <div style="line-height:1.2;">
               <span style="font-weight:700; color:#0F172A;">${escapeHtml(it.name || it.sku || 'Artículo')}</span>
-              ${it.sku ? `<span style="font-size:0.68rem; color:#64748B; font-family:'JetBrains Mono',monospace; margin-left:4px;">[${escapeHtml(it.sku)}]</span>` : ''}
+              ${it.sku ? `<span style="font-size:0.65rem; color:#64748B; font-family:'JetBrains Mono',monospace; margin-left:3px;">[${escapeHtml(it.sku)}]</span>` : ''}
             </div>
           </div>
         `).join('') + `</div>`
-      : '<span style="color:#94A3B8; font-style:italic;">Sin artículos detallados</span>';
+      : '<span style="color:#94A3B8; font-style:italic;">Sin detalle</span>';
 
     return `
       <tr style="border-bottom:1px solid #E2E8F0; ${isPending ? 'background:#F0FDF4;' : ''}">
-        <td style="padding:12px 14px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
-          ${o.orderCode}
-          ${isPending ? `<span style="display:inline-block; font-size:0.65rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:4px; font-weight:800; animation:pulse 2s infinite;">NUEVO</span>` : ''}
-          <div style="margin-top:4px;">
+        <td style="padding:10px 12px; font-weight:800; font-family:'JetBrains Mono',monospace; color:#0B192C;">
+          ${escapeHtml(o.orderCode)}
+          ${isPending ? `<span style="display:inline-block; font-size:0.62rem; background:#10B981; color:#FFF; padding:1px 5px; border-radius:10px; margin-left:3px; font-weight:800;">NUEVO</span>` : ''}
+          <div style="margin-top:3px;">
             ${isWeb ? `
-              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; display:inline-flex; align-items:center; gap:3px;">
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; display:inline-flex; align-items:center; gap:2px;">
                 <i class="bi bi-globe2"></i> Web
               </span>
             ` : `
-              <span style="font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; display:inline-flex; align-items:center; gap:3px;">
+              <span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; font-weight:800; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; display:inline-flex; align-items:center; gap:2px;">
                 <i class="bi bi-building"></i> Bodega
               </span>
             `}
           </div>
-          <div style="font-size:0.72rem; color:#64748B; font-family:inherit; font-weight:normal; margin-top:2px;">
-            ${o.date || 'Hoy'}
+          <div style="font-size:0.7rem; color:#64748B; margin-top:2px;">
+            ${escapeHtml(o.date || 'Hoy')}
           </div>
         </td>
-        <td style="padding:12px 14px;">
-          <div style="font-weight:700; color:#0B192C;">${escapeHtml(o.customerName || 'Cliente')}</div>
-          <div style="font-size:0.75rem; color:#64748B;">Céd: ${escapeHtml(o.customerTaxId || 'N/A')}</div>
+        <td style="padding:10px 12px;">
+          <div style="font-weight:700; color:#0B192C; font-size:0.82rem;">${escapeHtml(o.customerName || 'Cliente')}</div>
+          <div style="font-size:0.72rem; color:#64748B;">Céd: ${escapeHtml(o.customerTaxId || 'N/A')}</div>
           ${o.customerPhone ? `
-            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="font-size:0.75rem; color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; margin-top:2px;">
+            <a href="https://wa.me/506${String(o.customerPhone).replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(o.customerName)},%20te%20saludamos%20de%20Distribuidora%20Fragama%20respecto%20a%20tu%20pedido%20${o.orderCode}" target="_blank" style="font-size:0.72rem; color:#10B981; text-decoration:none; display:inline-flex; align-items:center; gap:3px; font-weight:700; margin-top:2px;">
               <i class="bi bi-whatsapp"></i> ${escapeHtml(o.customerPhone)}
             </a>
           ` : ''}
         </td>
-        <td style="padding:12px 14px;">
-          <div style="font-weight:700; color:#0284C7;"><i class="bi bi-truck"></i> ${escapeHtml(o.deliveryRoute || o.deliveryDate || 'Cartago')}</div>
-          ${o.customerAddress ? `<div style="font-size:0.74rem; color:#475569; margin-top:2px; max-width:200px;"><i class="bi bi-geo-alt"></i> ${escapeHtml(o.customerAddress)}</div>` : ''}
+        <td style="padding:10px 12px;">
+          <div style="font-weight:700; color:#0284C7; font-size:0.8rem;"><i class="bi bi-truck"></i> ${escapeHtml(o.deliveryRoute || o.deliveryDate || 'Cartago')}</div>
+          ${o.customerAddress ? `<div style="font-size:0.72rem; color:#475569; margin-top:2px; max-width:180px;"><i class="bi bi-geo-alt"></i> ${escapeHtml(o.customerAddress)}</div>` : ''}
         </td>
-        <td style="padding:12px 14px; font-size:0.78rem;">
-          <div style="font-weight:700; color:#0F172A; margin-bottom:3px;">
-            ${itemsCount} líneas (${totalUnits} unidades)
+        <td style="padding:10px 12px; font-size:0.76rem;">
+          <div style="font-weight:700; color:#0F172A; margin-bottom:2px;">
+            ${itemsCount} líneas (${totalUnits} uds)
           </div>
-          <div style="color:#475569; line-height:1.35;">
-            ${itemsSummary}
-          </div>
+          ${itemsSummary}
         </td>
-        <td style="padding:12px 14px; text-align:right; font-weight:800; color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace;">
+        <td style="padding:10px 12px; text-align:right; font-weight:800; color:var(--fragama-blue-primary); font-family:'JetBrains Mono',monospace;">
           ${formatCRC(o.total)}
         </td>
-        <td style="padding:12px 14px;">
-          ${o.preparedByName ? `
-            <div style="font-size:0.75rem; color:#0369A1; font-weight:700;">
-              <i class="bi bi-box-seam-fill"></i> Alistó: ${escapeHtml(o.preparedByName)}
+        <td style="padding:10px 12px;">
+          <!-- Dropdowns directos de asignación -->
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:170px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Alisto:</span>
+              <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', this.value, null)" title="Asignar bodeguero">
+                <option value="">⚠️ Sin asignar</option>
+                ${bodeguerosList.map(b => `
+                  <option value="${b.id}" ${(o.preparedByName && o.preparedByName.toLowerCase().includes(b.name.split(' ')[0].toLowerCase())) || (Number(o.preparedByUserId) === Number(b.id)) ? 'selected' : ''}>
+                    ${escapeHtml(b.name.split(' (')[0])}
+                  </option>
+                `).join('')}
+              </select>
             </div>
-          ` : `<span style="font-size:0.72rem; color:#94A3B8;">Alistador: Sin asignar</span>`}
-          ${o.driverName ? `
-            <div style="font-size:0.75rem; color:#6B21A8; font-weight:700; margin-top:2px;">
-              <i class="bi bi-truck"></i> Chofer: ${escapeHtml(o.driverName)}
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span style="font-size:0.68rem; color:#64748B; font-weight:700; width:45px;">Chofer:</span>
+              <select class="collab-quick-select" onchange="quickAssignOrder('${targetCode}', null, this.value)" title="Asignar chofer">
+                <option value="">⚠️ Sin asignar</option>
+                ${choferesList.map(c => `
+                  <option value="${c.id}" ${(o.driverName && o.driverName.toLowerCase().includes(c.name.split(' ')[0].toLowerCase())) || (Number(o.driverUserId) === Number(c.id)) ? 'selected' : ''}>
+                    ${escapeHtml(c.name.split(' (')[0])}
+                  </option>
+                `).join('')}
+              </select>
             </div>
-          ` : ''}
-          ${o.undeliveredReason ? `
-            <div style="font-size:0.72rem; color:#DC2626; font-weight:700; margin-top:2px; background:#FEF2F2; padding:2px 6px; border-radius:4px; border:1px solid #FECACA;">
-              <i class="bi bi-exclamation-circle-fill"></i> Motivo: ${escapeHtml(o.undeliveredReason)}
-            </div>
-          ` : ''}
+          </div>
         </td>
-        <td style="padding:12px 14px; text-align:center;">
+        <td style="padding:10px 12px; text-align:center;">
           ${badgeHtml}
         </td>
-        <td style="padding:12px 14px; text-align:center;">
-          <div style="display:flex; justify-content:center; gap:5px; flex-wrap:wrap;">
-            
-            <!-- 1. ALISTAR (PENDIENTE -> ALISTADO) -->
-            ${isPending ? `
-              <button class="btn-fragama btn-primary-fragama" style="padding:5px 10px; font-size:0.75rem; background:#10B981; border-color:#10B981; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido y Asignar Responsables">
+        <td style="padding:10px 12px; text-align:center;">
+          <div style="display:flex; justify-content:center; gap:4px; flex-wrap:wrap;">
+            ${isDelivered ? `
+              <span style="font-size:0.75rem; color:#059669; font-weight:800; background:#ECFDF5; border:1px solid #A7F3D0; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="bi bi-check2-all"></i> Finalizado
+              </span>
+            ` : ''}
+
+            ${(!isDelivered && (!o.preparedByName || o.preparedByName === 'Sin asignar' || isPending)) ? `
+              <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#10B981; color:#FFF; font-weight:800; border-radius:6px; border:none;" onclick="takeOrderTask('${targetCode}')" title="Asignarme este pedido">
+                <i class="bi bi-hand-index-thumb"></i> ✋ Tomar
+              </button>
+            ` : ''}
+
+            ${(!isDelivered && isPending) ? `
+              <button class="btn-fragama btn-primary-fragama" style="padding:4px 9px; font-size:0.72rem; background:#0284C7; border-color:#0284C7; font-weight:800;" onclick="openOrderPickingModal('${targetCode}')" title="Alistar Pedido">
                 <i class="bi bi-box-seam"></i> Alistar
               </button>
             ` : ''}
 
-            <!-- 2. DESPACHAR / RUTA -->
-            ${isPrepared ? `
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#7C3AED; color:#FFF; font-weight:700; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta con Chofer">
+            ${(!isDelivered && isPrepared) ? `
+              <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#7C3AED; color:#FFF; font-weight:700; border-radius:6px;" onclick="dispatchOrderToRoute('${targetCode}')" title="Despachar a Ruta">
                 <i class="bi bi-truck"></i> A Ruta
               </button>
             ` : ''}
 
-            <!-- 3. ENTREGAR / CONFIRMAR KARDEX -->
-            ${(isPrepared || isInRoute) ? `
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#059669; color:#FFF; font-weight:700; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega y Rebajar Kardex">
+            ${(!isDelivered && (isPrepared || isInRoute)) ? `
+              <button class="btn-fragama" style="padding:4px 8px; font-size:0.72rem; background:#059669; color:#FFF; font-weight:700; border-radius:6px;" onclick="confirmOrderDelivered('${targetCode}')" title="Confirmar Entrega">
                 <i class="bi bi-check-circle-fill"></i> Entregar
               </button>
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#DC2626; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderUndeliveredModal('${targetCode}')" title="Registrar Motivo de No Entrega">
-                <i class="bi bi-x-circle-fill"></i> No Entregado
-              </button>
             ` : ''}
 
-            <!-- 4. REPROGRAMAR / REINTENTAR ALISTADO SI FUE RECHAZADO -->
-            ${isUndelivered ? `
-              <button class="btn-fragama" style="padding:5px 9px; font-size:0.75rem; background:#F59E0B; color:#FFF; font-weight:700; border-radius:6px;" onclick="openOrderPickingModal('${targetCode}')" title="Reintentar Alistado y Reprogramar Despacho">
-                <i class="bi bi-arrow-repeat"></i> Reprogramar
-              </button>
-            ` : ''}
-
-            <!-- 5. TRAZABILIDAD / AUDITORÍA -->
-            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Ver Bitácora de Trazabilidad y Tiempos">
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 6px; font-size:0.72rem; border-color:#0284C7; color:#0284C7;" onclick="openOrderAuditTimeline('${targetCode}')" title="Trazabilidad">
               <i class="bi bi-clock-history"></i>
             </button>
-
-            <!-- 6. IMPRIMIR COMPROBANTE -->
-            <button class="btn-fragama btn-outline-fragama" style="padding:5px 7px; font-size:0.75rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir Comprobante Oficial">
+            <button class="btn-fragama btn-outline-fragama" style="padding:4px 6px; font-size:0.72rem;" onclick="viewSavedOrderPrint('${targetCode}')" title="Imprimir">
               <i class="bi bi-printer"></i>
             </button>
           </div>
@@ -9715,6 +10285,134 @@ window.renderWebOrdersFullTable = function() {
       </tr>
     `;
   }).join('');
+};
+
+// ==============================================================================
+// 3. ACCIONES DE ASIGNACIÓN RÁPIDA (AUTO-ASIGNAR, TOMAR TRABAJO, REASIGNAR)
+// ==============================================================================
+window.takeOrderTask = async function(orderCode) {
+  const curUser = AppState.currentUser || { id: 9, name: "Carlos Calvo (Bodega Central)" };
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderCode)}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preparedByUserId: curUser.id || 9,
+        preparedByName: curUser.name || 'Colaborador Fragama',
+        status: 'EN_ALISTADO',
+        notes: `Trabajo tomado por ${curUser.name || 'Colaborador'}`
+      })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      const ord = AppState.salesOrders.find(o => String(o.orderCode) === String(orderCode) || String(o.id) === String(orderCode));
+      if (ord) {
+        ord.preparedByName = curUser.name;
+        ord.preparedByUserId = curUser.id;
+        ord.status = 'EN_ALISTADO';
+      }
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`✅ Trabajo ${orderCode} asignado a tu nombre.`, 'success');
+      }
+      renderCollaboratorWorkloadChips();
+      renderWebOrdersCurrentView();
+    }
+  } catch(e) {
+    alert("Error al tomar el trabajo: " + e.message);
+  }
+};
+
+window.quickAssignOrder = async function(orderCode, newBodId, newChofId) {
+  const staff = await getStaffMembersList();
+  const ord = AppState.salesOrders.find(o => String(o.orderCode) === String(orderCode) || String(o.id) === String(orderCode));
+  if (!ord) return;
+
+  let bodId = ord.preparedByUserId;
+  let bodName = ord.preparedByName;
+  let chofId = ord.driverUserId;
+  let chofName = ord.driverName;
+
+  if (newBodId !== null && newBodId !== undefined) {
+    if (!newBodId) {
+      bodId = null;
+      bodName = '';
+    } else {
+      bodId = Number(newBodId);
+      const u = staff.find(s => Number(s.id) === bodId);
+      bodName = u ? u.name : 'Colaborador Bodega';
+    }
+  }
+
+  if (newChofId !== null && newChofId !== undefined) {
+    if (!newChofId) {
+      chofId = null;
+      chofName = '';
+    } else {
+      chofId = Number(newChofId);
+      const u = staff.find(s => Number(s.id) === chofId);
+      chofName = u ? u.name : 'Chofer Ruta';
+    }
+  }
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderCode)}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preparedByUserId: bodId,
+        preparedByName: bodName,
+        driverUserId: chofId,
+        driverName: chofName,
+        notes: `Asignación actualizada: Alistador ${bodName || 'Sin asignar'}, Chofer ${chofName || 'Sin asignar'}`
+      })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      ord.preparedByName = bodName;
+      ord.preparedByUserId = bodId;
+      ord.driverName = chofName;
+      ord.driverUserId = chofId;
+
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`✅ Pedido ${orderCode} asignado a ${bodName || chofName}.`, 'success');
+      }
+      renderCollaboratorWorkloadChips();
+      renderWebOrdersCurrentView();
+    }
+  } catch(e) {
+    console.error("Error en asignación rápida:", e);
+  }
+};
+
+window.triggerAutoAssignOrders = async function() {
+  const btn = document.getElementById('btnAutoAssignOrders');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Asignando equitativamente...`;
+  }
+
+  try {
+    const res = await fetch('/api/orders/auto-assign', { method: 'POST' });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      if (typeof showNotificationToast === 'function') {
+        showNotificationToast(`⚡ ${result.message}`, 'success');
+      }
+      await performOrderSync(true);
+      renderCollaboratorWorkloadChips();
+      renderWebOrdersCurrentView();
+    } else {
+      alert(result.message || 'Error en auto-asignación');
+    }
+  } catch(e) {
+    alert("Error al auto-asignar pedidos: " + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
 };
 
 window.triggerManualOrderSync = async function() {
